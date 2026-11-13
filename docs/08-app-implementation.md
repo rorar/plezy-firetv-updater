@@ -18,7 +18,8 @@ BOOT_COMPLETED re-arm                  ─┤
                                         │
                                         ▼
                          MainActivity (TV UI, D-pad focus)
-                           [Check for updates] [Install X] [Choose version…] [Settings]
+                           [Install X] [What's new] [Check for updates]
+                           [Choose version…] [Settings]
                            free-space line
                            → download plezy-android-armeabi-v7a.tar.gz (~48 MB)
                            → GZIPInputStream + 512-byte tar header → plezy.apk (~90 MB)
@@ -101,13 +102,19 @@ file and checks space before it spends it:
 
 ## Settings
 
-| Switch | Key | Default | Effect |
-|---|---|---|---|
-| Toast notifications | `toast_enabled` | on | Bottom-of-screen toasts |
-| Notifications | `notification_enabled` | on | Fire TV notification-centre entry |
-| Check automatically | `auto_check_enabled` | on | 12 h alarm + boot re-arm |
-| Allow older versions | `allow_older_versions` | off | Shows **Choose version…** and sets the hidden downgrade flag |
-| Delete APK after installing | `delete_apk_after_install` | **on** | Removes the downloaded APK once installed |
+The switches are grouped into sections — **User settings**, **Advanced settings**, **Developer
+settings** and a bottom **Diagnostics** block (test toast, test notification, back). The rows are
+plain platform `Switch` widgets, so their focus colours are set explicitly: white text on the
+`#2F6E8F` highlight, instead of the Fire OS default of black-on-blue, which is unreadable on the
+dark background.
+
+| Switch | Section | Key | Default | Effect |
+|---|---|---|---|---|
+| Toast notifications | User | `toast_enabled` | on | Bottom-of-screen toasts |
+| Notifications | User | `notification_enabled` | on | Fire TV notification-centre entry |
+| Check automatically | Advanced | `auto_check_enabled` | on | 12 h alarm + boot re-arm |
+| Delete APK after installing | Advanced | `delete_apk_after_install` | **on** | Removes the downloaded APK once installed |
+| Allow older versions | Developer | `allow_older_versions` | off | Shows **Choose version…** and sets the hidden downgrade flag |
 
 Every message goes through `Notifier`, so a switched-off channel stays silent everywhere,
 including the "Test toast" / "Test notification" buttons.
@@ -115,6 +122,24 @@ including the "Test toast" / "Test notification" buttons.
 After an install finishes (success *or* failure) the app **re-runs the check** automatically: if
 the screen is alive it is refreshed in place (via the in-app `INSTALL_FINISHED` broadcast),
 otherwise a background check runs and only speaks up through a notification.
+
+## Changelog
+
+Release notes come straight from the GitHub release `body`, which `PlezyRepo.Release` now carries
+alongside `publishedAt`. There is no Markdown renderer on API 25 and the app carries no libraries,
+so `Markdown.toPlainText()` does a small strip — headings, `**bold**`, backticks, blockquotes,
+link brackets — and turns bullets into `•`.
+
+Two places show them:
+
+- **`VersionListActivity`** is a two-pane picker: versions on the left, the highlighted version's
+  notes on the right, updating as the D-pad moves. The list takes focus so up/down changes the
+  version; pressing right moves into the notes pane to scroll a long changelog. OK returns the tag,
+  asset URL, body and date to the main screen.
+- **`ChangelogActivity`** is a single-release view opened from the main screen's **What's new**
+  button, which is only visible while a release is selected.
+
+An empty body shows "No release notes for this version."
 
 ## Build and install
 
@@ -144,6 +169,16 @@ no longer be replaced by a new build.
 | Downgrade to 2.25.0 | `INSTALL_FAILED_VERSION_DOWNGRADE` (Finding 2), explained in the toast |
 | Reinstall 2.26.0 | **`INSTALL_SUCCEEDED`** (`status=0`), UI refreshed to "up to date", free space rose 415 MB → 830 MB |
 | Delete-after-install | cache cleared on success (free space went up, not down) |
+
+UI/changelog phases, same stick:
+
+| Step | Result |
+|---|---|
+| Button order | `INSTALL UPDATE` sits above `CHECK FOR UPDATES` |
+| Settings sections | `USER SETTINGS` / `ADVANCED SETTINGS` / `DEVELOPER SETTINGS` / `DIAGNOSTICS` headings |
+| Focus colours | focused row sampled as white text on `#2F6E8F` (pixel histogram), not black-on-blue |
+| Two-pane picker | D-pad moves the version, the notes pane follows (`2.26.0` → `2.24.0`); `•` bullets, headings stripped |
+| What's new | hidden while up to date, appears with a selection; opens `ChangelogActivity` (`Plezy 2.24.0`, `2026-10-21`) |
 
 ## Known limitations
 

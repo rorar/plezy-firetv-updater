@@ -41,6 +41,11 @@
             android:exported="false"
             android:label="Choose version" />
 
+        <activity
+            android:name=".ChangelogActivity"
+            android:exported="false"
+            android:label="Release notes" />
+
         <!-- The alarm delivery and adb test both use explicit intents. -->
         <receiver
             android:name=".CheckReceiver"

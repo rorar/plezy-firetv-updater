@@ -11,18 +11,13 @@ commitment; it is a parking lot. Status is checked against the code in `app/`.
   broadcast (or a background check) after every install result, so the app re-reads the installed
   version and asks GitHub again. See
   [08](08-app-implementation.md#settings).
-
-## Requested — UI / UX
-
-- **Button order.** Put `Check for updates` *below* `Install update` on the main screen
-  (currently above it).
-- **Changelog view.** Show the release notes for each version (GitHub release `body`), ideally in
-  the version picker or a dedicated screen.
-- **Settings: fix the focused-switch colours.** The selected/"hovered" setting renders black text
-  on the dark-blue focus highlight and is hard to read. Give the `Switch` rows an explicit focused
-  text colour (and a focus background) instead of relying on the Fire OS default.
-- **Settings: sections + ordering.** Group the switches under **User settings**, **Advanced
-  settings** and **Developer settings** with headings, and sort them accordingly.
+- **Button order.** `Install update` now sits above `Check for updates` on the main screen.
+- **Changelog view.** The version picker is two-pane (versions left, notes right) and a **What's
+  new** button opens a single-release screen. See [08](08-app-implementation.md#changelog).
+- **Settings: focused-switch colours.** Focused rows render white on the focus highlight instead of
+  the Fire OS default black-on-blue.
+- **Settings: sections + ordering.** Switches are grouped under **User settings**, **Advanced
+  settings** and **Developer settings**, with a **Diagnostics** block at the bottom.
 
 ## Requested — features to investigate
 
@@ -39,5 +34,6 @@ commitment; it is a parking lot. Status is checked against the code in `app/`.
 
 ## Notes
 
-- The two "already implemented" items were part of the 2026-11-14 build; the rest came in as
-  follow-up requests on the same day.
+- The two "already implemented" auto-check items were part of the 2026-11-14 build; the UI items
+  (button order, changelog, focus colours, sections) landed the same day in the UI/changelog
+  phases. Uninstall and downgrade are still open.

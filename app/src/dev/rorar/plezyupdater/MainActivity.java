@@ -49,6 +49,7 @@ public class MainActivity extends Activity {
     private Button checkButton;
     private Button installButton;
     private Button chooseButton;
+    private Button whatsNewButton;
 
     private static final int REQUEST_PICK_VERSION = 1;
 
@@ -135,7 +136,9 @@ public class MainActivity extends Activity {
         String tag = data.getStringExtra(VersionListActivity.EXTRA_TAG);
         String url = data.getStringExtra(VersionListActivity.EXTRA_URL);
         if (tag != null && url != null) {
-            pendingRelease = new PlezyRepo.Release(tag, url);
+            pendingRelease = new PlezyRepo.Release(tag, url,
+                    data.getStringExtra(VersionListActivity.EXTRA_BODY),
+                    data.getStringExtra(VersionListActivity.EXTRA_PUBLISHED));
             latestVersion = tag;
             lastError = null;
             renderStatus();
@@ -181,6 +184,16 @@ public class MainActivity extends Activity {
             }
         });
         root.addView(installButton, buttonParams());
+
+        whatsNewButton = button("What's new");
+        whatsNewButton.setVisibility(View.GONE);
+        whatsNewButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                showWhatsNew();
+            }
+        });
+        root.addView(whatsNewButton, buttonParams());
 
         checkButton = button("Check for updates");
         checkButton.setOnClickListener(new View.OnClickListener() {
@@ -279,6 +292,9 @@ public class MainActivity extends Activity {
                 ? "Install update" : "Install " + latestVersion);
         installButton.setEnabled(pendingRelease != null && !busy);
 
+        // The changelog only makes sense once a specific release is selected.
+        whatsNewButton.setVisibility(pendingRelease == null ? View.GONE : View.VISIBLE);
+
         long free = ApkInstaller.freeBytes(getCacheDir());
         if (free >= 0) {
             String text = "Free space: " + ApkInstaller.formatSize(this, free);
@@ -289,6 +305,19 @@ public class MainActivity extends Activity {
             }
             storageView.setText(text);
         }
+    }
+
+    /** Open the release notes for the release that is currently selected. */
+    private void showWhatsNew() {
+        PlezyRepo.Release release = pendingRelease;
+        if (release == null) {
+            return;
+        }
+        Intent intent = new Intent(this, ChangelogActivity.class);
+        intent.putExtra(ChangelogActivity.EXTRA_TAG, release.tag);
+        intent.putExtra(ChangelogActivity.EXTRA_PUBLISHED, release.publishedAt);
+        intent.putExtra(ChangelogActivity.EXTRA_BODY, release.body);
+        startActivity(intent);
     }
 
     private void setBusy(boolean value) {

@@ -12,23 +12,28 @@ import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
 import android.widget.BaseAdapter;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ListView;
+import android.widget.ScrollView;
 import android.widget.TextView;
 
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Release picker for the "Allow older versions" developer option. Returns the chosen tag and
- * its asset URL; the caller downloads and installs it exactly like a normal update.
+ * Release picker for the "Allow older versions" developer option. Two panes: the versions on the
+ * left, the focused version's release notes on the right. Returns the chosen tag, its asset URL
+ * and its changelog; the caller downloads and installs it exactly like a normal update.
  */
 public class VersionListActivity extends Activity {
 
     public static final String EXTRA_TAG = "tag";
     public static final String EXTRA_URL = "url";
+    public static final String EXTRA_BODY = "body";
+    public static final String EXTRA_PUBLISHED = "published";
 
     private static final int MAX_RELEASES = 30;
 
@@ -37,6 +42,8 @@ public class VersionListActivity extends Activity {
 
     private ListView list;
     private TextView empty;
+    private TextView changelog;
+    private ScrollView changelogScroll;
     private String installedVersion;
 
     @Override
@@ -63,23 +70,28 @@ public class VersionListActivity extends Activity {
 
         TextView hint = new TextView(this);
         hint.setText("Newest first. Installed: "
-                + (installedVersion == null ? "none" : installedVersion));
+                + (installedVersion == null ? "none" : installedVersion)
+                + "   —   press OK to install the highlighted version.");
         hint.setTextColor(Color.rgb(150, 168, 182));
         hint.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
         hint.setPadding(0, dp(6), 0, dp(12));
         root.addView(hint);
 
-        FrameLayout frame = new FrameLayout(this);
-        root.addView(frame, new LinearLayout.LayoutParams(
+        LinearLayout columns = new LinearLayout(this);
+        columns.setOrientation(LinearLayout.HORIZONTAL);
+        root.addView(columns, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
+
+        FrameLayout listFrame = new FrameLayout(this);
+        columns.addView(listFrame, new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.MATCH_PARENT, 1f));
 
         list = new ListView(this);
         list.setBackgroundColor(Color.rgb(16, 24, 32));
         list.setDivider(null);
-        list.setDrawSelectorOnTop(false);
         list.setSelector(focusSelector());
         list.setVerticalScrollBarEnabled(true);
-        frame.addView(list, new FrameLayout.LayoutParams(
+        listFrame.addView(list, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
 
         empty = new TextView(this);
@@ -87,9 +99,34 @@ public class VersionListActivity extends Activity {
         empty.setTextColor(Color.rgb(150, 168, 182));
         empty.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
         empty.setGravity(Gravity.CENTER);
-        frame.addView(empty, new FrameLayout.LayoutParams(
+        listFrame.addView(empty, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
         list.setEmptyView(empty);
+
+        LinearLayout changelogColumn = new LinearLayout(this);
+        changelogColumn.setOrientation(LinearLayout.VERTICAL);
+        changelogColumn.setPadding(dp(24), 0, 0, 0);
+        columns.addView(changelogColumn, new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.MATCH_PARENT, 1.3f));
+
+        TextView changelogHeading = new TextView(this);
+        changelogHeading.setText("RELEASE NOTES");
+        changelogHeading.setTextColor(Color.rgb(110, 168, 200));
+        changelogHeading.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
+        changelogHeading.setPadding(0, dp(8), 0, dp(6));
+        changelogColumn.addView(changelogHeading);
+
+        changelogScroll = new ScrollView(this);
+        changelogScroll.setBackgroundColor(Color.rgb(22, 32, 42));
+        changelogScroll.setPadding(dp(16), dp(12), dp(16), dp(12));
+        changelogColumn.addView(changelogScroll, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
+
+        changelog = new TextView(this);
+        changelog.setTextColor(Color.rgb(214, 222, 230));
+        changelog.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
+        changelog.setText("Select a version to see its release notes.");
+        changelogScroll.addView(changelog);
 
         setContentView(root);
         list.requestFocus();
@@ -129,18 +166,47 @@ public class VersionListActivity extends Activity {
             return;
         }
         list.setAdapter(new ReleaseAdapter());
-        list.setOnItemClickListener(new android.widget.AdapterView.OnItemClickListener() {
+        list.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
-            public void onItemClick(android.widget.AdapterView<?> parent, View view,
-                                    int position, long id) {
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                showChangelog(releases.get(position));
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+            }
+        });
+        list.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
                 PlezyRepo.Release release = releases.get(position);
                 Intent result = new Intent();
                 result.putExtra(EXTRA_TAG, release.tag);
                 result.putExtra(EXTRA_URL, release.assetUrl);
+                result.putExtra(EXTRA_BODY, release.body);
+                result.putExtra(EXTRA_PUBLISHED, release.publishedAt);
                 setResult(RESULT_OK, result);
                 finish();
             }
         });
+        // Take focus so the D-pad changes the version (and the notes follow). Press right to move
+        // into the notes pane to scroll long changelogs, left to come back.
+        list.requestFocus();
+    }
+
+    private void showChangelog(PlezyRepo.Release release) {
+        String notes = Markdown.toPlainText(release.body);
+        String header = release.tag + (release.publishedAt == null ? "" : "   " + date(release.publishedAt));
+        if (notes.isEmpty()) {
+            notes = "No release notes for this version.";
+        }
+        changelog.setText(header + "\n\n" + notes);
+        changelogScroll.scrollTo(0, 0);
+    }
+
+    /** "2026-11-13T…Z" → "2026-11-13". */
+    static String date(String iso) {
+        return iso != null && iso.length() >= 10 ? iso.substring(0, 10) : iso;
     }
 
     private static StateListDrawable focusSelector() {

@@ -33,10 +33,20 @@ public final class PlezyRepo {
     public static final class Release {
         public final String tag;
         public final String assetUrl;
+        /** GitHub release notes (Markdown), or null when the release has none. */
+        public final String body;
+        /** ISO-8601 publication date, or null. */
+        public final String publishedAt;
 
         Release(String tag, String assetUrl) {
+            this(tag, assetUrl, null, null);
+        }
+
+        Release(String tag, String assetUrl, String body, String publishedAt) {
             this.tag = tag;
             this.assetUrl = assetUrl;
+            this.body = body;
+            this.publishedAt = publishedAt;
         }
     }
 
@@ -56,7 +66,7 @@ public final class PlezyRepo {
         if (assetUrl == null) {
             throw new IllegalStateException("Release " + tag + " has no " + ANDROID_ASSET);
         }
-        return new Release(tag, assetUrl);
+        return new Release(tag, assetUrl, body(json), publishedAt(json));
     }
 
     /** Newest first, drafts and releases without the 32-bit Android build skipped. */
@@ -71,7 +81,7 @@ public final class PlezyRepo {
             String tag = json.optString("tag_name", null);
             String url = assetUrl(json);
             if (tag != null && url != null) {
-                releases.add(new Release(tag, url));
+                releases.add(new Release(tag, url, body(json), publishedAt(json)));
             }
         }
         return releases;
@@ -101,6 +111,15 @@ public final class PlezyRepo {
         } finally {
             conn.disconnect();
         }
+    }
+
+    private static String body(JSONObject release) {
+        String b = release.optString("body", null);
+        return b == null || b.trim().isEmpty() ? null : b;
+    }
+
+    private static String publishedAt(JSONObject release) {
+        return release.optString("published_at", null);
     }
 
     private static String assetUrl(JSONObject release) {
