@@ -8,7 +8,8 @@ Android archives on GitHub, and therefore does not fit either of the "normal" up
 (Amazon Appstore, Obtainium). This repo records what was measured on real hardware and what
 follows from it.
 
-> Status: **documentation only**. No app code yet; `app/` is reserved for the updater.
+> Status: **a working updater app** (`app/`) plus the findings that led to it (`docs/`) and a
+> throwaway probe (`probe/`). Verified end-to-end on the stick.
 
 Verified on **2026-11-13** with Plezy `2.26.0`, ADB `1.0.41` (platform-tools `37.0.0`).
 
@@ -29,7 +30,16 @@ Verified on **2026-11-13** with Plezy `2.26.0`, ADB `1.0.41` (platform-tools `37
 5. The promising design is a **small TV-native updater** that polls GitHub, posts a
    **notification**, and installs with one remote click. Silent install is impossible on this
    device (no root, no device-owner, `INSTALL_PACKAGES` is `signature|privileged`).
-   See [docs/06](docs/06-own-updater-feasibility.md) and [docs/07](docs/07-notification-design.md).
+   See [docs/06](docs/06-own-updater-feasibility.md).
+6. **Verified end-to-end on the hardware**: a debug-signed sideloaded app can show a toast, post
+   a notification **from the background**, have it retained in the Fire TV notification center,
+   and open its activity when the user presses OK on it. The only remaining UX cost is the
+   installer confirmation dialog. See [docs/07](docs/07-notification-design.md).
+7. **The updater is built and works.** `app/` (`dev.rorar.plezyupdater`, plain Java, no Gradle)
+   checks GitHub, downloads the upstream tarball, verifies the signer, and installs through the
+   stock dialog. Two surprises are documented: on API 25 the app must launch the installer
+   dialog itself, and Android 7.1 refuses downgrades of release builds.
+   See [docs/08](docs/08-app-implementation.md).
 
 ## Current state of the stick
 
@@ -38,9 +48,30 @@ Verified on **2026-11-13** with Plezy `2.26.0`, ADB `1.0.41` (platform-tools `37
 | Installed Plezy | `com.edde746.plezy` `2.26.0` (`versionCode 1160`, minSdk 25, targetSdk 36) |
 | Launcher | 24 `LEANBACK_LAUNCHER` entries, app appears in the Fire TV home row |
 | APK used | `derFrisson/plezy-apks` `2.26.0` → `plezy-android-armeabi-v7a.apk` (90,748,577 bytes) |
-| Installed size | 87 MB in `/data/app/com.edde746.plezy-1` |
-| Free space after install | 803 MB |
-| Updater | **none** — deliberately, see [docs/05](docs/05-update-strategies.md) |
+| Installed size | ~87 MB in `/data/app/com.edde746.plezy-1` |
+| Updater | `dev.rorar.plezyupdater` `0.1.0` — see [docs/08](docs/08-app-implementation.md) |
+
+## The updater app
+
+`app/` builds to a ~37 KB APK. It polls the upstream GitHub release twice a day (and after boot),
+posts a notification when something newer exists, and installs it with one confirmation on the
+stock Fire OS installer screen. Settings are switchable in-app:
+
+- **Toast notifications** and **Notifications** — each output can be turned off independently.
+- **Check automatically** — the 12 h alarm + boot re-arm.
+- **Allow older versions** — developer option: pick any release, not just newer ones. (Android 7.1
+  still refuses downgrades of release builds — the app says so if you try.)
+- **Delete APK after installing** — on by default, frees the downloaded APK once installed.
+
+It also shows free space and refuses to start a download that would not fit.
+
+Build (no Gradle — `aapt2` + `javac` + `d8` + `zipalign` + `apksigner`):
+
+```bash
+cd app
+BT=/tmp/opencode/sdk/android-15 AJ=/tmp/opencode/sdk/android-35/android.jar ./build.sh
+adb install -r build/plezy-updater.apk
+```
 
 ## Docs
 
@@ -53,7 +84,8 @@ Verified on **2026-11-13** with Plezy `2.26.0`, ADB `1.0.41` (platform-tools `37
 | [04-apk-provenance](docs/04-apk-provenance.md) | Signing chain: upstream keystore, tarball layout, mirror trust |
 | [05-update-strategies](docs/05-update-strategies.md) | Amazon store vs Obtainium vs PC cron vs own APK |
 | [06-own-updater-feasibility](docs/06-own-updater-feasibility.md) | What an own updater can and cannot do here |
-| [07-notification-design](docs/07-notification-design.md) | Notification infrastructure findings + proposed architecture |
+| [07-notification-design](docs/07-notification-design.md) | Notification infrastructure findings + architecture |
+| [08-app-implementation](docs/08-app-implementation.md) | The updater app as built: pending-user-action, downgrade limit, storage, settings |
 
 ## Quick start (reproduce the install)
 

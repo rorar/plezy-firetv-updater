@@ -1,27 +1,4 @@
-# Android / Gradle
-*.apk
-*.aab
-*.ap_
-*.idsig
-*.jks
-*.keystore
-key.properties
-local.properties
-.gradle/
 build/
-app/build/
-captures/
-
-# IDE
+*.keystore
 .idea/
 *.iml
-.vscode/
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Local scratch (APKs, screenshots, dumps)
-tmp/
-*.png
-!docs/**/*.png

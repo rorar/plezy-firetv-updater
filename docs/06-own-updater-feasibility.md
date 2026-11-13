@@ -94,15 +94,27 @@ Why this beats Obtainium here:
 - **Installer of record** changes to the updater after the first update. Harmless, but it is
   one more reason the Amazon store will never manage this install.
 - **Self-update**: the updater must be able to replace itself, or it goes stale. Host it on its
-  own GitHub release and use the same flow.
-- **No downgrade protection by default**: Android happily installs a lower `versionCode` with
-  `-r`. Enforce `versionCode > installed` in code.
+  own GitHub release and use the same flow. (Not implemented yet; `adb install -r` for now.)
+- **Downgrades are blocked, not allowed** (corrected after building it): Android **7.1** only
+  permits a lower `versionCode` when the *installed* app is debuggable
+  (`Build.IS_DEBUGGABLE || packageDebuggable`), so release-signed Plezy cannot be downgraded
+  here. See [08](08-app-implementation.md#finding-2--android-71-refuses-downgrades-of-release-builds).
+- **Pending user action** (also only found while building): on API 25 a committed
+  `PackageInstaller` session does **not** show the dialog by itself — the app must launch
+  `Intent.EXTRA_INTENT` from the `STATUS_PENDING_USER_ACTION` result. See
+  [08](08-app-implementation.md#finding-1--on-api-25-the-app-must-launch-the-installer-dialog-itself).
 - **API rate limits**: 60/h unauthenticated per IP; cache with ETag and do not poll more than
   a few times a day.
 
-## Open questions to settle first
+## Open questions (answered while building)
 
-1. Do third-party notifications actually render on Fire OS 6? ([07](07-notification-design.md))
-2. How does a user reach the notification center with only a remote?
-3. Default focus of the installer dialog → 1 or 2 clicks.
-4. Does the mirror even need to be involved? (No — direct tarball extraction is ~40 lines.)
+1. Do third-party notifications actually render on Fire OS 6? — **Yes**, verified in
+   [07](07-notification-design.md).
+2. How does a user reach the notification center with only a remote? — It is a normal part of the
+   Fire TV UI; the entry is selectable and OK opens the app.
+3. Default focus of the installer dialog → the app just launches the dialog
+   ([08](08-app-implementation.md)); the confirmation is one press either way.
+4. Does the mirror even need to be involved? — **No**; direct tarball extraction from the upstream
+   GitHub release is what the app does.
+
+The updater itself is built and verified — see [08 — the updater app, as built](08-app-implementation.md).
