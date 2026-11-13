@@ -86,6 +86,7 @@ adb install -r build/plezy-updater.apk
 | [06-own-updater-feasibility](docs/06-own-updater-feasibility.md) | What an own updater can and cannot do here |
 | [07-notification-design](docs/07-notification-design.md) | Notification infrastructure findings + architecture |
 | [08-app-implementation](docs/08-app-implementation.md) | The updater app as built: pending-user-action, downgrade limit, storage, settings |
+| [09-backlog](docs/09-backlog.md) | Requested-but-not-done ideas (UI/UX, changelog, uninstall) |
 
 ## Quick start (reproduce the install)
 
