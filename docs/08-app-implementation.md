@@ -141,6 +141,28 @@ Two places show them:
 
 An empty body shows "No release notes for this version."
 
+## Uninstall
+
+**Advanced settings** has an **Uninstall Plezy…** row. It first asks for confirmation (an
+`AlertDialog`, because a fresh install afterwards starts from an empty app — servers, settings and
+downloads are gone), then launches the stock uninstaller with
+`Intent(ACTION_DELETE, "package:com.edde746.plezy")`. There is no `REQUEST_DELETE_PACKAGES` on
+API 25; the intent is all that is needed, and the user confirms in the system dialog like an
+install.
+
+A receiver for `ACTION_PACKAGE_REMOVED` (data scheme `package`) matches the Plezy package and
+refreshes the row to "Plezy is not installed" (button disabled). The main screen also notices the
+change: `onResume` compares the installed version with the one the last check saw and, when they
+differ, runs a fresh check — so returning from an uninstall immediately offers **Install 2.26.0**
+instead of a stale "up to date".
+
+## Verification with nothing installed
+
+When Plezy is not installed there is no signer to compare against, so `ApkInstaller.verify` falls
+back to the pinned upstream certificate (`PINNED_SIGNER_SHA256`, the same `903b862c…1672` from
+[04](04-signing-and-verification.md)) and skips the version comparison. This also makes a fresh
+stick work: the latest release is treated as something to install rather than "up to date".
+
 ## Build and install
 
 No Gradle. `app/build.sh` runs `aapt2` → `javac` (JDK 17) → `d8` → `zipalign` → `apksigner`:
@@ -179,6 +201,9 @@ UI/changelog phases, same stick:
 | Focus colours | focused row sampled as white text on `#2F6E8F` (pixel histogram), not black-on-blue |
 | Two-pane picker | D-pad moves the version, the notes pane follows (`2.26.0` → `2.24.0`); `•` bullets, headings stripped |
 | What's new | hidden while up to date, appears with a selection; opens `ChangelogActivity` (`Plezy 2.24.0`, `2026-10-21`) |
+| Uninstall | Advanced row → pre-confirm → stock `UninstallerActivity`; on confirm the row flips to "Plezy is not installed" (button disabled) |
+| Install with nothing installed | pinned-signer verify passes, `INSTALL 2.26.0` offered, installs `2.26.0`, UI refreshes to "up to date" |
+| Return from uninstall | main screen re-checks on `onResume`: "not installed" + `INSTALL 2.26.0` enabled |
 
 ## Known limitations
 

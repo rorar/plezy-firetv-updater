@@ -53,6 +53,14 @@ public final class ApkInstaller {
 
     public static final long MIN_FREE_SPACE = MIN_FREE_BYTES;
 
+    /**
+     * SHA-256 of the upstream Plezy signing certificate. When Plezy is not installed there is
+     * nothing to compare against, so the download is checked against this pinned value instead
+     * (a fresh stick, or the uninstall step of a downgrade). See docs/04.
+     */
+    private static final String PINNED_SIGNER_SHA256 =
+            "903b862cf5e3a0bfbad9b5e049ec3de703f83422bba9c5559a7b019716316e72";
+
     public interface Progress {
         void onPercent(int percent);
     }
@@ -206,14 +214,15 @@ public final class ApkInstaller {
             throw new IOException("Wrong package: " + candidate.packageName);
         }
 
-        PackageInfo installed;
+        PackageInfo installed = null;
         try {
             installed = pm.getPackageInfo(PlezyRepo.PACKAGE_NAME, PackageManager.GET_SIGNATURES);
         } catch (PackageManager.NameNotFoundException e) {
-            throw new IOException("Plezy is not installed on this device");
+            // Not installed: a fresh stick, or the uninstall half of a downgrade. There is
+            // nothing to compare against, so the pinned signer below is used instead.
         }
 
-        if (candidate.versionCode < installed.versionCode && !allowOlder) {
+        if (installed != null && candidate.versionCode < installed.versionCode && !allowOlder) {
             throw new IOException("Downloaded build " + candidate.versionCode
                     + " is older than installed " + installed.versionCode
                     + " — enable \"Allow older versions\" to install it anyway");
@@ -229,11 +238,18 @@ public final class ApkInstaller {
             throw new IOException("APK has no armeabi-v7a libraries");
         }
 
-        if (candidate.signatures == null || candidate.signatures.length == 0
-                || installed.signatures == null || installed.signatures.length == 0) {
+        if (candidate.signatures == null || candidate.signatures.length == 0) {
             throw new IOException("Missing signature information");
         }
-        byte[] expected = digest(installed.signatures[0]);
+        byte[] expected;
+        if (installed != null) {
+            if (installed.signatures == null || installed.signatures.length == 0) {
+                throw new IOException("Missing signature information");
+            }
+            expected = digest(installed.signatures[0]);
+        } else {
+            expected = hexToBytes(PINNED_SIGNER_SHA256);
+        }
         byte[] actual = digest(candidate.signatures[0]);
         if (!MessageDigest.isEqual(expected, actual)) {
             throw new IOException("Signer mismatch — refusing to install");
@@ -403,6 +419,14 @@ public final class ApkInstaller {
             sb.append(String.format(Locale.US, "%02x", b & 0xff));
         }
         return sb.toString();
+    }
+
+    private static byte[] hexToBytes(String hex) {
+        byte[] out = new byte[hex.length() / 2];
+        for (int i = 0; i < out.length; i++) {
+            out[i] = (byte) Integer.parseInt(hex.substring(i * 2, i * 2 + 2), 16);
+        }
+        return out;
     }
 
     // --- tar plumbing -------------------------------------------------------

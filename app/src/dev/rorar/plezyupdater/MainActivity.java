@@ -62,6 +62,9 @@ public class MainActivity extends Activity {
     private String installedVersion;
     private String latestVersion;
     private String lastError;
+    /** The installed version seen by the last completed check, to spot install/uninstall. */
+    private String checkedInstalledVersion;
+    private boolean hasChecked;
 
     @Override
     protected void onCreate(Bundle state) {
@@ -104,6 +107,11 @@ public class MainActivity extends Activity {
         }
         chooseButton.setVisibility(Prefs.allowOlderVersions(this) ? View.VISIBLE : View.GONE);
         renderStatus();
+        // Plezy may have been installed or uninstalled while this screen was away (e.g. the
+        // Settings screen's uninstall): ask again so the status is not stale.
+        if (hasChecked && !busy && !same(installedVersion, checkedInstalledVersion)) {
+            checkForUpdates(false);
+        }
     }
 
     @Override
@@ -271,7 +279,11 @@ public class MainActivity extends Activity {
         int comparison = 0;
         if (pendingRelease != null) {
             comparison = PlezyRepo.compareVersions(latestVersion, installedVersion);
-            sb.append("\nSelected: ").append(latestVersion);
+            if (installedVersion == null) {
+                sb.append("\nLatest upstream: ").append(latestVersion).append(" (not installed)");
+            } else {
+                sb.append("\nSelected: ").append(latestVersion);
+            }
         } else if (lastError != null) {
             sb.append("\nLast check failed: ").append(lastError);
         } else if (latestVersion != null) {
@@ -280,7 +292,9 @@ public class MainActivity extends Activity {
         statusView.setText(sb.toString());
 
         if (pendingRelease != null) {
-            if (comparison > 0) {
+            if (installedVersion == null) {
+                progressView.setText("Plezy is not installed — press \"Install update\".");
+            } else if (comparison > 0) {
                 progressView.setText("Update available — press \"Install update\".");
             } else if (comparison == 0) {
                 progressView.setText("Same version as installed — installing re-downloads it.");
@@ -357,6 +371,8 @@ public class MainActivity extends Activity {
         latestVersion = result.latestVersion;
         lastError = result.error;
         pendingRelease = result.isNewer() ? result.release : null;
+        hasChecked = true;
+        checkedInstalledVersion = result.installedVersion;
 
         if (result.error != null) {
             progressView.setText("Check failed: " + result.error);
@@ -467,6 +483,10 @@ public class MainActivity extends Activity {
     private static String describe(Throwable t) {
         String m = t.getMessage();
         return m == null ? t.getClass().getSimpleName() : m;
+    }
+
+    private static boolean same(String a, String b) {
+        return a == null ? b == null : a.equals(b);
     }
 
     private static void deleteQuietly(File f) {

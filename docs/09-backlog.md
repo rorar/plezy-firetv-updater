@@ -18,6 +18,24 @@ commitment; it is a parking lot. Status is checked against the code in `app/`.
   the Fire OS default black-on-blue.
 - **Settings: sections + ordering.** Switches are grouped under **User settings**, **Advanced
   settings** and **Developer settings**, with a **Diagnostics** block at the bottom.
+- **Uninstall Plezy.** An **Uninstall Plezy…** row in Advanced settings, with a pre-confirm and the
+  stock uninstaller; a removed-Plezy broadcast refreshes the row. See
+  [08](08-app-implementation.md#uninstall).
+- **Install with nothing installed.** Verification falls back to the pinned signer when Plezy is
+  absent, and the main screen treats the latest release as installable instead of "up to date".
+- **Fixed: "not installed" showed "Update available".** With no Plezy installed the blue status
+  line now reads "Plezy is not installed — press \"Install update\"."
+
+## Requested — UI / UX
+
+- **Changelog typography.** Take over the release-notes formatting: the current `Markdown` strip
+  is deliberately minimal (headings and bullets flattened to plain text). Adapt the text so
+  headings, sections and lists read well on a TV.
+- **Custom update-check interval.** Let the user choose the schedule — every *n* hours, days, weeks
+  or months — instead of the fixed 12 h. Look for a small prebuilt picker/dialog component rather
+  than building a number wheel by hand.
+- **UI overhaul.** Draft, plan and build a TV-friendly UI that is easy to drive with a remote
+  (focus order, spacing, readable text sizes) — a general pass over the whole app, not one screen.
 
 ## Requested — features to investigate
 

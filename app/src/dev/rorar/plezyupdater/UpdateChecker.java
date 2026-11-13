@@ -25,7 +25,14 @@ public final class UpdateChecker {
         }
 
         public boolean isNewer() {
-            return release != null && PlezyRepo.compareVersions(latestVersion, installedVersion) > 0;
+            if (release == null) {
+                return false;
+            }
+            if (installedVersion == null) {
+                // Nothing installed: the latest release is something to install, not "up to date".
+                return true;
+            }
+            return PlezyRepo.compareVersions(latestVersion, installedVersion) > 0;
         }
 
         public boolean installed() {

@@ -1,10 +1,18 @@
 package dev.rorar.plezyupdater;
 
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.ActivityNotFoundException;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.DialogInterface;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.StateListDrawable;
+import android.net.Uri;
 import android.os.Bundle;
 import android.util.TypedValue;
 import android.view.Gravity;
@@ -34,6 +42,9 @@ public class SettingsActivity extends Activity {
     private static final int FOCUS_BG = Color.rgb(47, 110, 143);
 
     private LinearLayout content;
+    private Button uninstallButton;
+    private TextView uninstallSummary;
+    private BroadcastReceiver packageRemovedReceiver;
 
     @Override
     protected void onCreate(Bundle state) {
@@ -63,6 +74,7 @@ public class SettingsActivity extends Activity {
         addSwitch("Delete APK after installing", "Remove the downloaded file once Plezy is "
                         + "installed, to save space on the stick.",
                 Prefs.KEY_DELETE_APK, Prefs.deleteApkAfterInstall(this));
+        addUninstall();
 
         addSection("Developer settings");
         addSwitch("Allow older versions", "Developer option: pick any release, not only newer ones. "
@@ -113,6 +125,96 @@ public class SettingsActivity extends Activity {
         scroll.setBackgroundColor(Color.rgb(16, 24, 32));
         scroll.addView(content);
         setContentView(scroll);
+
+        // Refresh the uninstall row when Android reports the removal, so the summary is correct
+        // even before the screen is resumed.
+        packageRemovedReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                Uri data = intent.getData();
+                if (data != null
+                        && PlezyRepo.PACKAGE_NAME.equals(data.getSchemeSpecificPart())) {
+                    refreshUninstallRow();
+                    Notifier.toast(SettingsActivity.this, "Plezy uninstalled");
+                }
+            }
+        };
+        IntentFilter filter = new IntentFilter(Intent.ACTION_PACKAGE_REMOVED);
+        filter.addDataScheme("package");
+        registerReceiver(packageRemovedReceiver, filter);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        refreshUninstallRow();
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (packageRemovedReceiver != null) {
+            unregisterReceiver(packageRemovedReceiver);
+            packageRemovedReceiver = null;
+        }
+        super.onDestroy();
+    }
+
+    private void addUninstall() {
+        uninstallButton = button("Uninstall Plezy…");
+        uninstallButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                confirmUninstall();
+            }
+        });
+        content.addView(uninstallButton, buttonParams());
+
+        uninstallSummary = new TextView(this);
+        uninstallSummary.setTextColor(TEXT_MUTED);
+        uninstallSummary.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
+        uninstallSummary.setPadding(dp(12), 0, 0, dp(4));
+        content.addView(uninstallSummary);
+        refreshUninstallRow();
+    }
+
+    private void refreshUninstallRow() {
+        if (uninstallButton == null) {
+            return;
+        }
+        boolean installed = PlezyRepo.installedVersion(this) != null;
+        uninstallButton.setEnabled(installed);
+        uninstallSummary.setText(installed
+                ? "Removes com.edde746.plezy and erases its data (servers, settings, downloads)."
+                : "Plezy is not installed.");
+    }
+
+    /**
+     * The system uninstall dialog is the only way to remove an app on API 25. Ask first, because a
+     * fresh install afterwards starts from an empty app — everything Plezy stored is gone.
+     */
+    private void confirmUninstall() {
+        new AlertDialog.Builder(this)
+                .setTitle("Uninstall Plezy?")
+                .setMessage("This removes Plezy and erases its data — servers, settings and "
+                        + "downloads. Android will ask you to confirm.")
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Uninstall", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        launchUninstall();
+                    }
+                })
+                .show();
+    }
+
+    private void launchUninstall() {
+        Intent intent = new Intent(Intent.ACTION_DELETE,
+                Uri.parse("package:" + PlezyRepo.PACKAGE_NAME));
+        try {
+            startActivity(intent);
+        } catch (ActivityNotFoundException e) {
+            Notifier.toast(this, "No uninstaller found");
+        }
     }
 
     private void addSection(String name) {
