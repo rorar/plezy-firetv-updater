@@ -172,15 +172,6 @@ public class MainActivity extends Activity {
         progressParams.topMargin = dp(8);
         root.addView(progressView, progressParams);
 
-        checkButton = button("Check for updates");
-        checkButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                checkForUpdates(true);
-            }
-        });
-        root.addView(checkButton, buttonParams());
-
         installButton = button("Install update");
         installButton.setEnabled(false);
         installButton.setOnClickListener(new View.OnClickListener() {
@@ -190,6 +181,15 @@ public class MainActivity extends Activity {
             }
         });
         root.addView(installButton, buttonParams());
+
+        checkButton = button("Check for updates");
+        checkButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                checkForUpdates(true);
+            }
+        });
+        root.addView(checkButton, buttonParams());
 
         chooseButton = button("Choose version…");
         chooseButton.setVisibility(View.GONE);
