@@ -140,7 +140,8 @@ public class MainActivity extends Activity {
                 installPendingDowngrade();
             } else {
                 clearPendingDowngrade();
-                progressView.setText("Downgrade cancelled.");
+                // A toast, not the progress line: renderStatus() below overwrites that.
+                Notifier.toast(this, "Downgrade cancelled");
             }
         }
 

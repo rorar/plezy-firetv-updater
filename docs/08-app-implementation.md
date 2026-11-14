@@ -173,8 +173,14 @@ Instead the app takes the only route Android 7.1 allows — uninstall, then inst
    the latest release is now newer again, offers the upgrade back).
 
 A downgrade therefore costs **two** system confirmations and **erases Plezy's data**. The pending
-tag is persisted in `Prefs` so the flow survives the dialog and a low-memory process restart;
-cancelling the uninstall dialog clears it. Verification uses the pinned signer because Plezy is
+tag is persisted in `Prefs` so the flow survives the dialog and a low-memory process restart.
+
+Cancelling at the system uninstaller is handled: `onResume` sees Plezy still installed, clears the
+pending state and shows a **"Downgrade cancelled"** toast. (A toast rather than the progress line,
+which `renderStatus()` overwrites in the same pass.) Cancelling earlier — at the app's own
+"Downgrade to …?" dialog — clears the state directly.
+
+Verification uses the pinned signer because Plezy is
 absent ([below](#verification-with-nothing-installed)).
 
 ## Verification with nothing installed
@@ -227,6 +233,7 @@ UI/changelog phases, same stick:
 | Return from uninstall | main screen re-checks on `onResume`: "not installed" + `INSTALL 2.26.0` enabled |
 | Downgrade 2.26.0 → 2.25.0 | download/verify → "Downgrade to 2.25.0?" → uninstall → auto install dialog → **`2.25.0` installed**, UI re-checked and offered `INSTALL 2.26.0` |
 | Upgrade back | `2.26.0` installed again, UI back to "up to date" |
+| Cancel downgrade | at the system uninstaller: Plezy stays `2.26.0`, no install dialog, pending state cleared, "Downgrade cancelled" toast (own window, `package=dev.rorar.plezyupdater`); the selected version remains `2.24.0` ("Older than installed…") |
 
 ## Known limitations
 
