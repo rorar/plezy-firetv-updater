@@ -156,6 +156,27 @@ change: `onResume` compares the installed version with the one the last check sa
 differ, runs a fresh check — so returning from an uninstall immediately offers **Install 2.26.0**
 instead of a stale "up to date".
 
+## Downgrade
+
+Selecting an older version while **Allow older versions** is on would normally die at
+`INSTALL_FAILED_VERSION_DOWNGRADE` ([Finding 2](#finding-2--android-71-refuses-downgrades-of-release-builds)).
+Instead the app takes the only route Android 7.1 allows — uninstall, then install:
+
+1. **Download and verify first**, while Plezy is still installed, so a failed download never
+   leaves the user with no Plezy. The verified APK is cached.
+2. **Confirm** with a clear data-loss warning ("Plezy will be uninstalled first — its data
+   (servers, settings, downloads) is erased — and then 2.25.0 installed").
+3. **Uninstall** via `ACTION_DELETE`.
+4. On `ACTION_PACKAGE_REMOVED` (or `onResume`, whichever comes first), **install** the cached APK
+   through the normal `PackageInstaller` session → the usual install dialog.
+5. `InstallResultReceiver` re-checks as always, so the screen shows the new version (and, since
+   the latest release is now newer again, offers the upgrade back).
+
+A downgrade therefore costs **two** system confirmations and **erases Plezy's data**. The pending
+tag is persisted in `Prefs` so the flow survives the dialog and a low-memory process restart;
+cancelling the uninstall dialog clears it. Verification uses the pinned signer because Plezy is
+absent ([below](#verification-with-nothing-installed)).
+
 ## Verification with nothing installed
 
 When Plezy is not installed there is no signer to compare against, so `ApkInstaller.verify` falls
@@ -204,10 +225,13 @@ UI/changelog phases, same stick:
 | Uninstall | Advanced row → pre-confirm → stock `UninstallerActivity`; on confirm the row flips to "Plezy is not installed" (button disabled) |
 | Install with nothing installed | pinned-signer verify passes, `INSTALL 2.26.0` offered, installs `2.26.0`, UI refreshes to "up to date" |
 | Return from uninstall | main screen re-checks on `onResume`: "not installed" + `INSTALL 2.26.0` enabled |
+| Downgrade 2.26.0 → 2.25.0 | download/verify → "Downgrade to 2.25.0?" → uninstall → auto install dialog → **`2.25.0` installed**, UI re-checked and offered `INSTALL 2.26.0` |
+| Upgrade back | `2.26.0` installed again, UI back to "up to date" |
 
 ## Known limitations
 
 - One remote confirmation per install (silent install is impossible; [06](06-own-updater-feasibility.md)).
-- No downgrades of release builds ([Finding 2](#finding-2--android-71-refuses-downgrades-of-release-builds)).
+- A downgrade costs two confirmations and **erases Plezy's data**; the app warns before starting
+  ([Downgrade](#downgrade)).
 - Self-update is not implemented yet: a new updater build is installed with `adb install -r`.
 - GitHub's unauthenticated limit is 60 req/h; the app polls a few times a day, which is plenty.

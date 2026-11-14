@@ -14,6 +14,7 @@ public final class Prefs {
     public static final String KEY_ALLOW_OLDER = "allow_older_versions";
     public static final String KEY_DELETE_APK = "delete_apk_after_install";
     private static final String KEY_LAST_CHECK = "last_check_ms";
+    private static final String KEY_PENDING_DOWNGRADE = "pending_downgrade_tag";
 
     private Prefs() {
     }
@@ -60,5 +61,23 @@ public final class Prefs {
 
     public static void setLastCheckMs(Context c, long value) {
         sp(c).edit().putLong(KEY_LAST_CHECK, value).apply();
+    }
+
+    /**
+     * Tag of a downgrade whose uninstall has been requested but not yet finished. Persisted so the
+     * flow survives the system uninstall dialog (and a low-memory process restart).
+     */
+    public static String pendingDowngrade(Context c) {
+        return sp(c).getString(KEY_PENDING_DOWNGRADE, null);
+    }
+
+    public static void setPendingDowngrade(Context c, String tag) {
+        SharedPreferences.Editor e = sp(c).edit();
+        if (tag == null) {
+            e.remove(KEY_PENDING_DOWNGRADE);
+        } else {
+            e.putString(KEY_PENDING_DOWNGRADE, tag);
+        }
+        e.apply();
     }
 }

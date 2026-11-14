@@ -1,11 +1,15 @@
 package dev.rorar.plezyupdater;
 
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.ActivityNotFoundException;
 import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.graphics.Color;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -56,6 +60,7 @@ public class MainActivity extends Activity {
     private final Handler ui = new Handler(Looper.getMainLooper());
 
     private BroadcastReceiver installFinishedReceiver;
+    private BroadcastReceiver packageRemovedReceiver;
     private volatile boolean busy;
     private PlezyRepo.Release pendingRelease;
     private String installedAtInstallCommit;
@@ -65,6 +70,11 @@ public class MainActivity extends Activity {
     /** The installed version seen by the last completed check, to spot install/uninstall. */
     private String checkedInstalledVersion;
     private boolean hasChecked;
+    /**
+     * A verified APK waiting for Plezy to be uninstalled before it can be installed (a downgrade).
+     * Non-null only between the uninstall confirmation and the install.
+     */
+    private File pendingDowngradeApk;
 
     @Override
     protected void onCreate(Bundle state) {
@@ -79,6 +89,32 @@ public class MainActivity extends Activity {
             }
         };
         registerReceiver(installFinishedReceiver, new IntentFilter(ACTION_INSTALL_FINISHED));
+
+        // A downgrade installs only after the uninstall broadcast; catch it here.
+        packageRemovedReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                Uri data = intent.getData();
+                if (data != null
+                        && PlezyRepo.PACKAGE_NAME.equals(data.getSchemeSpecificPart())) {
+                    onPlezyRemoved();
+                }
+            }
+        };
+        IntentFilter removed = new IntentFilter(Intent.ACTION_PACKAGE_REMOVED);
+        removed.addDataScheme("package");
+        registerReceiver(packageRemovedReceiver, removed);
+
+        // Resume a downgrade that was interrupted (e.g. the process was killed in the dialog).
+        String pendingTag = Prefs.pendingDowngrade(this);
+        if (pendingTag != null) {
+            File apk = ApkInstaller.cachedApk(this, pendingTag);
+            if (apk != null) {
+                pendingDowngradeApk = apk;
+            } else {
+                Prefs.setPendingDowngrade(this, null);
+            }
+        }
 
         ApkInstaller.cleanStaleCache(this);
         installedVersion = PlezyRepo.installedVersion(this);
@@ -96,6 +132,18 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         installedVersion = PlezyRepo.installedVersion(this);
+
+        // Downgrade flow: the uninstall dialog just closed. If Plezy is gone, install the APK we
+        // downloaded earlier; if it is still there, the user cancelled and we stop.
+        if (pendingDowngradeApk != null && !busy) {
+            if (installedVersion == null) {
+                installPendingDowngrade();
+            } else {
+                clearPendingDowngrade();
+                progressView.setText("Downgrade cancelled.");
+            }
+        }
+
         if (installedAtInstallCommit != null && installedVersion != null
                 && !installedVersion.equals(installedAtInstallCommit)) {
             // The install actually went through: drop the now-stale selection.
@@ -108,8 +156,10 @@ public class MainActivity extends Activity {
         chooseButton.setVisibility(Prefs.allowOlderVersions(this) ? View.VISIBLE : View.GONE);
         renderStatus();
         // Plezy may have been installed or uninstalled while this screen was away (e.g. the
-        // Settings screen's uninstall): ask again so the status is not stale.
-        if (hasChecked && !busy && !same(installedVersion, checkedInstalledVersion)) {
+        // Settings screen's uninstall): ask again so the status is not stale. Skipped during a
+        // downgrade, where Plezy is deliberately absent.
+        if (hasChecked && !busy && pendingDowngradeApk == null
+                && !same(installedVersion, checkedInstalledVersion)) {
             checkForUpdates(false);
         }
     }
@@ -119,6 +169,10 @@ public class MainActivity extends Activity {
         if (installFinishedReceiver != null) {
             unregisterReceiver(installFinishedReceiver);
             installFinishedReceiver = null;
+        }
+        if (packageRemovedReceiver != null) {
+            unregisterReceiver(packageRemovedReceiver);
+            packageRemovedReceiver = null;
         }
         if (instance == this) {
             instance = null;
@@ -438,6 +492,22 @@ public class MainActivity extends Activity {
                     // Only a verified APK is worth caching for a retry.
                     ApkInstaller.markCached(MainActivity.this, release.tag);
 
+                    final boolean downgrade = installedVersion != null
+                            && PlezyRepo.compareVersions(verified.versionName, installedVersion) < 0;
+                    if (downgrade) {
+                        // Android 7.1 refuses a downgrade of a release build, so the installed
+                        // Plezy has to go first. The APK is already verified and cached.
+                        final File apkFile = apk;
+                        ui.post(new Runnable() {
+                            @Override
+                            public void run() {
+                                setBusy(false);
+                                confirmDowngrade(release, apkFile, verified);
+                            }
+                        });
+                        return;
+                    }
+
                     post("Opening the installer for " + verified.versionName + "…");
                     ApkInstaller.install(MainActivity.this, apk, allowOlder);
                     installedAtInstallCommit = installedVersion;
@@ -483,6 +553,119 @@ public class MainActivity extends Activity {
     private static String describe(Throwable t) {
         String m = t.getMessage();
         return m == null ? t.getClass().getSimpleName() : m;
+    }
+
+    /**
+     * A downgrade needs the installed app gone first. Warn clearly — the uninstall erases Plezy's
+     * data — then let the system uninstaller run; {@link #onPlezyRemoved()} installs the APK.
+     */
+    private void confirmDowngrade(final PlezyRepo.Release release, final File apk,
+            final ApkInstaller.Verified verified) {
+        pendingDowngradeApk = apk;
+        Prefs.setPendingDowngrade(this, release.tag);
+        new AlertDialog.Builder(this)
+                .setTitle("Downgrade to " + verified.versionName + "?")
+                .setMessage("Android 7.1 cannot downgrade this app directly. Plezy will be "
+                        + "uninstalled first — its data (servers, settings, downloads) is erased — "
+                        + "and then " + verified.versionName + " installed. Android will ask you "
+                        + "to confirm the uninstall.")
+                .setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        clearPendingDowngrade();
+                        progressView.setText("Downgrade cancelled.");
+                    }
+                })
+                .setPositiveButton("Uninstall & install", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        launchUninstallForDowngrade();
+                    }
+                })
+                .show();
+    }
+
+    private void launchUninstallForDowngrade() {
+        progressView.setText("Uninstalling Plezy…");
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        Intent intent = new Intent(Intent.ACTION_DELETE,
+                Uri.parse("package:" + PlezyRepo.PACKAGE_NAME));
+        try {
+            startActivity(intent);
+        } catch (ActivityNotFoundException e) {
+            clearPendingDowngrade();
+            progressView.setText("Update failed: no uninstaller found");
+        }
+    }
+
+    /** Plezy is gone: finish a pending downgrade by installing the verified APK. */
+    private void onPlezyRemoved() {
+        installedVersion = null;
+        if (pendingDowngradeApk != null) {
+            installPendingDowngrade();
+        }
+    }
+
+    private void installPendingDowngrade() {
+        final File apk = pendingDowngradeApk;
+        if (apk == null || busy) {
+            return;
+        }
+        pendingDowngradeApk = null;
+        Prefs.setPendingDowngrade(this, null);
+        setBusy(true);
+        progressView.setText("Installing…");
+
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    // Plezy is uninstalled, so this is a plain install — no downgrade flag needed.
+                    ApkInstaller.install(MainActivity.this, apk, false);
+                    installedAtInstallCommit = null;
+                    post("Confirm the install on the TV.");
+                    ui.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            setBusy(false);
+                        }
+                    });
+                } catch (final Throwable t) {
+                    Log.e(TAG, "downgrade install failed", t);
+                    final String message = describe(t);
+                    ui.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            progressView.setText("Update failed: " + message);
+                            setBusy(false);
+                            Notifier.toast(MainActivity.this, "Update failed: " + message);
+                        }
+                    });
+                } finally {
+                    ui.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            getWindow().clearFlags(
+                                    WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                        }
+                    });
+                }
+            }
+
+            private void post(final String text) {
+                ui.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        progressView.setText(text);
+                    }
+                });
+            }
+        }, "plezy-downgrade-install").start();
+    }
+
+    private void clearPendingDowngrade() {
+        pendingDowngradeApk = null;
+        Prefs.setPendingDowngrade(this, null);
     }
 
     private static boolean same(String a, String b) {
