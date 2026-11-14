@@ -8,8 +8,9 @@ Android archives on GitHub, and therefore does not fit either of the "normal" up
 (Amazon Appstore, Obtainium). This repo records what was measured on real hardware and what
 follows from it.
 
-> Status: **a working updater app** (`app/`) plus the findings that led to it (`docs/`) and a
-> throwaway probe (`probe/`). Verified end-to-end on the stick, UI overhaul included.
+> Status: **a working updater app** (`app/`) plus the findings that led to it (`docs/`), the
+> artwork sources (`design/`) and a throwaway probe (`probe/`). Verified end-to-end on the stick,
+> UI overhaul and original artwork included.
 
 Verified on **2026-11-13/14** with Plezy `2.26.0`, ADB `1.0.41` (platform-tools `37.0.0`).
 
@@ -41,7 +42,8 @@ Verified on **2026-11-13/14** with Plezy `2.26.0`, ADB `1.0.41` (platform-tools 
    the check interval. Two surprises are documented: on API 25 the app must launch the installer
    dialog itself, and Android 7.1 refuses downgrades of release builds — so a downgrade is done by
    uninstalling and reinstalling. The UI is a TV-first dashboard (large text, one primary action,
-   unmistakable D-pad focus) with real release-notes typography. See
+   unmistakable D-pad focus) with real release-notes typography and hand-drawn icons; the launcher
+   icon and TV banner are original artwork. See
    [docs/08](docs/08-app-implementation.md) and [docs/10](docs/10-tv-ui-design.md).
 
 ## Current state of the stick
@@ -56,7 +58,8 @@ Verified on **2026-11-13/14** with Plezy `2.26.0`, ADB `1.0.41` (platform-tools 
 
 ## The updater app
 
-`app/` builds to a ~49 KB APK. It polls the upstream GitHub release on a user-set interval
+`app/` builds to a ~199 KB APK (the launcher icon and TV banner at every density are the bulk of
+it; the code and vectors are small). It polls the upstream GitHub release on a user-set interval
 (default twice a day) and after boot, posts a notification when something newer exists, and
 installs it with one confirmation on the stock Fire OS installer screen. Settings are grouped into
 User / Advanced / Developer sections:
@@ -74,6 +77,12 @@ User / Advanced / Developer sections:
 new** shows the selected release's notes. Release notes are rendered with real typography —
 coloured, larger section headings and hanging-indented bullets — through a hand-written
 `Markdown.toStyled`. It also shows free space and refuses to start a download that would not fit.
+
+The dashboard reads at a glance: a status glyph beside the headline (green check, accent up-arrow,
+amber warning, red cross), a leading icon on every action row, and an original app icon and TV
+banner. The glyphs are hand-written `<vector>` drawables (no icon pack, no AndroidX — the build has
+no resource merging) and the icon/banner are generated procedurally. See
+[`design/`](design/README.md).
 
 Build (no Gradle — `aapt2` + `javac` + `d8` + `zipalign` + `apksigner`):
 
@@ -95,9 +104,9 @@ adb install -r build/plezy-updater.apk
 | [05-update-strategies](docs/05-update-strategies.md) | Amazon store vs Obtainium vs PC cron vs own APK |
 | [06-own-updater-feasibility](docs/06-own-updater-feasibility.md) | What an own updater can and cannot do here |
 | [07-notification-design](docs/07-notification-design.md) | Notification infrastructure findings + architecture |
-| [08-app-implementation](docs/08-app-implementation.md) | The updater app as built: pending-user-action, downgrade, uninstall, changelog typography, check interval, the `Ui` toolkit, storage, settings |
+| [08-app-implementation](docs/08-app-implementation.md) | The updater app as built: pending-user-action, downgrade, uninstall, changelog typography, check interval, the `Ui` toolkit, icons/artwork, storage, settings |
 | [09-backlog](docs/09-backlog.md) | Done items (no open requests) |
-| [10-tv-ui-design](docs/10-tv-ui-design.md) | The TV UI plan: layout grid, focus model, per-screen design, how the look is verified |
+| [10-tv-ui-design](docs/10-tv-ui-design.md) | The TV UI plan: layout grid, focus model, icons, per-screen design, how the look is verified |
 
 ## Quick start (reproduce the install)
 

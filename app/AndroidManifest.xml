@@ -15,7 +15,7 @@
 
     <application
         android:label="Plezy Updater"
-        android:icon="@drawable/ic_launcher"
+        android:icon="@mipmap/ic_launcher"
         android:banner="@drawable/tv_banner"
         android:allowBackup="false"
         android:theme="@android:style/Theme.Material.NoActionBar">

@@ -217,14 +217,15 @@ public class MainActivity extends Activity {
         content.setBackgroundColor(Ui.BG);
         content.setPadding(pad, pad, pad, pad);
 
-        content.addView(Ui.title(this, "Plezy Updater"));
+        TextView title = Ui.title(this, "Plezy Updater");
+        Ui.leadingIcon(title, Ui.icon(this, R.drawable.ic_up, Ui.ACCENT_BRIGHT), 28);
+        content.addView(title);
 
         TextView subtitle = Ui.subtitle(this, "Keeps com.edde746.plezy up to date on this TV.");
         LinearLayout.LayoutParams subtitleParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         subtitleParams.topMargin = dp(2);
         content.addView(subtitle, subtitleParams);
-
         // Status card: a one-line verdict, the versions behind it, and what to do next.
         LinearLayout statusCard = Ui.card(this);
         statusHeadline = Ui.text(this, "", 24, Ui.TEXT);
@@ -244,7 +245,7 @@ public class MainActivity extends Activity {
         cardParams.topMargin = dp(12);
         content.addView(statusCard, cardParams);
 
-        installButton = Ui.primaryButton(this, "Install update");
+        installButton = Ui.primaryButton(this, "Install update", R.drawable.ic_download);
         installButton.setEnabled(false);
         installButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -254,7 +255,7 @@ public class MainActivity extends Activity {
         });
         content.addView(installButton, buttonParams(12));
 
-        whatsNewButton = Ui.actionButton(this, "What's new");
+        whatsNewButton = Ui.actionButton(this, "What's new", R.drawable.ic_news);
         whatsNewButton.setVisibility(View.GONE);
         whatsNewButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -264,7 +265,7 @@ public class MainActivity extends Activity {
         });
         content.addView(whatsNewButton, buttonParams(8));
 
-        checkButton = Ui.actionButton(this, "Check for updates");
+        checkButton = Ui.actionButton(this, "Check for updates", R.drawable.ic_refresh);
         checkButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -273,7 +274,7 @@ public class MainActivity extends Activity {
         });
         content.addView(checkButton, buttonParams(8));
 
-        chooseButton = Ui.actionButton(this, "Choose version…");
+        chooseButton = Ui.actionButton(this, "Choose version…", R.drawable.ic_versions);
         chooseButton.setVisibility(View.GONE);
         chooseButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -285,7 +286,7 @@ public class MainActivity extends Activity {
         });
         content.addView(chooseButton, buttonParams(8));
 
-        Button settingsButton = Ui.actionButton(this, "Settings");
+        Button settingsButton = Ui.actionButton(this, "Settings", R.drawable.ic_settings);
         settingsButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -339,42 +340,50 @@ public class MainActivity extends Activity {
 
         String headline;
         int headlineColor;
+        int headlineIcon;
         String detail;
         String action;
 
         if (pendingRelease == null && lastError != null) {
             headline = "Update check failed";
             headlineColor = Ui.ERROR;
+            headlineIcon = R.drawable.ic_error;
             detail = "Installed: " + installed;
             action = lastError;
         } else if (pendingRelease != null && installedVersion == null) {
             headline = "Plezy is not installed";
             headlineColor = Ui.WARN;
+            headlineIcon = R.drawable.ic_warning;
             detail = "Latest upstream: " + latestVersion;
             action = "Press \"Install update\" to install it.";
         } else if (pendingRelease != null && comparison > 0) {
             headline = "Update available";
             headlineColor = Ui.ACCENT_BRIGHT;
+            headlineIcon = R.drawable.ic_up;
             detail = "Installed " + installedVersion + "   ·   latest " + latestVersion;
             action = "Press \"Install update\" to get " + latestVersion + ".";
         } else if (pendingRelease != null && comparison == 0) {
             headline = "Selected " + latestVersion;
             headlineColor = Ui.TEXT_HEADING;
+            headlineIcon = R.drawable.ic_info;
             detail = "Installed " + installedVersion + "   ·   same version";
             action = "Installing re-downloads it.";
         } else if (pendingRelease != null) {
             headline = "Selected " + latestVersion;
             headlineColor = Ui.TEXT_HEADING;
+            headlineIcon = R.drawable.ic_down;
             detail = "Installed " + installedVersion + "   ·   older";
             action = "Downgrade uninstalls first — enabled by \"Allow older versions\".";
         } else if (latestVersion != null) {
             headline = "Plezy is up to date";
             headlineColor = Ui.OK;
+            headlineIcon = R.drawable.ic_check;
             detail = "Installed " + installedVersion + "   ·   latest " + latestVersion;
             action = "";
         } else {
             headline = "Checking for updates…";
             headlineColor = Ui.TEXT_MUTED;
+            headlineIcon = R.drawable.ic_refresh;
             detail = installedVersion == null
                     ? "Plezy is not installed." : "Installed " + installedVersion + ".";
             action = "";
@@ -382,6 +391,7 @@ public class MainActivity extends Activity {
 
         statusHeadline.setText(headline);
         statusHeadline.setTextColor(headlineColor);
+        Ui.leadingIcon(statusHeadline, Ui.icon(this, headlineIcon, headlineColor), 26);
         statusView.setText(detail);
         // While a download/install is running, the progress line belongs to that flow.
         if (!busy) {

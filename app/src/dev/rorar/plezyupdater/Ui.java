@@ -4,6 +4,7 @@ import android.content.Context;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.StateListDrawable;
 import android.util.TypedValue;
@@ -93,9 +94,27 @@ public final class Ui {
         return styledButton(c, label, 20, focusBackground(c), rowTextColors());
     }
 
+    /** A full-width action row with a leading glyph, e.g. {@code ic_refresh}. */
+    public static Button actionButton(Context c, String label, int iconRes) {
+        Button b = actionButton(c, label);
+        if (iconRes != 0) {
+            leadingIcon(b, stateIcon(c, iconRes), 22);
+        }
+        return b;
+    }
+
     /** The one action the screen wants you to press. */
     public static Button primaryButton(Context c, String label) {
         return styledButton(c, label, 22, primaryBackground(c), rowTextColors());
+    }
+
+    /** The one action the screen wants you to press, with a leading glyph. */
+    public static Button primaryButton(Context c, String label, int iconRes) {
+        Button b = primaryButton(c, label);
+        if (iconRes != 0) {
+            leadingIcon(b, stateIcon(c, iconRes), 24);
+        }
+        return b;
     }
 
     private static Button styledButton(Context c, String label, int sp,
@@ -185,6 +204,40 @@ public final class Ui {
                         new int[]{}
                 },
                 new int[]{Color.WHITE, TEXT_DISABLED, TEXT});
+    }
+
+    /**
+     * A bundled glyph tinted with one colour. The main-screen icons are hand-drawn vector
+     * drawables in {@code res/drawable/}; nothing is pulled from a font or an icon pack, because
+     * the build has no resource merging.
+     */
+    public static Drawable icon(Context c, int resId, int color) {
+        Drawable d = c.getResources().getDrawable(resId, c.getTheme()).mutate();
+        d.setTint(color);
+        return d;
+    }
+
+    /**
+     * A glyph that recolours with the view's state, so it matches the label it sits beside:
+     * white while focused, dimmed while disabled, body colour otherwise. A {@link StateListDrawable}
+     * of already-tinted copies is used rather than a stateful tint, so the state handling is
+     * explicit and identical to {@link #focusBackground}.
+     */
+    public static Drawable stateIcon(Context c, int resId) {
+        StateListDrawable s = new StateListDrawable();
+        s.addState(new int[]{android.R.attr.state_focused}, icon(c, resId, Color.WHITE));
+        s.addState(new int[]{-android.R.attr.state_enabled}, icon(c, resId, TEXT_DISABLED));
+        s.addState(new int[]{}, icon(c, resId, TEXT));
+        return s;
+    }
+
+    /** Puts a glyph before a label, sized and spaced for the 10-foot layout. */
+    public static void leadingIcon(TextView v, Drawable glyph, int sizeDp) {
+        Context c = v.getContext();
+        int px = dp(c, sizeDp);
+        glyph.setBounds(0, 0, px, px);
+        v.setCompoundDrawablesRelative(glyph, null, null, null);
+        v.setCompoundDrawablePadding(dp(c, 12));
     }
 
     /** A body font that is comfortable to read from a couch. */

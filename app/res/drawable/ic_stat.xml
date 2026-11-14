@@ -1,14 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Small status-bar / notification icon: a simple arrow-in-circle. -->
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item>
-        <shape android:shape="oval">
-            <solid android:color="#FFFFFF" />
-        </shape>
-    </item>
-    <item android:top="8dp" android:bottom="8dp" android:left="8dp" android:right="8dp">
-        <shape android:shape="rectangle">
-            <solid android:color="#1B2430" />
-        </shape>
-    </item>
-</layer-list>
+<!-- Notification small icon. Only the alpha channel is used (it is drawn as a white
+     silhouette), so it is a solid-white up arrow on a transparent field. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:pathData="M12,20 L12,5 M5,12 L12,5 L19,12"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000" />
+</vector>
