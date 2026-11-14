@@ -37,8 +37,9 @@ Verified on **2026-11-13** with Plezy `2.26.0`, ADB `1.0.41` (platform-tools `37
    installer confirmation dialog. See [docs/07](docs/07-notification-design.md).
 7. **The updater is built and works.** `app/` (`dev.rorar.plezyupdater`, plain Java, no Gradle)
    checks GitHub, downloads the upstream tarball, verifies the signer, and installs through the
-   stock dialog. Two surprises are documented: on API 25 the app must launch the installer
-   dialog itself, and Android 7.1 refuses downgrades of release builds.
+   stock dialog. It also shows per-version changelogs and can uninstall Plezy. Two surprises are
+   documented: on API 25 the app must launch the installer dialog itself, and Android 7.1 refuses
+   downgrades of release builds — so a downgrade is done by uninstalling and reinstalling.
    See [docs/08](docs/08-app-implementation.md).
 
 ## Current state of the stick
@@ -53,17 +54,21 @@ Verified on **2026-11-13** with Plezy `2.26.0`, ADB `1.0.41` (platform-tools `37
 
 ## The updater app
 
-`app/` builds to a ~37 KB APK. It polls the upstream GitHub release twice a day (and after boot),
+`app/` builds to a ~42 KB APK. It polls the upstream GitHub release twice a day (and after boot),
 posts a notification when something newer exists, and installs it with one confirmation on the
-stock Fire OS installer screen. Settings are switchable in-app:
+stock Fire OS installer screen. Settings are grouped into User / Advanced / Developer sections:
 
 - **Toast notifications** and **Notifications** — each output can be turned off independently.
 - **Check automatically** — the 12 h alarm + boot re-arm.
-- **Allow older versions** — developer option: pick any release, not just newer ones. (Android 7.1
-  still refuses downgrades of release builds — the app says so if you try.)
 - **Delete APK after installing** — on by default, frees the downloaded APK once installed.
+- **Uninstall Plezy…** — removes Plezy through the stock uninstaller, after a confirm.
+- **Allow older versions** — developer option: pick any release, not just newer ones. A downgrade
+  uninstalls Plezy and reinstalls the older build (Android 7.1 cannot downgrade directly), so it
+  costs two confirmations and erases Plezy's data; the app warns first.
 
-It also shows free space and refuses to start a download that would not fit.
+**Choose version…** opens a two-pane picker (versions left, release notes right), and **What's
+new** shows the selected release's notes. It also shows free space and refuses to start a download
+that would not fit.
 
 Build (no Gradle — `aapt2` + `javac` + `d8` + `zipalign` + `apksigner`):
 
@@ -85,8 +90,8 @@ adb install -r build/plezy-updater.apk
 | [05-update-strategies](docs/05-update-strategies.md) | Amazon store vs Obtainium vs PC cron vs own APK |
 | [06-own-updater-feasibility](docs/06-own-updater-feasibility.md) | What an own updater can and cannot do here |
 | [07-notification-design](docs/07-notification-design.md) | Notification infrastructure findings + architecture |
-| [08-app-implementation](docs/08-app-implementation.md) | The updater app as built: pending-user-action, downgrade limit, storage, settings |
-| [09-backlog](docs/09-backlog.md) | Requested-but-not-done ideas (UI/UX, changelog, uninstall) |
+| [08-app-implementation](docs/08-app-implementation.md) | The updater app as built: pending-user-action, downgrade, uninstall, changelog, storage, settings |
+| [09-backlog](docs/09-backlog.md) | Done items plus the open ideas (changelog typography, custom interval, UI overhaul) |
 
 ## Quick start (reproduce the install)
 
