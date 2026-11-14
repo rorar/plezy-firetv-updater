@@ -37,6 +37,11 @@
             android:label="Settings" />
 
         <activity
+            android:name=".IntervalActivity"
+            android:exported="false"
+            android:label="Check interval" />
+
+        <activity
             android:name=".VersionListActivity"
             android:exported="false"
             android:label="Choose version" />

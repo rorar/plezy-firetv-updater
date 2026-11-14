@@ -15,6 +15,26 @@ public final class Prefs {
     public static final String KEY_DELETE_APK = "delete_apk_after_install";
     private static final String KEY_LAST_CHECK = "last_check_ms";
     private static final String KEY_PENDING_DOWNGRADE = "pending_downgrade_tag";
+    private static final String KEY_INTERVAL_VALUE = "interval_value";
+    private static final String KEY_INTERVAL_UNIT = "interval_unit";
+
+    /** Units the user can pick for the check interval. */
+    public static final String UNIT_HOURS = "hours";
+    public static final String UNIT_DAYS = "days";
+    public static final String UNIT_WEEKS = "weeks";
+    public static final String UNIT_MONTHS = "months";
+
+    public static final String[] UNITS = {UNIT_HOURS, UNIT_DAYS, UNIT_WEEKS, UNIT_MONTHS};
+
+    /** The original fixed cadence, kept as the default. */
+    public static final int DEFAULT_INTERVAL_VALUE = 12;
+    public static final String DEFAULT_INTERVAL_UNIT = UNIT_HOURS;
+
+    private static final long HOUR_MS = 60L * 60L * 1000L;
+    private static final long DAY_MS = 24L * HOUR_MS;
+    private static final long WEEK_MS = 7L * DAY_MS;
+    /** A month has no fixed length; the schedule treats one as 30 days and says so in the UI. */
+    private static final long MONTH_MS = 30L * DAY_MS;
 
     private Prefs() {
     }
@@ -79,5 +99,67 @@ public final class Prefs {
             e.putString(KEY_PENDING_DOWNGRADE, tag);
         }
         e.apply();
+    }
+
+    // ---- check interval -----------------------------------------------------
+
+    public static int intervalValue(Context c) {
+        return sp(c).getInt(KEY_INTERVAL_VALUE, DEFAULT_INTERVAL_VALUE);
+    }
+
+    public static String intervalUnit(Context c) {
+        String unit = sp(c).getString(KEY_INTERVAL_UNIT, DEFAULT_INTERVAL_UNIT);
+        for (String known : UNITS) {
+            if (known.equals(unit)) {
+                return unit;
+            }
+        }
+        return DEFAULT_INTERVAL_UNIT;
+    }
+
+    public static void setInterval(Context c, int value, String unit) {
+        int safeValue = Math.max(1, value);
+        String safeUnit = unit;
+        for (String known : UNITS) {
+            if (known.equals(unit)) {
+                safeUnit = unit;
+                break;
+            }
+        }
+        if (safeUnit == null) {
+            safeUnit = DEFAULT_INTERVAL_UNIT;
+        }
+        sp(c).edit()
+                .putInt(KEY_INTERVAL_VALUE, safeValue)
+                .putString(KEY_INTERVAL_UNIT, safeUnit)
+                .apply();
+    }
+
+    /** The interval in milliseconds, derived from the value and unit. */
+    public static long intervalMs(Context c) {
+        int value = intervalValue(c);
+        String unit = intervalUnit(c);
+        long base;
+        if (UNIT_DAYS.equals(unit)) {
+            base = DAY_MS;
+        } else if (UNIT_WEEKS.equals(unit)) {
+            base = WEEK_MS;
+        } else if (UNIT_MONTHS.equals(unit)) {
+            base = MONTH_MS;
+        } else {
+            base = HOUR_MS;
+        }
+        return value * base;
+    }
+
+    /** "every 12 hours", "every 1 day" — for summaries. */
+    public static String intervalLabel(Context c) {
+        int value = intervalValue(c);
+        String unit = intervalUnit(c);
+        if (value == 1) {
+            // "hour", "day", "week", "month"
+            unit = unit.substring(0, unit.length() - 1);
+        }
+        return "every " + value + " " + unit;
     }
 }

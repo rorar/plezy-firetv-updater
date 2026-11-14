@@ -68,6 +68,21 @@ The device also answers mDNS as `Android.local`.
 | `offline` | Stale transport / device asleep | `adb disconnect && adb connect` |
 | (absent) | ADB debugging off, wrong IP, or Wi-Fi off | Check *Settings → My Fire TV → Developer Options → ADB debugging* |
 
+## The ADB daemon stops on its own — toggle it off and on
+
+Fire OS 6 on the stick periodically stops answering ADB even though the device is fine: it still
+pings, and port 5555 may still look open, but `adb devices` shows `offline` and reconnecting does
+not help. This happened repeatedly during development (the summary note "adb link is flaky" is
+this bug). `adb disconnect` → `adb kill-server` → `adb start-server` → `adb connect` sometimes
+recovers it; when it does not, the reliable fix is on the TV:
+
+> **Settings → My Fire TV → Developer Options → ADB debugging: switch it Off, then On again.**
+
+The port reopens a few seconds later and `adb connect 192.168.1.50:5555` succeeds. Treat "toggle
+ADB debugging" as the standard first step whenever the connection goes stale for more than a
+minute — it is faster than fighting the server-side reconnect loop. The persisted host key
+(`~/.android/adbkey`) means no new authorisation prompt appears after the toggle.
+
 ## Cheat-sheet
 
 Read-only inspection:

@@ -2,9 +2,6 @@ package dev.rorar.plezyupdater;
 
 import android.app.Activity;
 import android.content.Intent;
-import android.graphics.Color;
-import android.graphics.drawable.ColorDrawable;
-import android.graphics.drawable.StateListDrawable;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -42,6 +39,7 @@ public class VersionListActivity extends Activity {
 
     private ListView list;
     private TextView empty;
+    private TextView changelogHeader;
     private TextView changelog;
     private ScrollView changelogScroll;
     private String installedVersion;
@@ -55,27 +53,23 @@ public class VersionListActivity extends Activity {
     }
 
     private void buildUi() {
-        int pad = dp(40);
+        int pad = Ui.dp(this, 40);
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(Color.rgb(16, 24, 32));
+        root.setBackgroundColor(Ui.BG);
         root.setPadding(pad, pad, pad, pad);
 
-        TextView title = new TextView(this);
-        title.setText("Choose version");
-        title.setTextColor(Color.WHITE);
-        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 30);
-        root.addView(title);
+        root.addView(Ui.title(this, "Choose version"));
 
-        TextView hint = new TextView(this);
-        hint.setText("Newest first. Installed: "
+        TextView hint = Ui.subtitle(this, "Newest first. Installed: "
                 + (installedVersion == null ? "none" : installedVersion)
                 + "   —   press OK to install the highlighted version.");
-        hint.setTextColor(Color.rgb(150, 168, 182));
-        hint.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
-        hint.setPadding(0, dp(6), 0, dp(12));
-        root.addView(hint);
+        LinearLayout.LayoutParams hintParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        hintParams.topMargin = Ui.dp(this, 6);
+        hintParams.bottomMargin = Ui.dp(this, 12);
+        root.addView(hint, hintParams);
 
         LinearLayout columns = new LinearLayout(this);
         columns.setOrientation(LinearLayout.HORIZONTAL);
@@ -87,17 +81,14 @@ public class VersionListActivity extends Activity {
                 LinearLayout.LayoutParams.MATCH_PARENT, 1f));
 
         list = new ListView(this);
-        list.setBackgroundColor(Color.rgb(16, 24, 32));
+        list.setBackgroundColor(Ui.BG);
         list.setDivider(null);
-        list.setSelector(focusSelector());
+        list.setSelector(Ui.listSelector());
         list.setVerticalScrollBarEnabled(true);
         listFrame.addView(list, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
 
-        empty = new TextView(this);
-        empty.setText("Loading releases…");
-        empty.setTextColor(Color.rgb(150, 168, 182));
-        empty.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
+        empty = Ui.text(this, "Loading releases…", 18, Ui.TEXT_MUTED);
         empty.setGravity(Gravity.CENTER);
         listFrame.addView(empty, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
@@ -105,27 +96,27 @@ public class VersionListActivity extends Activity {
 
         LinearLayout changelogColumn = new LinearLayout(this);
         changelogColumn.setOrientation(LinearLayout.VERTICAL);
-        changelogColumn.setPadding(dp(24), 0, 0, 0);
+        changelogColumn.setPadding(Ui.dp(this, 24), 0, 0, 0);
         columns.addView(changelogColumn, new LinearLayout.LayoutParams(0,
                 LinearLayout.LayoutParams.MATCH_PARENT, 1.3f));
 
-        TextView changelogHeading = new TextView(this);
-        changelogHeading.setText("RELEASE NOTES");
-        changelogHeading.setTextColor(Color.rgb(110, 168, 200));
-        changelogHeading.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
-        changelogHeading.setPadding(0, dp(8), 0, dp(6));
+        TextView changelogHeading = Ui.sectionHeading(this, "Release notes");
+        changelogHeading.setPadding(0, Ui.dp(this, 8), 0, Ui.dp(this, 6));
         changelogColumn.addView(changelogHeading);
 
-        changelogScroll = new ScrollView(this);
-        changelogScroll.setBackgroundColor(Color.rgb(22, 32, 42));
-        changelogScroll.setPadding(dp(16), dp(12), dp(16), dp(12));
-        changelogColumn.addView(changelogScroll, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
+        changelogHeader = Ui.text(this, "", 20, android.graphics.Color.WHITE);
+        changelogColumn.addView(changelogHeader);
 
-        changelog = new TextView(this);
-        changelog.setTextColor(Color.rgb(214, 222, 230));
-        changelog.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
-        changelog.setText("Select a version to see its release notes.");
+        changelogScroll = new ScrollView(this);
+        changelogScroll.setBackground(Ui.rounded(this, Ui.SURFACE, 10));
+        changelogScroll.setPadding(Ui.dp(this, 16), Ui.dp(this, 12),
+                Ui.dp(this, 16), Ui.dp(this, 12));
+        LinearLayout.LayoutParams scrollParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f);
+        scrollParams.topMargin = Ui.dp(this, 8);
+        changelogColumn.addView(changelogScroll, scrollParams);
+
+        changelog = Ui.body(this, "Select a version to see its release notes.");
         changelogScroll.addView(changelog);
 
         setContentView(root);
@@ -195,28 +186,20 @@ public class VersionListActivity extends Activity {
     }
 
     private void showChangelog(PlezyRepo.Release release) {
-        String notes = Markdown.toPlainText(release.body);
-        String header = release.tag + (release.publishedAt == null ? "" : "   " + date(release.publishedAt));
-        if (notes.isEmpty()) {
+        changelogHeader.setText(release.tag
+                + (release.publishedAt == null ? "" : "   " + date(release.publishedAt)));
+        CharSequence notes = Markdown.toStyled(release.body,
+                getResources().getDisplayMetrics().density);
+        if (notes.length() == 0) {
             notes = "No release notes for this version.";
         }
-        changelog.setText(header + "\n\n" + notes);
+        changelog.setText(notes);
         changelogScroll.scrollTo(0, 0);
     }
 
     /** "2026-11-13T…Z" → "2026-11-13". */
     static String date(String iso) {
         return iso != null && iso.length() >= 10 ? iso.substring(0, 10) : iso;
-    }
-
-    private static StateListDrawable focusSelector() {
-        StateListDrawable selector = new StateListDrawable();
-        selector.addState(new int[]{android.R.attr.state_focused},
-                new ColorDrawable(Color.rgb(47, 110, 143)));
-        selector.addState(new int[]{android.R.attr.state_pressed},
-                new ColorDrawable(Color.rgb(47, 110, 143)));
-        selector.addState(new int[]{}, new ColorDrawable(Color.TRANSPARENT));
-        return selector;
     }
 
     private class ReleaseAdapter extends BaseAdapter {
@@ -247,15 +230,12 @@ public class VersionListActivity extends Activity {
                 label += "   (installed)";
             }
             row.setText(label);
-            row.setTextColor(Color.WHITE);
+            row.setTextColor(Ui.TEXT);
             row.setTextSize(TypedValue.COMPLEX_UNIT_SP, 20);
             row.setGravity(Gravity.CENTER_VERTICAL);
-            row.setPadding(dp(20), dp(14), dp(20), dp(14));
+            row.setPadding(Ui.dp(VersionListActivity.this, 20), Ui.dp(VersionListActivity.this, 14),
+                    Ui.dp(VersionListActivity.this, 20), Ui.dp(VersionListActivity.this, 14));
             return row;
         }
-    }
-
-    private int dp(int value) {
-        return Math.round(getResources().getDisplayMetrics().density * value);
     }
 }

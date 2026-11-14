@@ -9,9 +9,9 @@ Android archives on GitHub, and therefore does not fit either of the "normal" up
 follows from it.
 
 > Status: **a working updater app** (`app/`) plus the findings that led to it (`docs/`) and a
-> throwaway probe (`probe/`). Verified end-to-end on the stick.
+> throwaway probe (`probe/`). Verified end-to-end on the stick, UI overhaul included.
 
-Verified on **2026-11-13** with Plezy `2.26.0`, ADB `1.0.41` (platform-tools `37.0.0`).
+Verified on **2026-11-13/14** with Plezy `2.26.0`, ADB `1.0.41` (platform-tools `37.0.0`).
 
 ---
 
@@ -37,10 +37,12 @@ Verified on **2026-11-13** with Plezy `2.26.0`, ADB `1.0.41` (platform-tools `37
    installer confirmation dialog. See [docs/07](docs/07-notification-design.md).
 7. **The updater is built and works.** `app/` (`dev.rorar.plezyupdater`, plain Java, no Gradle)
    checks GitHub, downloads the upstream tarball, verifies the signer, and installs through the
-   stock dialog. It also shows per-version changelogs and can uninstall Plezy. Two surprises are
-   documented: on API 25 the app must launch the installer dialog itself, and Android 7.1 refuses
-   downgrades of release builds — so a downgrade is done by uninstalling and reinstalling.
-   See [docs/08](docs/08-app-implementation.md).
+   stock dialog. It also shows per-version changelogs, can uninstall Plezy, and lets the user pick
+   the check interval. Two surprises are documented: on API 25 the app must launch the installer
+   dialog itself, and Android 7.1 refuses downgrades of release builds — so a downgrade is done by
+   uninstalling and reinstalling. The UI is a TV-first dashboard (large text, one primary action,
+   unmistakable D-pad focus) with real release-notes typography. See
+   [docs/08](docs/08-app-implementation.md) and [docs/10](docs/10-tv-ui-design.md).
 
 ## Current state of the stick
 
@@ -54,12 +56,14 @@ Verified on **2026-11-13** with Plezy `2.26.0`, ADB `1.0.41` (platform-tools `37
 
 ## The updater app
 
-`app/` builds to a ~42 KB APK. It polls the upstream GitHub release twice a day (and after boot),
-posts a notification when something newer exists, and installs it with one confirmation on the
-stock Fire OS installer screen. Settings are grouped into User / Advanced / Developer sections:
+`app/` builds to a ~49 KB APK. It polls the upstream GitHub release on a user-set interval
+(default twice a day) and after boot, posts a notification when something newer exists, and
+installs it with one confirmation on the stock Fire OS installer screen. Settings are grouped into
+User / Advanced / Developer sections:
 
 - **Toast notifications** and **Notifications** — each output can be turned off independently.
-- **Check automatically** — the 12 h alarm + boot re-arm.
+- **Check automatically** — enables the interval alarm + boot re-arm.
+- **Check interval** — every *n* hours / days / weeks / months (1–30), default 12 hours.
 - **Delete APK after installing** — on by default, frees the downloaded APK once installed.
 - **Uninstall Plezy…** — removes Plezy through the stock uninstaller, after a confirm.
 - **Allow older versions** — developer option: pick any release, not just newer ones. A downgrade
@@ -67,8 +71,9 @@ stock Fire OS installer screen. Settings are grouped into User / Advanced / Deve
   costs two confirmations and erases Plezy's data; the app warns first.
 
 **Choose version…** opens a two-pane picker (versions left, release notes right), and **What's
-new** shows the selected release's notes. It also shows free space and refuses to start a download
-that would not fit.
+new** shows the selected release's notes. Release notes are rendered with real typography —
+coloured, larger section headings and hanging-indented bullets — through a hand-written
+`Markdown.toStyled`. It also shows free space and refuses to start a download that would not fit.
 
 Build (no Gradle — `aapt2` + `javac` + `d8` + `zipalign` + `apksigner`):
 
@@ -90,8 +95,9 @@ adb install -r build/plezy-updater.apk
 | [05-update-strategies](docs/05-update-strategies.md) | Amazon store vs Obtainium vs PC cron vs own APK |
 | [06-own-updater-feasibility](docs/06-own-updater-feasibility.md) | What an own updater can and cannot do here |
 | [07-notification-design](docs/07-notification-design.md) | Notification infrastructure findings + architecture |
-| [08-app-implementation](docs/08-app-implementation.md) | The updater app as built: pending-user-action, downgrade, uninstall, changelog, storage, settings |
-| [09-backlog](docs/09-backlog.md) | Done items plus the open ideas (changelog typography, custom interval, UI overhaul) |
+| [08-app-implementation](docs/08-app-implementation.md) | The updater app as built: pending-user-action, downgrade, uninstall, changelog typography, check interval, the `Ui` toolkit, storage, settings |
+| [09-backlog](docs/09-backlog.md) | Done items (no open requests) |
+| [10-tv-ui-design](docs/10-tv-ui-design.md) | The TV UI plan: layout grid, focus model, per-screen design, how the look is verified |
 
 ## Quick start (reproduce the install)
 

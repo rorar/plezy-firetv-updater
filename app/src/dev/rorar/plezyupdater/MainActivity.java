@@ -8,18 +8,16 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
-import android.util.TypedValue;
-import android.view.Gravity;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 
 import java.io.File;
@@ -48,8 +46,10 @@ public class MainActivity extends Activity {
     }
 
     private TextView statusView;
+    private TextView statusHeadline;
     private TextView progressView;
     private TextView storageView;
+    private TextView hintView;
     private Button checkButton;
     private Button installButton;
     private Button chooseButton;
@@ -155,6 +155,7 @@ public class MainActivity extends Activity {
             installedAtInstallCommit = null;
         }
         chooseButton.setVisibility(Prefs.allowOlderVersions(this) ? View.VISIBLE : View.GONE);
+        updateHint();
         renderStatus();
         // Plezy may have been installed or uninstalled while this screen was away (e.g. the
         // Settings screen's uninstall): ask again so the status is not stale. Skipped during a
@@ -209,36 +210,41 @@ public class MainActivity extends Activity {
     }
 
     private void buildUi() {
-        int pad = dp(48);
+        int pad = dp(32);
 
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(Color.rgb(16, 24, 32));
-        root.setPadding(pad, pad, pad, pad);
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setBackgroundColor(Ui.BG);
+        content.setPadding(pad, pad, pad, pad);
 
-        TextView title = new TextView(this);
-        title.setText("Plezy Updater");
-        title.setTextColor(Color.WHITE);
-        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 34);
-        root.addView(title);
+        content.addView(Ui.title(this, "Plezy Updater"));
 
-        statusView = new TextView(this);
-        statusView.setTextColor(Color.rgb(184, 199, 212));
-        statusView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 22);
-        LinearLayout.LayoutParams statusParams = new LinearLayout.LayoutParams(
+        TextView subtitle = Ui.subtitle(this, "Keeps com.edde746.plezy up to date on this TV.");
+        LinearLayout.LayoutParams subtitleParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        statusParams.topMargin = dp(16);
-        root.addView(statusView, statusParams);
+        subtitleParams.topMargin = dp(2);
+        content.addView(subtitle, subtitleParams);
 
-        progressView = new TextView(this);
-        progressView.setTextColor(Color.rgb(128, 200, 255));
-        progressView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
+        // Status card: a one-line verdict, the versions behind it, and what to do next.
+        LinearLayout statusCard = Ui.card(this);
+        statusHeadline = Ui.text(this, "", 24, Ui.TEXT);
+        statusCard.addView(statusHeadline);
+        statusView = Ui.text(this, "", 17, Ui.TEXT_MUTED);
+        LinearLayout.LayoutParams detailParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        detailParams.topMargin = dp(4);
+        statusCard.addView(statusView, detailParams);
+        progressView = Ui.text(this, "", 16, Ui.LINK);
         LinearLayout.LayoutParams progressParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        progressParams.topMargin = dp(8);
-        root.addView(progressView, progressParams);
+        progressParams.topMargin = dp(6);
+        statusCard.addView(progressView, progressParams);
+        LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        cardParams.topMargin = dp(12);
+        content.addView(statusCard, cardParams);
 
-        installButton = button("Install update");
+        installButton = Ui.primaryButton(this, "Install update");
         installButton.setEnabled(false);
         installButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -246,9 +252,9 @@ public class MainActivity extends Activity {
                 downloadAndInstall();
             }
         });
-        root.addView(installButton, buttonParams());
+        content.addView(installButton, buttonParams(12));
 
-        whatsNewButton = button("What's new");
+        whatsNewButton = Ui.actionButton(this, "What's new");
         whatsNewButton.setVisibility(View.GONE);
         whatsNewButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -256,18 +262,18 @@ public class MainActivity extends Activity {
                 showWhatsNew();
             }
         });
-        root.addView(whatsNewButton, buttonParams());
+        content.addView(whatsNewButton, buttonParams(8));
 
-        checkButton = button("Check for updates");
+        checkButton = Ui.actionButton(this, "Check for updates");
         checkButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 checkForUpdates(true);
             }
         });
-        root.addView(checkButton, buttonParams());
+        content.addView(checkButton, buttonParams(8));
 
-        chooseButton = button("Choose version…");
+        chooseButton = Ui.actionButton(this, "Choose version…");
         chooseButton.setVisibility(View.GONE);
         chooseButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -277,86 +283,111 @@ public class MainActivity extends Activity {
                         REQUEST_PICK_VERSION);
             }
         });
-        root.addView(chooseButton, buttonParams());
+        content.addView(chooseButton, buttonParams(8));
 
-        Button settingsButton = button("Settings");
+        Button settingsButton = Ui.actionButton(this, "Settings");
         settingsButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 startActivity(new Intent(MainActivity.this, SettingsActivity.class));
             }
         });
-        root.addView(settingsButton, buttonParams());
+        content.addView(settingsButton, buttonParams(8));
 
-        TextView hint = new TextView(this);
-        hint.setText("A check runs twice a day while the TV is on. "
-                + "An update needs one confirmation on the system installer screen.");
-        hint.setTextColor(Color.rgb(120, 136, 150));
-        hint.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
+        hintView = Ui.muted(this, "");
         LinearLayout.LayoutParams hintParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        hintParams.topMargin = dp(24);
-        root.addView(hint, hintParams);
+        hintParams.topMargin = dp(14);
+        content.addView(hintView, hintParams);
 
-        storageView = new TextView(this);
-        storageView.setTextColor(Color.rgb(120, 136, 150));
-        storageView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
+        storageView = Ui.muted(this, "");
         LinearLayout.LayoutParams storageParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        storageParams.topMargin = dp(6);
-        root.addView(storageView, storageParams);
+        storageParams.topMargin = dp(4);
+        content.addView(storageView, storageParams);
 
-        setContentView(root);
+        ScrollView scroll = new ScrollView(this);
+        scroll.setBackgroundColor(Ui.BG);
+        scroll.addView(content);
+        setContentView(scroll);
+
+        updateHint();
         checkButton.requestFocus();
     }
 
-    private Button button(String text) {
-        Button b = new Button(this);
-        b.setText(text);
-        b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 20);
-        b.setGravity(Gravity.CENTER);
-        b.setFocusable(true);
-        return b;
-    }
-
-    private LinearLayout.LayoutParams buttonParams() {
+    private LinearLayout.LayoutParams buttonParams(int topMarginDp) {
         LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        p.topMargin = dp(12);
+        p.topMargin = dp(topMarginDp);
         return p;
+    }
+
+    /** The footer hint follows the configured interval. */
+    private void updateHint() {
+        if (hintView == null) {
+            return;
+        }
+        hintView.setText("Checks " + Prefs.intervalLabel(this)
+                + " while the TV is on. An update needs one confirmation on the system "
+                + "installer screen.");
     }
 
     private void renderStatus() {
         String installed = installedVersion == null ? "not installed" : installedVersion;
-        StringBuilder sb = new StringBuilder();
-        sb.append("Installed: ").append(installed);
+        int comparison = pendingRelease == null ? 0
+                : PlezyRepo.compareVersions(latestVersion, installedVersion);
 
-        int comparison = 0;
-        if (pendingRelease != null) {
-            comparison = PlezyRepo.compareVersions(latestVersion, installedVersion);
-            if (installedVersion == null) {
-                sb.append("\nLatest upstream: ").append(latestVersion).append(" (not installed)");
-            } else {
-                sb.append("\nSelected: ").append(latestVersion);
-            }
-        } else if (lastError != null) {
-            sb.append("\nLast check failed: ").append(lastError);
+        String headline;
+        int headlineColor;
+        String detail;
+        String action;
+
+        if (pendingRelease == null && lastError != null) {
+            headline = "Update check failed";
+            headlineColor = Ui.ERROR;
+            detail = "Installed: " + installed;
+            action = lastError;
+        } else if (pendingRelease != null && installedVersion == null) {
+            headline = "Plezy is not installed";
+            headlineColor = Ui.WARN;
+            detail = "Latest upstream: " + latestVersion;
+            action = "Press \"Install update\" to install it.";
+        } else if (pendingRelease != null && comparison > 0) {
+            headline = "Update available";
+            headlineColor = Ui.ACCENT_BRIGHT;
+            detail = "Installed " + installedVersion + "   ·   latest " + latestVersion;
+            action = "Press \"Install update\" to get " + latestVersion + ".";
+        } else if (pendingRelease != null && comparison == 0) {
+            headline = "Selected " + latestVersion;
+            headlineColor = Ui.TEXT_HEADING;
+            detail = "Installed " + installedVersion + "   ·   same version";
+            action = "Installing re-downloads it.";
+        } else if (pendingRelease != null) {
+            headline = "Selected " + latestVersion;
+            headlineColor = Ui.TEXT_HEADING;
+            detail = "Installed " + installedVersion + "   ·   older";
+            action = "Downgrade uninstalls first — enabled by \"Allow older versions\".";
         } else if (latestVersion != null) {
-            sb.append("\nLatest upstream: ").append(latestVersion).append(" (up to date)");
+            headline = "Plezy is up to date";
+            headlineColor = Ui.OK;
+            detail = "Installed " + installedVersion + "   ·   latest " + latestVersion;
+            action = "";
+        } else {
+            headline = "Checking for updates…";
+            headlineColor = Ui.TEXT_MUTED;
+            detail = installedVersion == null
+                    ? "Plezy is not installed." : "Installed " + installedVersion + ".";
+            action = "";
         }
-        statusView.setText(sb.toString());
 
-        if (pendingRelease != null) {
-            if (installedVersion == null) {
-                progressView.setText("Plezy is not installed — press \"Install update\".");
-            } else if (comparison > 0) {
-                progressView.setText("Update available — press \"Install update\".");
-            } else if (comparison == 0) {
-                progressView.setText("Same version as installed — installing re-downloads it.");
-            } else {
-                progressView.setText("Older than installed — enabled by \"Allow older versions\".");
-            }
+        statusHeadline.setText(headline);
+        statusHeadline.setTextColor(headlineColor);
+        statusView.setText(detail);
+        // While a download/install is running, the progress line belongs to that flow.
+        if (!busy) {
+            progressView.setText(action);
         }
+
         installButton.setText(pendingRelease == null
                 ? "Install update" : "Install " + latestVersion);
         installButton.setEnabled(pendingRelease != null && !busy);
@@ -430,17 +461,14 @@ public class MainActivity extends Activity {
         checkedInstalledVersion = result.installedVersion;
 
         if (result.error != null) {
-            progressView.setText("Check failed: " + result.error);
             if (manual) {
                 Notifier.toast(this, "Update check failed");
             }
         } else if (result.isNewer()) {
-            progressView.setText("Plezy " + result.latestVersion + " is available.");
             if (manual) {
                 Notifier.toast(this, "Plezy " + result.latestVersion + " is available");
             }
         } else {
-            progressView.setText("Plezy is up to date.");
             if (manual) {
                 Notifier.toast(this, "Plezy " + result.installedVersion + " is up to date");
             }

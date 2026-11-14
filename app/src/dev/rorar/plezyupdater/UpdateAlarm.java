@@ -8,11 +8,11 @@ import android.content.Intent;
 /**
  * Arms the periodic background check. On API 25 there are no Doze-forced inexact limits or
  * background-service restrictions to fight, so a plain alarm plus a short service is enough.
+ *
+ * <p>The cadence comes from the settings (default 12 h) so the user can pick anything from hourly
+ * to monthly. GitHub's unauthenticated limit is 60 requests per hour, so even hourly is tiny.
  */
 public final class UpdateAlarm {
-
-    /** Twice a day. GitHub's unauthenticated limit is 60 requests per hour, so this is tiny. */
-    private static final long INTERVAL_MS = 12L * 60L * 60L * 1000L;
 
     /** A few minutes after boot/launch, so the TV has settled its network. */
     private static final long FIRST_DELAY_MS = 2L * 60L * 1000L;
@@ -31,7 +31,7 @@ public final class UpdateAlarm {
         PendingIntent pi = pendingIntent(c);
         am.cancel(pi);
         am.setInexactRepeating(AlarmManager.RTC_WAKEUP,
-                System.currentTimeMillis() + FIRST_DELAY_MS, INTERVAL_MS, pi);
+                System.currentTimeMillis() + FIRST_DELAY_MS, Prefs.intervalMs(c), pi);
     }
 
     public static void cancel(Context c) {
