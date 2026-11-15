@@ -347,6 +347,26 @@ adb install -r build/plezy-updater.apk
 `app/debug.keystore` (gitignored) signs the updater; **keep it**, or the installed updater can
 no longer be replaced by a new build.
 
+## Flow tests (`test/`)
+
+The four flows below are also written down as runnable code in [`test/`](../test/README.md). The
+harness drives the real stick over ADB the way a person with the remote does — it reads the screen
+with `uiautomator dump`, finds the labelled button, and taps its centre — so the tests double as a
+record of *what to click* for each flow:
+
+```bash
+python3 test/run.py install                    # forward path (non-destructive)
+python3 test/run.py all --yes                   # install → downgrade → uninstall → clean-install
+python3 test/run.py install --app-lang de       # against a German build
+```
+
+**No label is hard-coded.** The app's own strings come from `test/strings/app.<lang>.json` (selected
+with `--app-lang`) and the stock installer/uninstaller strings from `test/strings/system.<lang>.json`
+(selected from the device locale with `--system-lang`, auto-detected). The same flows therefore run
+against an English or a German build and against a German or English Fire OS; adding a language is
+a matter of copying a pair of JSON files. The German app strings already exist as the *target* in
+`app.de.json` — see the backlog ([09](09-backlog.md)).
+
 ## Verified on hardware (2026-11-14)
 
 | Step | Result |

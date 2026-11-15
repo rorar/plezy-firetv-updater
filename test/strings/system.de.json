@@ -1,0 +1,18 @@
+{
+  "language": "German",
+  "locale": "de-DE",
+  "_comment": "The stock installer / uninstaller labels. These follow the DEVICE locale, not the app's, so they are chosen by --system-lang (auto-detected from persist.sys.locale).",
+
+  "installer": {
+    "confirm": "INSTALLIEREN",
+    "cancel": "ABBRECHEN",
+    "fresh_prompt_contains": "Möchtest du diese App installieren?",
+    "update_prompt_contains": "Möchtest du ein Update für diese App installieren?"
+  },
+
+  "uninstaller": {
+    "confirm": "OK",
+    "cancel": "Abbrechen",
+    "prompt_contains": "Möchtest du diese App deinstallieren?"
+  }
+}

@@ -5,7 +5,12 @@ parking lot. Status is checked against the code in `app/`.
 
 ## Requested — not started
 
-_None. The last open request — main-screen icons — landed on 2026-11-14 (see below)._
+- **Translate the app to German.** The updater's UI is English today; a German build is wanted.
+  The app has no resource merging (hand-rolled `aapt2`, no Gradle), so the strings live in the
+  Java. The flow tests already carry the *target* German strings in
+  [`test/strings/app.de.json`](../test/strings/app.de.json) — once the Java is translated to match,
+  re-run the flows with `--app-lang de` (see [test/README](../test/README.md)). Keep the Java and
+  that file in step.
 
 ## Already implemented
 
@@ -82,4 +87,8 @@ _None. The last open request — main-screen icons — landed on 2026-11-14 (see
 - **Icons on the main screen** and the **original app icon / TV banner** landed on 2026-11-14.
   With those in, there are **no open requests**; new ones go under *Requested* above.
 - **Install directly from the version picker** landed on 2026-11-15 (shared `InstallFlow`; main
-  screen keeps the initial-install flow). Still **no open requests**.
+  screen keeps the initial-install flow). That closed the last request at the time.
+- **Flow tests** landed on 2026-11-15: the four flows (install / downgrade / uninstall /
+  clean-install) are written down as code in [`test/`](../test/README.md), with all labels loaded
+  from per-language JSON so the same flows run against any app language and device locale.
+- The only open request is now the **German translation** (see *Requested* above).

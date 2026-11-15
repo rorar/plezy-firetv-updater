@@ -1,0 +1,16 @@
+{
+  "_comment": "Non-localised constants. Everything the user sees is in strings/.",
+
+  "updater_package": "dev.rorar.plezyupdater",
+  "main_activity": "dev.rorar.plezyupdater/.MainActivity",
+  "plezy_package": "com.edde746.plezy",
+
+  "installer_activity": "com.android.packageinstaller/.PackageInstallerActivity",
+  "uninstaller_activity": "com.android.packageinstaller/.UninstallerActivity",
+
+  "versions": {
+    "_comment": "The two releases the flows use. Bump these (or pass --latest/--older) when upstream moves on.",
+    "latest": "2.26.0",
+    "older": "2.25.0"
+  }
+}

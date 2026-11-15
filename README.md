@@ -9,8 +9,9 @@ Android archives on GitHub, and therefore does not fit either of the "normal" up
 follows from it.
 
 > Status: **a working updater app** (`app/`) plus the findings that led to it (`docs/`), the
-> artwork sources (`design/`) and a throwaway probe (`probe/`). Verified end-to-end on the stick,
-> UI overhaul, original artwork and the shared install routine included.
+> artwork sources (`design/`), the on-device **flow tests** (`test/`) and a throwaway probe
+> (`probe/`). Verified end-to-end on the stick, UI overhaul, original artwork and the shared
+> install routine included.
 
 Verified on **2026-11-13/15** with Plezy `2.26.0`, ADB `1.0.41` (platform-tools `37.0.0`).
 
@@ -111,8 +112,24 @@ adb install -r build/plezy-updater.apk
 | [06-own-updater-feasibility](docs/06-own-updater-feasibility.md) | What an own updater can and cannot do here |
 | [07-notification-design](docs/07-notification-design.md) | Notification infrastructure findings + architecture |
 | [08-app-implementation](docs/08-app-implementation.md) | The updater app as built: pending-user-action, the shared install routine, downgrade, uninstall, changelog typography, check interval, the `Ui` toolkit, icons/artwork, storage, settings |
-| [09-backlog](docs/09-backlog.md) | Done items (no open requests) |
+| [09-backlog](docs/09-backlog.md) | Done items, plus the one open request (translate the app to German) |
 | [10-tv-ui-design](docs/10-tv-ui-design.md) | The TV UI plan: layout grid, focus model, icons, per-screen design, how the look is verified |
+
+## Flow tests
+
+The four flows — **install**, **downgrade**, **uninstall**, **clean-install** — are written down as
+code in [`test/`](test/README.md). They drive the real stick over ADB exactly as a person with the
+remote would (find the labelled button, tap it), so they double as a record of what to click:
+
+```bash
+python3 test/run.py install          # forward path (non-destructive)
+python3 test/run.py all --yes        # the whole sequence
+python3 test/run.py install --app-lang de   # against a German build
+```
+
+Every label the flows look for lives in per-language JSON (`test/strings/app.<lang>.json` for the
+app, `test/strings/system.<lang>.json` for the stock Fire OS dialogs), so no label is hard-coded and
+the same flows run against any app language and any device locale.
 
 ## Quick start (reproduce the install)
 

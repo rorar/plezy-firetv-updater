@@ -1,0 +1,18 @@
+{
+  "language": "English",
+  "locale": "en-US",
+  "_comment": "The stock installer / uninstaller labels on an English-locale device. Kept for completeness; this stick is de-DE.",
+
+  "installer": {
+    "confirm": "INSTALL",
+    "cancel": "CANCEL",
+    "fresh_prompt_contains": "Do you want to install this app?",
+    "update_prompt_contains": "Do you want to update this app?"
+  },
+
+  "uninstaller": {
+    "confirm": "OK",
+    "cancel": "CANCEL",
+    "prompt_contains": "Do you want to uninstall this app?"
+  }
+}

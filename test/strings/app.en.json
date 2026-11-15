@@ -1,0 +1,37 @@
+{
+  "language": "English",
+  "_comment": "The updater app's own UI strings, as built. One file per language the app can be built in.",
+
+  "main": {
+    "title": "Plezy Updater",
+    "install_update": "Install update",
+    "install_version": "Install {version}",
+    "whats_new": "What's new",
+    "check_for_updates": "Check for updates",
+    "choose_version": "Choose version…",
+    "settings": "Settings",
+    "not_installed_headline": "Plezy is not installed"
+  },
+
+  "picker": {
+    "title": "Choose version",
+    "installed_suffix": "(installed)",
+    "progress_installed": "Installed {version}.",
+    "progress_confirm": "Confirm the install on the TV."
+  },
+
+  "settings": {
+    "title": "Settings",
+    "advanced_section": "Advanced settings",
+    "uninstall_row": "Uninstall Plezy…",
+    "uninstall_confirm_title": "Uninstall Plezy?",
+    "uninstall_confirm_button": "Uninstall",
+    "not_installed_summary": "Plezy is not installed."
+  },
+
+  "dialog": {
+    "cancel": "Cancel",
+    "downgrade_title": "Downgrade to {version}?",
+    "downgrade_button": "Uninstall & install"
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "language": "German",
+  "_status": "TARGET for the pending German translation of the app. The app is built in English today, so a run with --app-lang de will fail until the Java strings are translated to match these. Keep this file and the Java in step.",
+
+  "main": {
+    "title": "Plezy Updater",
+    "install_update": "Update installieren",
+    "install_version": "{version} installieren",
+    "whats_new": "Neuigkeiten",
+    "check_for_updates": "Nach Updates suchen",
+    "choose_version": "Version wählen…",
+    "settings": "Einstellungen",
+    "not_installed_headline": "Plezy ist nicht installiert"
+  },
+
+  "picker": {
+    "title": "Version wählen",
+    "installed_suffix": "(installiert)",
+    "progress_installed": "{version} installiert.",
+    "progress_confirm": "Installation auf dem TV bestätigen."
+  },
+
+  "settings": {
+    "title": "Einstellungen",
+    "advanced_section": "Erweiterte Einstellungen",
+    "uninstall_row": "Plezy deinstallieren…",
+    "uninstall_confirm_title": "Plezy deinstallieren?",
+    "uninstall_confirm_button": "Deinstallieren",
+    "not_installed_summary": "Plezy ist nicht installiert."
+  },
+
+  "dialog": {
+    "cancel": "Abbrechen",
+    "downgrade_title": "Downgrade auf {version}?",
+    "downgrade_button": "Deinstallieren & installieren"
+  }
+}
