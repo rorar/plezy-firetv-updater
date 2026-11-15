@@ -60,6 +60,18 @@ adb shell input tap 1115 984
 `KEYCODE_DPAD_CENTER`.) After the click, confirm the outcome: `dumpsys package com.edde746.plezy`
 should show a fresh `lastUpdateTime`, and the updater's own screen should report the new version.
 
+### Gotchas seen while driving the flow
+
+- **The first D-pad key event after the installer/uninstaller window closes is swallowed** (a
+  window-focus timing artefact). Press it again — the picker list otherwise ignores the first
+  UP/DOWN, which silently re-installs the same version.
+- The dialog buttons and their centres on this stick (German locale):
+  - installer `INSTALLIEREN` → `[998,936][1232,1032]` → tap `1115 984`;
+  - uninstaller `OK` → `[536,701][956,781]` → tap `746 741`;
+  - app "Downgrade to …?" → `Uninstall & install` → tap `746 718`;
+  - app "Uninstall Plezy?" → `Uninstall` → tap `746 694`.
+  Re-read the bounds with `uiautomator dump` before tapping; they shift with the dialog height.
+
 ## Driving the whole install / uninstall / downgrade flow
 
 The user has **authorised the agent to drive the entire flow by itself** while verifying — no need

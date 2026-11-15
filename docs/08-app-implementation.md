@@ -2,7 +2,7 @@
 
 `app/` is the working updater: `dev.rorar.plezyupdater`, minSdk/targetSdk **25**, plain Java,
 programmatic UI, **no Gradle and no AndroidX**. It was verified end-to-end on the stick
-(AFTMM, Fire OS 6.7.1.1 / API 25) on 2026-11-13/14.
+(AFTMM, Fire OS 6.7.1.1 / API 25) on 2026-11-13/15.
 
 ## What it does
 
@@ -411,6 +411,11 @@ Install-routine phase, same stick (2026-11-15):
 | Confirm on the TV | the harness clicked **INSTALLIEREN**; `lastUpdateTime` jumped, focus returned to the picker |
 | Picker reports the outcome | progress line became "Installed 2.26.0."; hint stayed "Installed: 2.26.0" and the row `2.26.0 (installed)` — **no "Installed: none" flicker** (Finding 4) |
 | Nothing lost | `dumpsys package com.edde746.plezy` = `2.26.0` / `versionCode 1160` before and after; `pm path` unchanged throughout |
+| **Downgrade from the picker** | OK on `2.25.0` → download → "Unpacking…" → app dialog **"Downgrade to 2.25.0?"** → **Uninstall & install** → system `UninstallerActivity` → **OK** → flow auto-opened the installer for the cached APK → **INSTALLIEREN** → Plezy `2.25.0` / `versionCode 1157`; picker reported "Installed 2.25.0." |
+| **Upgrade / replacement** | with `2.25.0` installed, OK on `2.26.0` → **Update** variant of the dialog → **INSTALLIEREN** → Plezy `2.26.0` / `versionCode 1160`; hint never dropped to *Installed: none* (confirms the `EXTRA_REPLACING` guard, [Finding 4](#finding-4--replacing-a-package-also-broadcasts-action_package_removed)) |
+| **Uninstall (from Settings)** | **Advanced → Uninstall Plezy…** → app dialog "Uninstall Plezy?" → **Uninstall** → system `UninstallerActivity` → **OK** → `pm path` empty; the row went `enabled=false` and its summary flipped to "Plezy is not installed." |
+| **Clean install (main screen)** | dashboard showed "Plezy is not installed" / "Latest upstream: 2.26.0" / **Install 2.26.0**; OK → fresh-install dialog ("Möchtest du diese App installieren?") → **INSTALLIEREN** → Plezy `2.26.0`, `lastUpdateTime` fresh; dashboard refreshed to "Plezy is up to date" |
+| **Delete-after-install** | with the setting on, `/data` free space rose across each run (e.g. `939 932` → `960 580` KB after the downgrade), so the downloaded tarball/APK was removed once the install succeeded |
 
 ## Known limitations
 
