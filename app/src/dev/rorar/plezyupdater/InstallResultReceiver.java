@@ -20,6 +20,9 @@ public class InstallResultReceiver extends BroadcastReceiver {
 
     @Override
     public void onReceive(Context c, Intent i) {
+        // A receiver has no activity to wrap; build a context that resolves strings in the picked
+        // language so the toast matches the rest of the app.
+        Context ctx = LocaleHelper.wrap(c);
         int status = i.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE);
         String message = i.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE);
         Log.i(TAG, "install result: status=" + status + " message=" + message);
@@ -27,7 +30,7 @@ public class InstallResultReceiver extends BroadcastReceiver {
         if (status == PackageInstaller.STATUS_PENDING_USER_ACTION) {
             Intent confirm = i.getParcelableExtra(Intent.EXTRA_INTENT);
             if (confirm == null) {
-                Notifier.toast(c, "Install could not be confirmed");
+                Notifier.toast(c, ctx.getString(R.string.toast_install_unconfirmed));
                 return;
             }
             confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -36,7 +39,7 @@ public class InstallResultReceiver extends BroadcastReceiver {
                 c.startActivity(confirm);
             } catch (Throwable t) {
                 Log.e(TAG, "could not launch confirmation intent", t);
-                Notifier.toast(c, "Install could not be confirmed");
+                Notifier.toast(c, ctx.getString(R.string.toast_install_unconfirmed));
             }
             return;
         }
@@ -49,9 +52,10 @@ public class InstallResultReceiver extends BroadcastReceiver {
                 ApkInstaller.deleteDownload(c);
             }
             Notifier.cancelNotification(c);
-            Notifier.toast(c, "Plezy " + PlezyRepo.installedVersion(c) + " installed");
+            Notifier.toast(c, ctx.getString(R.string.toast_installed, PlezyRepo.installedVersion(c)));
         } else {
-            Notifier.toast(c, "Install failed: " + describe(c, status, message));
+            Notifier.toast(c, ctx.getString(R.string.toast_install_failed,
+                    describe(ctx, status, message)));
         }
 
         // A finished install (or a failed one) is the moment the shown state is most likely
@@ -82,43 +86,43 @@ public class InstallResultReceiver extends BroadcastReceiver {
     private static String describe(Context c, int status, String message) {
         String code = message == null ? "" : message;
         if (code.contains("INSTALL_FAILED_VERSION_DOWNGRADE")) {
-            String text = "this build is older than the installed Plezy";
+            String text = c.getString(R.string.result_downgrade);
             if (Prefs.allowOlderVersions(c)) {
-                text += "; Android 7.1 only allows downgrades of debuggable apps";
+                text += c.getString(R.string.result_downgrade_note);
             }
             return text;
         }
         if (code.contains("INSTALL_FAILED_INSUFFICIENT_STORAGE")) {
-            return "not enough free space";
+            return c.getString(R.string.result_no_space);
         }
         if (code.contains("INSTALL_FAILED_UPDATE_INCOMPATIBLE")
                 || code.contains("INSTALL_FAILED_ALREADY_EXISTS")) {
-            return "signed differently from the installed Plezy";
+            return c.getString(R.string.result_different_signer);
         }
         if (code.contains("INSTALL_FAILED_OLDER_SDK")) {
-            return "this build needs a newer Android version";
+            return c.getString(R.string.result_needs_newer_android);
         }
         if (code.contains("INSTALL_FAILED_INVALID_APK")) {
-            return "the downloaded package is invalid";
+            return c.getString(R.string.result_invalid_package);
         }
         if (code.length() > 0) {
             return code;
         }
         switch (status) {
             case PackageInstaller.STATUS_FAILURE_ABORTED:
-                return "cancelled";
+                return c.getString(R.string.result_cancelled);
             case PackageInstaller.STATUS_FAILURE_BLOCKED:
-                return "blocked by the device";
+                return c.getString(R.string.result_blocked);
             case PackageInstaller.STATUS_FAILURE_CONFLICT:
-                return "conflicts with the installed app";
+                return c.getString(R.string.result_conflict);
             case PackageInstaller.STATUS_FAILURE_INCOMPATIBLE:
-                return "not compatible with this device";
+                return c.getString(R.string.result_incompatible);
             case PackageInstaller.STATUS_FAILURE_INVALID:
-                return "invalid package";
+                return c.getString(R.string.result_invalid);
             case PackageInstaller.STATUS_FAILURE_STORAGE:
-                return "not enough storage";
+                return c.getString(R.string.result_storage);
             default:
-                return "status " + status;
+                return c.getString(R.string.result_status, status);
         }
     }
 }

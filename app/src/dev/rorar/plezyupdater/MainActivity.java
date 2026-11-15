@@ -74,8 +74,8 @@ public class MainActivity extends Activity {
 
         @Override
         public void onFailed(String message) {
-            progressView.setText("Update failed: " + message);
-            Notifier.toast(MainActivity.this, "Update failed: " + message);
+            progressView.setText(getString(R.string.progress_update_failed, message));
+            Notifier.toast(MainActivity.this, getString(R.string.progress_update_failed, message));
         }
 
         @Override
@@ -88,6 +88,18 @@ public class MainActivity extends Activity {
             installedVersion = null;
         }
     };
+
+    @Override
+    protected void attachBaseContext(Context base) {
+        super.attachBaseContext(LocaleHelper.wrap(base));
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        // Reached by CLEAR_TOP after a language change: rebuild so the new strings apply.
+        recreate();
+    }
 
     @Override
     protected void onCreate(Bundle state) {
@@ -189,11 +201,11 @@ public class MainActivity extends Activity {
         content.setBackgroundColor(Ui.BG);
         content.setPadding(pad, pad, pad, pad);
 
-        TextView title = Ui.title(this, "Plezy Updater");
+        TextView title = Ui.title(this, getString(R.string.app_name));
         Ui.leadingIcon(title, Ui.icon(this, R.drawable.ic_up, Ui.ACCENT_BRIGHT), 28);
         content.addView(title);
 
-        TextView subtitle = Ui.subtitle(this, "Keeps com.edde746.plezy up to date on this TV.");
+        TextView subtitle = Ui.subtitle(this, getString(R.string.main_subtitle));
         LinearLayout.LayoutParams subtitleParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         subtitleParams.topMargin = dp(2);
@@ -217,7 +229,7 @@ public class MainActivity extends Activity {
         cardParams.topMargin = dp(12);
         content.addView(statusCard, cardParams);
 
-        installButton = Ui.primaryButton(this, "Install update", R.drawable.ic_download);
+        installButton = Ui.primaryButton(this, getString(R.string.main_install_update), R.drawable.ic_download);
         installButton.setEnabled(false);
         installButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -227,7 +239,7 @@ public class MainActivity extends Activity {
         });
         content.addView(installButton, buttonParams(12));
 
-        whatsNewButton = Ui.actionButton(this, "What's new", R.drawable.ic_news);
+        whatsNewButton = Ui.actionButton(this, getString(R.string.main_whats_new), R.drawable.ic_news);
         whatsNewButton.setVisibility(View.GONE);
         whatsNewButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -237,7 +249,7 @@ public class MainActivity extends Activity {
         });
         content.addView(whatsNewButton, buttonParams(8));
 
-        checkButton = Ui.actionButton(this, "Check for updates", R.drawable.ic_refresh);
+        checkButton = Ui.actionButton(this, getString(R.string.main_check), R.drawable.ic_refresh);
         checkButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -246,7 +258,7 @@ public class MainActivity extends Activity {
         });
         content.addView(checkButton, buttonParams(8));
 
-        chooseButton = Ui.actionButton(this, "Choose version…", R.drawable.ic_versions);
+        chooseButton = Ui.actionButton(this, getString(R.string.main_choose_version), R.drawable.ic_versions);
         chooseButton.setVisibility(View.GONE);
         chooseButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -257,7 +269,7 @@ public class MainActivity extends Activity {
         });
         content.addView(chooseButton, buttonParams(8));
 
-        Button settingsButton = Ui.actionButton(this, "Settings", R.drawable.ic_settings);
+        Button settingsButton = Ui.actionButton(this, getString(R.string.main_settings), R.drawable.ic_settings);
         settingsButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -299,13 +311,12 @@ public class MainActivity extends Activity {
         if (hintView == null) {
             return;
         }
-        hintView.setText("Checks " + Prefs.intervalLabel(this)
-                + " while the TV is on. An update needs one confirmation on the system "
-                + "installer screen.");
+        hintView.setText(getString(R.string.main_hint, Prefs.intervalLabel(this)));
     }
 
     private void renderStatus() {
-        String installed = installedVersion == null ? "not installed" : installedVersion;
+        String installed = installedVersion == null
+                ? getString(R.string.main_not_installed_word) : installedVersion;
         int comparison = pendingRelease == null ? 0
                 : PlezyRepo.compareVersions(latestVersion, installedVersion);
 
@@ -316,47 +327,48 @@ public class MainActivity extends Activity {
         String action;
 
         if (pendingRelease == null && lastError != null) {
-            headline = "Update check failed";
+            headline = getString(R.string.status_check_failed);
             headlineColor = Ui.ERROR;
             headlineIcon = R.drawable.ic_error;
-            detail = "Installed: " + installed;
+            detail = getString(R.string.status_installed_prefix, installed);
             action = lastError;
         } else if (pendingRelease != null && installedVersion == null) {
-            headline = "Plezy is not installed";
+            headline = getString(R.string.status_not_installed);
             headlineColor = Ui.WARN;
             headlineIcon = R.drawable.ic_warning;
-            detail = "Latest upstream: " + latestVersion;
-            action = "Press \"Install update\" to install it.";
+            detail = getString(R.string.status_latest_upstream, latestVersion);
+            action = getString(R.string.status_press_install);
         } else if (pendingRelease != null && comparison > 0) {
-            headline = "Update available";
+            headline = getString(R.string.status_update_available);
             headlineColor = Ui.ACCENT_BRIGHT;
             headlineIcon = R.drawable.ic_up;
-            detail = "Installed " + installedVersion + "   ·   latest " + latestVersion;
-            action = "Press \"Install update\" to get " + latestVersion + ".";
+            detail = getString(R.string.status_installed_latest, installedVersion, latestVersion);
+            action = getString(R.string.status_press_get, latestVersion);
         } else if (pendingRelease != null && comparison == 0) {
-            headline = "Selected " + latestVersion;
+            headline = getString(R.string.status_selected, latestVersion);
             headlineColor = Ui.TEXT_HEADING;
             headlineIcon = R.drawable.ic_info;
-            detail = "Installed " + installedVersion + "   ·   same version";
-            action = "Installing re-downloads it.";
+            detail = getString(R.string.status_same_version, installedVersion);
+            action = getString(R.string.status_reinstall);
         } else if (pendingRelease != null) {
-            headline = "Selected " + latestVersion;
+            headline = getString(R.string.status_selected, latestVersion);
             headlineColor = Ui.TEXT_HEADING;
             headlineIcon = R.drawable.ic_down;
-            detail = "Installed " + installedVersion + "   ·   older";
-            action = "Downgrade uninstalls first — enabled by \"Allow older versions\".";
+            detail = getString(R.string.status_older, installedVersion);
+            action = getString(R.string.status_downgrade_note);
         } else if (latestVersion != null) {
-            headline = "Plezy is up to date";
+            headline = getString(R.string.status_up_to_date);
             headlineColor = Ui.OK;
             headlineIcon = R.drawable.ic_check;
-            detail = "Installed " + installedVersion + "   ·   latest " + latestVersion;
+            detail = getString(R.string.status_installed_latest, installedVersion, latestVersion);
             action = "";
         } else {
-            headline = "Checking for updates…";
+            headline = getString(R.string.status_checking);
             headlineColor = Ui.TEXT_MUTED;
             headlineIcon = R.drawable.ic_refresh;
             detail = installedVersion == null
-                    ? "Plezy is not installed." : "Installed " + installedVersion + ".";
+                    ? getString(R.string.status_not_installed_period)
+                    : getString(R.string.status_installed_only, installedVersion);
             action = "";
         }
 
@@ -370,7 +382,8 @@ public class MainActivity extends Activity {
         }
 
         installButton.setText(pendingRelease == null
-                ? "Install update" : "Install " + latestVersion);
+                ? getString(R.string.main_install_update)
+                : getString(R.string.main_install_version, latestVersion));
         installButton.setEnabled(pendingRelease != null && !busy);
 
         // The changelog only makes sense once a specific release is selected.
@@ -378,11 +391,10 @@ public class MainActivity extends Activity {
 
         long free = ApkInstaller.freeBytes(getCacheDir());
         if (free >= 0) {
-            String text = "Free space: " + ApkInstaller.formatSize(this, free);
+            String text = getString(R.string.free_space, ApkInstaller.formatSize(this, free));
             if (free < ApkInstaller.MIN_FREE_SPACE) {
-                text += "  — too little for an update (about "
-                        + ApkInstaller.formatSize(this, ApkInstaller.MIN_FREE_SPACE)
-                        + " needed)";
+                text += getString(R.string.free_space_low,
+                        ApkInstaller.formatSize(this, ApkInstaller.MIN_FREE_SPACE));
             }
             storageView.setText(text);
         }
@@ -414,7 +426,7 @@ public class MainActivity extends Activity {
         setBusy(true);
         lastError = null;
         if (manual) {
-            progressView.setText("Checking for updates…");
+            progressView.setText(getString(R.string.status_checking));
         }
 
         final android.content.Context app = getApplicationContext();
@@ -443,15 +455,15 @@ public class MainActivity extends Activity {
 
         if (result.error != null) {
             if (manual) {
-                Notifier.toast(this, "Update check failed");
+                Notifier.toast(this, getString(R.string.toast_check_failed));
             }
         } else if (result.isNewer()) {
             if (manual) {
-                Notifier.toast(this, "Plezy " + result.latestVersion + " is available");
+                Notifier.toast(this, getString(R.string.toast_available, result.latestVersion));
             }
         } else {
             if (manual) {
-                Notifier.toast(this, "Plezy " + result.installedVersion + " is up to date");
+                Notifier.toast(this, getString(R.string.toast_up_to_date, result.installedVersion));
             }
         }
         renderStatus();

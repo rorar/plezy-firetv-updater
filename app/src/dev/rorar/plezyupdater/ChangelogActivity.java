@@ -1,6 +1,7 @@
 package dev.rorar.plezyupdater;
 
 import android.app.Activity;
+import android.content.Context;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
@@ -16,6 +17,11 @@ public class ChangelogActivity extends Activity {
     public static final String EXTRA_BODY = "body";
 
     @Override
+    protected void attachBaseContext(Context base) {
+        super.attachBaseContext(LocaleHelper.wrap(base));
+    }
+
+    @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
         int pad = Ui.dp(this, 40);
@@ -29,7 +35,9 @@ public class ChangelogActivity extends Activity {
         String published = getIntent().getStringExtra(EXTRA_PUBLISHED);
         String body = getIntent().getStringExtra(EXTRA_BODY);
 
-        root.addView(Ui.title(this, tag == null ? "Release notes" : "Plezy " + tag));
+        root.addView(Ui.title(this, tag == null
+                ? getString(R.string.changelog_title)
+                : getString(R.string.changelog_title_tag, tag)));
 
         if (published != null && published.length() >= 10) {
             TextView date = Ui.subtitle(this, published.substring(0, 10));
@@ -49,12 +57,12 @@ public class ChangelogActivity extends Activity {
 
         CharSequence notes = Markdown.toStyled(body, getResources().getDisplayMetrics().density);
         if (notes.length() == 0) {
-            notes = "No release notes for this version.";
+            notes = getString(R.string.changelog_no_notes);
         }
         TextView bodyView = Ui.body(this, notes);
         scroll.addView(bodyView);
 
-        Button back = Ui.actionButton(this, "Back");
+        Button back = Ui.actionButton(this, getString(R.string.action_back));
         back.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {

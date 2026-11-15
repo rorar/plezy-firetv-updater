@@ -1,6 +1,7 @@
 package dev.rorar.plezyupdater;
 
 import android.app.Activity;
+import android.content.Context;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.KeyEvent;
@@ -46,6 +47,11 @@ public class IntervalActivity extends Activity {
     private String selectedUnit;
 
     @Override
+    protected void attachBaseContext(Context base) {
+        super.attachBaseContext(LocaleHelper.wrap(base));
+    }
+
+    @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
         selectedValue = Prefs.intervalValue(this);
@@ -61,17 +67,15 @@ public class IntervalActivity extends Activity {
         root.setBackgroundColor(Ui.BG);
         root.setPadding(pad, pad, pad, pad);
 
-        root.addView(Ui.title(this, "Check interval"));
+        root.addView(Ui.title(this, getString(R.string.interval_title)));
 
-        TextView subtitle = Ui.subtitle(this,
-                "How often the updater asks GitHub for a new release.");
+        TextView subtitle = Ui.subtitle(this, getString(R.string.interval_subtitle));
         root.addView(subtitle, topMargin(2));
 
         preview = Ui.text(this, "", 28, Ui.TEXT_HEADING);
         root.addView(preview, topMargin(12));
 
-        TextView note = Ui.muted(this,
-                "Runs while the TV is on. A month is treated as 30 days.");
+        TextView note = Ui.muted(this, getString(R.string.interval_note));
         root.addView(note, topMargin(2));
 
         LinearLayout columns = new LinearLayout(this);
@@ -84,7 +88,7 @@ public class IntervalActivity extends Activity {
         buildValueColumn(columns);
         buildUnitColumn(columns);
 
-        saveButton = Ui.primaryButton(this, "Save");
+        saveButton = Ui.primaryButton(this, getString(R.string.interval_save));
         saveButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -93,7 +97,7 @@ public class IntervalActivity extends Activity {
         });
         root.addView(saveButton, topMargin(16));
 
-        root.addView(Ui.muted(this, "Press Back to cancel."), topMargin(10));
+        root.addView(Ui.muted(this, getString(R.string.interval_cancel_hint)), topMargin(10));
 
         setContentView(root);
         valueRows.get(valueIndex(selectedValue)).requestFocus();
@@ -133,7 +137,7 @@ public class IntervalActivity extends Activity {
             valueRows.add(row);
             list.addView(row, rowParams());
         }
-        addColumn(columns, "VALUE", list);
+        addColumn(columns, getString(R.string.interval_column_value), list);
     }
 
     private void buildUnitColumn(LinearLayout columns) {
@@ -141,7 +145,9 @@ public class IntervalActivity extends Activity {
         list.setOrientation(LinearLayout.VERTICAL);
         for (int i = 0; i < Prefs.UNITS.length; i++) {
             final String unit = Prefs.UNITS[i];
-            TextView row = row(capitalise(unit));
+            // The column lists the plural form of each unit ("Hours", "Stunden", …); the preview
+            // line below then picks the right singular/plural for the chosen count.
+            TextView row = row(capitalise(Prefs.unitWord(this, unit, 2)));
             row.setOnFocusChangeListener(new View.OnFocusChangeListener() {
                 @Override
                 public void onFocusChange(View v, boolean hasFocus) {
@@ -171,7 +177,7 @@ public class IntervalActivity extends Activity {
             unitRows.add(row);
             list.addView(row, rowParams());
         }
-        addColumn(columns, "UNIT", list);
+        addColumn(columns, getString(R.string.interval_column_unit), list);
     }
 
     /** A titled column that scrolls when the rows do not fit (the value column needs it). */
@@ -217,9 +223,8 @@ public class IntervalActivity extends Activity {
     }
 
     private void updatePreview() {
-        String unit = selectedValue == 1
-                ? selectedUnit.substring(0, selectedUnit.length() - 1) : selectedUnit;
-        preview.setText("Every " + selectedValue + " " + unit);
+        preview.setText(getString(R.string.interval_preview, selectedValue,
+                Prefs.unitWord(this, selectedUnit, selectedValue)));
         // Keep each column's own choice highlighted while the D-pad is in the other column: the
         // focused row shows the full accent, the selected row shows the dimmer fill.
         int value = valueIndex(selectedValue);
@@ -238,7 +243,7 @@ public class IntervalActivity extends Activity {
         if (Prefs.autoCheckEnabled(this)) {
             UpdateAlarm.schedule(this);
         }
-        Notifier.toast(this, "Checking " + Prefs.intervalLabel(this));
+        Notifier.toast(this, getString(R.string.interval_checking, Prefs.intervalLabel(this)));
         setResult(RESULT_OK);
         finish();
     }

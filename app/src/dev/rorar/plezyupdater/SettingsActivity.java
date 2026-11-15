@@ -39,7 +39,13 @@ public class SettingsActivity extends Activity {
     private Button intervalButton;
     private TextView intervalSummary;
     private TextView autoCheckSummary;
+    private TextView languageSummary;
     private BroadcastReceiver packageRemovedReceiver;
+
+    @Override
+    protected void attachBaseContext(Context base) {
+        super.attachBaseContext(LocaleHelper.wrap(base));
+    }
 
     @Override
     protected void onCreate(Bundle state) {
@@ -51,51 +57,50 @@ public class SettingsActivity extends Activity {
         content.setBackgroundColor(Ui.BG);
         content.setPadding(pad, pad, pad, pad);
 
-        content.addView(Ui.title(this, "Settings"));
+        content.addView(Ui.title(this, getString(R.string.settings_title)));
 
-        addSection("User settings");
-        addSwitch("Toast notifications", "Short message at the bottom of the screen.",
+        addSection(getString(R.string.section_user));
+        addLanguage();
+        addSwitch(getString(R.string.set_toast_label), getString(R.string.set_toast_desc),
                 Prefs.KEY_TOAST, Prefs.toastEnabled(this));
-        addSwitch("Notifications", "Entry in the Fire TV notification center.",
+        addSwitch(getString(R.string.set_notification_label), getString(R.string.set_notification_desc),
                 Prefs.KEY_NOTIFICATION, Prefs.notificationEnabled(this));
 
-        addSection("Advanced settings");
-        autoCheckSummary = addSwitch("Check automatically",
-                "Runs on the interval below and after the TV boots.",
+        addSection(getString(R.string.section_advanced));
+        autoCheckSummary = addSwitch(getString(R.string.set_auto_label),
+                getString(R.string.set_auto_desc),
                 Prefs.KEY_AUTO_CHECK, Prefs.autoCheckEnabled(this));
         addInterval();
-        addSwitch("Delete APK after installing", "Remove the downloaded file once Plezy is "
-                        + "installed, to save space on the stick.",
+        addSwitch(getString(R.string.set_delete_label), getString(R.string.set_delete_desc),
                 Prefs.KEY_DELETE_APK, Prefs.deleteApkAfterInstall(this));
         addUninstall();
 
-        addSection("Developer settings");
-        addSwitch("Allow older versions", "Developer option: pick any release, not only newer ones.",
+        addSection(getString(R.string.section_developer));
+        addSwitch(getString(R.string.set_allow_older_label), getString(R.string.set_allow_older_desc),
                 Prefs.KEY_ALLOW_OLDER, Prefs.allowOlderVersions(this));
 
-        addSection("Diagnostics");
+        addSection(getString(R.string.section_diagnostics));
 
-        Button testToast = Ui.actionButton(this, "Test toast");
+        Button testToast = Ui.actionButton(this, getString(R.string.set_test_toast));
         testToast.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                Notifier.toast(SettingsActivity.this,
-                        "Test toast — updates will look like this");
+                Notifier.toast(SettingsActivity.this, getString(R.string.set_test_toast_msg));
             }
         });
         content.addView(testToast, buttonParams(8));
 
-        Button testNotification = Ui.actionButton(this, "Test notification");
+        Button testNotification = Ui.actionButton(this, getString(R.string.set_test_notification));
         testNotification.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                Notifier.notification(SettingsActivity.this, "Plezy Updater",
-                        "Test notification — press OK to open");
+                Notifier.notification(SettingsActivity.this, getString(R.string.notifications_title),
+                        getString(R.string.set_test_notification_msg));
             }
         });
         content.addView(testNotification, buttonParams(12));
 
-        Button back = Ui.actionButton(this, "Back");
+        Button back = Ui.actionButton(this, getString(R.string.action_back));
         back.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -104,8 +109,7 @@ public class SettingsActivity extends Activity {
         });
         content.addView(back, buttonParams(12));
 
-        TextView hint = Ui.muted(this,
-                "A switched-off channel stays silent, including the test buttons above.");
+        TextView hint = Ui.muted(this, getString(R.string.set_channels_hint));
         LinearLayout.LayoutParams hintParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         hintParams.topMargin = Ui.dp(this, 24);
@@ -125,7 +129,7 @@ public class SettingsActivity extends Activity {
                 if (data != null
                         && PlezyRepo.PACKAGE_NAME.equals(data.getSchemeSpecificPart())) {
                     refreshUninstallRow();
-                    Notifier.toast(SettingsActivity.this, "Plezy uninstalled");
+                    Notifier.toast(SettingsActivity.this, getString(R.string.toast_uninstalled));
                 }
             }
         };
@@ -138,6 +142,7 @@ public class SettingsActivity extends Activity {
     protected void onResume() {
         super.onResume();
         refreshUninstallRow();
+        refreshLanguageRow();
     }
 
     @Override
@@ -157,8 +162,38 @@ public class SettingsActivity extends Activity {
         super.onDestroy();
     }
 
+    /** The Language row: opens the picker; its summary shows what is chosen. */
+    private void addLanguage() {
+        Button languageButton = Ui.actionButton(this, getString(R.string.language_label));
+        languageButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                startActivity(new Intent(SettingsActivity.this, LanguageActivity.class));
+            }
+        });
+        content.addView(languageButton, buttonParams(8));
+
+        languageSummary = summary();
+        content.addView(languageSummary);
+        refreshLanguageRow();
+    }
+
+    private void refreshLanguageRow() {
+        if (languageSummary == null) {
+            return;
+        }
+        String current = Prefs.appLanguage(this);
+        if (LocaleHelper.SYSTEM.equals(current)) {
+            String device = LocaleHelper.systemCode(this);
+            languageSummary.setText(
+                    getString(R.string.language_system_current, LocaleHelper.name(this, device)));
+        } else {
+            languageSummary.setText(LocaleHelper.name(this, current));
+        }
+    }
+
     private void addInterval() {
-        intervalButton = Ui.actionButton(this, "Check interval");
+        intervalButton = Ui.actionButton(this, getString(R.string.set_interval_label));
         intervalButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -176,16 +211,15 @@ public class SettingsActivity extends Activity {
 
     private void refreshIntervalRow() {
         if (intervalSummary != null) {
-            intervalSummary.setText("Now " + Prefs.intervalLabel(this) + ".");
+            intervalSummary.setText(getString(R.string.set_interval_now, Prefs.intervalLabel(this)));
         }
         if (autoCheckSummary != null) {
-            autoCheckSummary.setText("Runs " + Prefs.intervalLabel(this)
-                    + " and after the TV boots.");
+            autoCheckSummary.setText(getString(R.string.set_interval_runs, Prefs.intervalLabel(this)));
         }
     }
 
     private void addUninstall() {
-        uninstallButton = Ui.actionButton(this, "Uninstall Plezy…");
+        uninstallButton = Ui.actionButton(this, getString(R.string.set_uninstall_label));
         uninstallButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -206,8 +240,8 @@ public class SettingsActivity extends Activity {
         boolean installed = PlezyRepo.installedVersion(this) != null;
         uninstallButton.setEnabled(installed);
         uninstallSummary.setText(installed
-                ? "Removes com.edde746.plezy and erases its data (servers, settings, downloads)."
-                : "Plezy is not installed.");
+                ? getString(R.string.set_uninstall_present)
+                : getString(R.string.set_uninstall_absent));
     }
 
     /**
@@ -216,16 +250,16 @@ public class SettingsActivity extends Activity {
      */
     private void confirmUninstall() {
         new AlertDialog.Builder(this)
-                .setTitle("Uninstall Plezy?")
-                .setMessage("This removes Plezy and erases its data — servers, settings and "
-                        + "downloads. Android will ask you to confirm.")
-                .setNegativeButton("Cancel", null)
-                .setPositiveButton("Uninstall", new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        launchUninstall();
-                    }
-                })
+                .setTitle(getString(R.string.set_uninstall_title))
+                .setMessage(getString(R.string.set_uninstall_message))
+                .setNegativeButton(getString(R.string.action_cancel), null)
+                .setPositiveButton(getString(R.string.set_uninstall_confirm),
+                        new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                launchUninstall();
+                            }
+                        })
                 .show();
     }
 
@@ -235,7 +269,7 @@ public class SettingsActivity extends Activity {
         try {
             startActivity(intent);
         } catch (ActivityNotFoundException e) {
-            Notifier.toast(this, "No uninstaller found");
+            Notifier.toast(this, getString(R.string.toast_no_uninstaller));
         }
     }
 
@@ -293,11 +327,12 @@ public class SettingsActivity extends Activity {
             }
         } else if (Prefs.KEY_TOAST.equals(key)) {
             if (enabled) {
-                Notifier.toast(this, "Toast notifications on");
+                Notifier.toast(this, getString(R.string.toast_toast_on));
             }
         } else if (Prefs.KEY_NOTIFICATION.equals(key)) {
             if (enabled) {
-                Notifier.notification(this, "Plezy Updater", "Notifications are on");
+                Notifier.notification(this, getString(R.string.notifications_title),
+                        getString(R.string.toast_notifications_on));
             } else {
                 Notifier.cancelNotification(this);
             }

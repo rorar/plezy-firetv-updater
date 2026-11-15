@@ -126,7 +126,7 @@ public final class InstallFlow {
             installPendingDowngrade();
         } else {
             clearPendingDowngrade();
-            Notifier.toast(activity, "Downgrade cancelled");
+            Notifier.toast(activity, activity.getString(R.string.toast_downgrade_cancelled));
         }
     }
 
@@ -136,7 +136,7 @@ public final class InstallFlow {
             return;
         }
         setBusy(true);
-        callback.onProgress("Preparing…");
+        callback.onProgress(activity.getString(R.string.progress_preparing));
         keepScreenOn(true);
 
         new Thread(new Runnable() {
@@ -145,22 +145,24 @@ public final class InstallFlow {
                 try {
                     File apk = ApkInstaller.cachedApk(activity, release.tag);
                     if (apk != null) {
-                        post("Using the cached download of " + release.tag + "…");
+                        post(activity.getString(R.string.progress_cached, release.tag));
                     } else {
                         ApkInstaller.cleanCache(activity);
                         apk = new File(activity.getCacheDir(), "plezy-update.apk");
-                        ApkInstaller.requireSpace(activity.getCacheDir(), ApkInstaller.MIN_FREE_SPACE);
-                        post("Downloading…");
+                        ApkInstaller.requireSpace(activity, activity.getCacheDir(),
+                                ApkInstaller.MIN_FREE_SPACE);
+                        post(activity.getString(R.string.progress_downloading));
                         final File tar = new File(activity.getCacheDir(), "plezy-update.tar.gz");
                         try {
-                            ApkInstaller.download(release.assetUrl, tar, new ApkInstaller.Progress() {
+                            ApkInstaller.download(activity, release.assetUrl, tar,
+                                    new ApkInstaller.Progress() {
                                 @Override
                                 public void onPercent(final int percent) {
-                                    post("Downloading… " + percent + "%");
+                                    post(activity.getString(R.string.progress_downloading_pct, percent));
                                 }
                             });
-                            post("Unpacking…");
-                            ApkInstaller.extractApk(tar, apk);
+                            post(activity.getString(R.string.progress_unpacking));
+                            ApkInstaller.extractApk(activity, tar, apk);
                         } finally {
                             // Never leave the tarball (or a partial one) behind.
                             deleteQuietly(tar);
@@ -189,9 +191,9 @@ public final class InstallFlow {
                         return;
                     }
 
-                    post("Opening the installer for " + verified.versionName + "…");
+                    post(activity.getString(R.string.progress_opening, verified.versionName));
                     ApkInstaller.install(activity, apk, allowOlder);
-                    post("Confirm the install on the TV.");
+                    post(activity.getString(R.string.progress_confirm));
                     ui.post(new Runnable() {
                         @Override
                         public void run() {
@@ -239,19 +241,18 @@ public final class InstallFlow {
         pendingDowngradeApk = apk;
         Prefs.setPendingDowngrade(activity, release.tag);
         new AlertDialog.Builder(activity)
-                .setTitle("Downgrade to " + verified.versionName + "?")
-                .setMessage("Android 7.1 cannot downgrade this app directly. Plezy will be "
-                        + "uninstalled first — its data (servers, settings, downloads) is erased — "
-                        + "and then " + verified.versionName + " installed. Android will ask you "
-                        + "to confirm the uninstall.")
-                .setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+                .setTitle(activity.getString(R.string.dialog_downgrade_title, verified.versionName))
+                .setMessage(activity.getString(R.string.dialog_downgrade_message, verified.versionName))
+                .setNegativeButton(activity.getString(R.string.action_cancel),
+                        new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
                         clearPendingDowngrade();
-                        callback.onProgress("Downgrade cancelled.");
+                        callback.onProgress(activity.getString(R.string.progress_downgrade_cancelled));
                     }
                 })
-                .setPositiveButton("Uninstall & install", new DialogInterface.OnClickListener() {
+                .setPositiveButton(activity.getString(R.string.dialog_downgrade_button),
+                        new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
                         launchUninstallForDowngrade();
@@ -261,7 +262,7 @@ public final class InstallFlow {
     }
 
     private void launchUninstallForDowngrade() {
-        callback.onProgress("Uninstalling Plezy…");
+        callback.onProgress(activity.getString(R.string.progress_uninstalling));
         keepScreenOn(true);
         Intent intent = new Intent(Intent.ACTION_DELETE,
                 Uri.parse("package:" + PlezyRepo.PACKAGE_NAME));
@@ -269,7 +270,7 @@ public final class InstallFlow {
             activity.startActivity(intent);
         } catch (ActivityNotFoundException e) {
             clearPendingDowngrade();
-            callback.onFailed("no uninstaller found");
+            callback.onFailed(activity.getString(R.string.toast_no_uninstaller));
         }
     }
 
@@ -289,7 +290,7 @@ public final class InstallFlow {
         pendingDowngradeApk = null;
         Prefs.setPendingDowngrade(activity, null);
         setBusy(true);
-        callback.onProgress("Installing…");
+        callback.onProgress(activity.getString(R.string.progress_installing));
 
         new Thread(new Runnable() {
             @Override
@@ -297,7 +298,7 @@ public final class InstallFlow {
                 try {
                     // Plezy is uninstalled, so this is a plain install — no downgrade flag needed.
                     ApkInstaller.install(activity, apk, false);
-                    post("Confirm the install on the TV.");
+                    post(activity.getString(R.string.progress_confirm));
                     ui.post(new Runnable() {
                         @Override
                         public void run() {

@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- French. Overrides the default (English) strings in res/values/strings.xml. -->
+<resources>
+    <string name="action_back">Retour</string>
+    <string name="action_cancel">Annuler</string>
+
+    <string name="main_subtitle">Garde com.edde746.plezy à jour sur ce téléviseur.</string>
+    <string name="main_install_update">Installer la mise à jour</string>
+    <string name="main_install_version">Installer %1$s</string>
+    <string name="main_whats_new">Nouveautés</string>
+    <string name="main_check">Rechercher des mises à jour</string>
+    <string name="main_choose_version">Choisir la version…</string>
+    <string name="main_settings">Paramètres</string>
+    <string name="main_hint">Vérifie %1$s pendant que le téléviseur est allumé. Une mise à jour nécessite une confirmation sur l\'écran d\'installation du système.</string>
+    <string name="main_not_installed_word">non installé</string>
+
+    <string name="status_check_failed">Échec de la recherche de mise à jour</string>
+    <string name="status_installed_prefix">Installé : %1$s</string>
+    <string name="status_not_installed">Plezy n\'est pas installé</string>
+    <string name="status_not_installed_period">Plezy n\'est pas installé.</string>
+    <string name="status_latest_upstream">Dernière version : %1$s</string>
+    <string name="status_press_install">Appuyez sur \"Installer la mise à jour\" pour l\'installer.</string>
+    <string name="status_update_available">Mise à jour disponible</string>
+    <string name="status_installed_latest">Installé %1$s   ·   dernière %2$s</string>
+    <string name="status_press_get">Appuyez sur \"Installer la mise à jour\" pour obtenir %1$s.</string>
+    <string name="status_selected">Sélectionné %1$s</string>
+    <string name="status_same_version">Installé %1$s   ·   même version</string>
+    <string name="status_reinstall">L\'installation le retélécharge.</string>
+    <string name="status_older">Installé %1$s   ·   plus ancien</string>
+    <string name="status_downgrade_note">Une rétrogradation désinstalle d\'abord — activé par \"Autoriser les versions plus anciennes\".</string>
+    <string name="status_up_to_date">Plezy est à jour</string>
+    <string name="status_checking">Recherche de mises à jour…</string>
+    <string name="status_installed_only">Installé %1$s.</string>
+
+    <string name="free_space">Espace libre : %1$s</string>
+    <string name="free_space_low">"  — trop peu pour une mise à jour (environ %1$s requis)"</string>
+
+    <string name="progress_update_failed">Échec de la mise à jour : %1$s</string>
+    <string name="toast_check_failed">Échec de la recherche de mise à jour</string>
+    <string name="toast_available">Plezy %1$s est disponible</string>
+    <string name="toast_up_to_date">Plezy %1$s est à jour</string>
+
+    <string name="settings_title">Paramètres</string>
+    <string name="section_user">Paramètres utilisateur</string>
+    <string name="section_advanced">Paramètres avancés</string>
+    <string name="section_developer">Options de développeur</string>
+    <string name="section_diagnostics">Diagnostic</string>
+
+    <string name="set_toast_label">Notifications toast</string>
+    <string name="set_toast_desc">Court message en bas de l\'écran.</string>
+    <string name="set_notification_label">Notifications</string>
+    <string name="set_notification_desc">Entrée dans le centre de notifications du Fire TV.</string>
+    <string name="set_auto_label">Vérifier automatiquement</string>
+    <string name="set_auto_desc">S\'exécute à l\'intervalle ci-dessous et après le démarrage du téléviseur.</string>
+    <string name="set_interval_label">Intervalle de vérification</string>
+    <string name="set_interval_now">Maintenant %1$s.</string>
+    <string name="set_interval_runs">S\'exécute %1$s et après le démarrage du téléviseur.</string>
+    <string name="set_delete_label">Supprimer l\'APK après l\'installation</string>
+    <string name="set_delete_desc">Supprimer le fichier téléchargé une fois Plezy installé, pour économiser de l\'espace.</string>
+    <string name="set_allow_older_label">Autoriser les versions plus anciennes</string>
+    <string name="set_allow_older_desc">Option de développeur : choisir n\'importe quelle version, pas seulement les plus récentes.</string>
+    <string name="set_uninstall_label">Désinstaller Plezy…</string>
+    <string name="set_uninstall_present">Supprime com.edde746.plezy et efface ses données (serveurs, paramètres, téléchargements).</string>
+    <string name="set_uninstall_absent">Plezy n\'est pas installé.</string>
+    <string name="set_test_toast">Tester le toast</string>
+    <string name="set_test_toast_msg">Toast de test — les mises à jour ressembleront à ceci</string>
+    <string name="set_test_notification">Tester la notification</string>
+    <string name="set_test_notification_msg">Notification de test — appuyez sur OK pour ouvrir</string>
+    <string name="set_channels_hint">Un canal désactivé reste silencieux, y compris les boutons de test ci-dessus.</string>
+    <string name="set_uninstall_title">Désinstaller Plezy ?</string>
+    <string name="set_uninstall_message">Cela supprime Plezy et efface ses données — serveurs, paramètres et téléchargements. Android vous demandera de confirmer.</string>
+    <string name="set_uninstall_confirm">Désinstaller</string>
+    <string name="toast_no_uninstaller">Aucun désinstalleur trouvé</string>
+    <string name="toast_uninstalled">Plezy désinstallé</string>
+    <string name="toast_toast_on">Notifications toast activées</string>
+    <string name="toast_notifications_on">Les notifications sont activées</string>
+
+    <string name="language_label">Langue</string>
+    <string name="language_title">Langue</string>
+    <string name="language_system">Par défaut du système</string>
+    <string name="language_system_current">Par défaut du système (%1$s)</string>
+
+    <string name="interval_title">Intervalle de vérification</string>
+    <string name="interval_subtitle">Fréquence à laquelle l\'updater interroge GitHub pour une nouvelle version.</string>
+    <string name="interval_note">S\'exécute pendant que le téléviseur est allumé. Un mois compte pour 30 jours.</string>
+    <string name="interval_column_value">VALEUR</string>
+    <string name="interval_column_unit">UNITÉ</string>
+    <string name="interval_save">Enregistrer</string>
+    <string name="interval_cancel_hint">Appuyez sur Retour pour annuler.</string>
+    <string name="interval_checking">Vérification %1$s</string>
+    <string name="interval_every">toutes les %1$d %2$s</string>
+    <string name="interval_preview">Toutes les %1$d %2$s</string>
+
+    <plurals name="unit_hours">
+        <item quantity="one">heure</item>
+        <item quantity="other">heures</item>
+    </plurals>
+    <plurals name="unit_days">
+        <item quantity="one">jour</item>
+        <item quantity="other">jours</item>
+    </plurals>
+    <plurals name="unit_weeks">
+        <item quantity="one">semaine</item>
+        <item quantity="other">semaines</item>
+    </plurals>
+    <plurals name="unit_months">
+        <item quantity="one">mois</item>
+        <item quantity="other">mois</item>
+    </plurals>
+
+    <string name="picker_title">Choisir la version</string>
+    <string name="picker_hint">Plus récent en premier. Installé : %1$s   —   appuyez sur OK pour installer la version en surbrillance.</string>
+    <string name="picker_loading">Chargement des versions…</string>
+    <string name="picker_select">Sélectionnez une version pour voir ses notes de version.</string>
+    <string name="picker_none">aucune</string>
+    <string name="picker_installed_suffix">(installé)</string>
+    <string name="picker_could_not_load">Impossible de charger les versions :\n%1$s</string>
+    <string name="picker_empty">Aucune version trouvée.</string>
+    <string name="progress_preparing">Préparation…</string>
+    <string name="progress_downloading">Téléchargement…</string>
+    <string name="progress_downloading_pct">Téléchargement… %1$d%%</string>
+    <string name="progress_unpacking">Décompression…</string>
+    <string name="progress_cached">Utilisation du téléchargement en cache de %1$s…</string>
+    <string name="progress_opening">Ouverture de l\'installateur pour %1$s…</string>
+    <string name="progress_confirm">Confirmez l\'installation sur le téléviseur.</string>
+    <string name="progress_installed">%1$s installé.</string>
+    <string name="progress_uninstalling">Désinstallation de Plezy…</string>
+    <string name="progress_installing">Installation…</string>
+
+    <string name="dialog_downgrade_title">Rétrograder vers %1$s ?</string>
+    <string name="dialog_downgrade_message">Android 7.1 ne peut pas rétrograder cette application directement. Plezy sera d\'abord désinstallé — ses données (serveurs, paramètres, téléchargements) sont effacées — puis %1$s installé. Android vous demandera de confirmer la désinstallation.</string>
+    <string name="dialog_downgrade_button">Désinstaller et installer</string>
+    <string name="toast_downgrade_cancelled">Rétrogradation annulée</string>
+    <string name="progress_downgrade_cancelled">Rétrogradation annulée.</string>
+
+    <string name="changelog_title">Notes de version</string>
+    <string name="changelog_heading">Notes de version</string>
+    <string name="changelog_title_tag">Plezy %1$s</string>
+    <string name="changelog_no_notes">Aucune note de version pour cette version.</string>
+
+    <string name="toast_install_unconfirmed">Installation non confirmée</string>
+    <string name="toast_installed">Plezy %1$s installé</string>
+    <string name="toast_install_failed">Échec de l\'installation : %1$s</string>
+
+    <string name="notif_available_title">Plezy %1$s disponible</string>
+    <string name="notif_available_text">Appuyez sur OK pour installer</string>
+
+    <string name="err_repo_no_asset">La version %1$s n\'a pas de %2$s</string>
+    <string name="err_repo_http">L\'API GitHub a renvoyé HTTP %1$d</string>
+
+    <string name="err_download_http">Échec du téléchargement : HTTP %1$d</string>
+    <string name="err_download_truncated">Téléchargement incomplet : %1$d/%2$d octets</string>
+    <string name="err_not_enough_space">Espace libre insuffisant : %1$s libres, environ %2$s requis. Libérez de l\'espace sur le Fire TV et réessayez</string>
+    <string name="err_archive_no_apk">L\'archive ne contient aucune entrée .apk</string>
+    <string name="err_invalid_apk">Le fichier téléchargé n\'est pas un APK valide</string>
+    <string name="err_wrong_package">Mauvais paquet : %1$s</string>
+    <string name="err_older_build">La version téléchargée %1$d est plus ancienne que la version installée %2$d — activez \"Autoriser les versions plus anciennes\" pour l\'installer quand même</string>
+    <string name="err_needs_api">Nécessite l\'API Android %1$d, cet appareil est en API %2$d</string>
+    <string name="err_no_arm">L\'APK n\'a pas de bibliothèques armeabi-v7a</string>
+    <string name="err_missing_signature">Informations de signature manquantes</string>
+    <string name="err_signer_mismatch">Signature non concordante — installation refusée</string>
+    <string name="err_hash_signer">Impossible de hacher la signature</string>
+    <string name="err_unexpected_eof">Fin d\'archive inattendue</string>
+
+    <string name="result_downgrade">cette version est plus ancienne que le Plezy installé</string>
+    <string name="result_downgrade_note">; Android 7.1 n\'autorise les rétrogradations que pour les applications débuggables</string>
+    <string name="result_no_space">espace libre insuffisant</string>
+    <string name="result_different_signer">signé différemment du Plezy installé</string>
+    <string name="result_needs_newer_android">cette version nécessite une version d\'Android plus récente</string>
+    <string name="result_invalid_package">le paquet téléchargé est invalide</string>
+    <string name="result_cancelled">annulé</string>
+    <string name="result_blocked">bloqué par l\'appareil</string>
+    <string name="result_conflict">entre en conflit avec l\'application installée</string>
+    <string name="result_incompatible">non compatible avec cet appareil</string>
+    <string name="result_invalid">paquet invalide</string>
+    <string name="result_storage">espace de stockage insuffisant</string>
+    <string name="result_status">statut %1$d</string>
+</resources>

@@ -35,9 +35,12 @@ mkdir -p build/gen build/classes
 
 echo "== resources"
 "$BT/aapt2" compile --dir res -o build/res.zip
+# The compiled resources are passed positionally (not with -R/--overlay): they are the
+# app's own resources, and aapt2 has to merge the per-locale configs (values-de, …) with
+# the default values/ rather than treat the locales as overlays that must override one.
 "$BT/aapt2" link -o build/unsigned.apk -I "$AJ" \
   --manifest AndroidManifest.xml \
-  -R build/res.zip \
+  build/res.zip \
   --java build/gen \
   --min-sdk-version "$MIN_SDK" --target-sdk-version "$TARGET_SDK" \
   --no-version-vectors

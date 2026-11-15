@@ -59,19 +59,19 @@ public final class PlezyRepo {
         }
     }
 
-    public static Release fetchLatest() throws Exception {
-        JSONObject json = new JSONObject(get(LATEST_RELEASE_URL));
+    public static Release fetchLatest(Context c) throws Exception {
+        JSONObject json = new JSONObject(get(c, LATEST_RELEASE_URL));
         String tag = json.getString("tag_name");
         String assetUrl = assetUrl(json);
         if (assetUrl == null) {
-            throw new IllegalStateException("Release " + tag + " has no " + ANDROID_ASSET);
+            throw new IllegalStateException(c.getString(R.string.err_repo_no_asset, tag, ANDROID_ASSET));
         }
         return new Release(tag, assetUrl, body(json), publishedAt(json));
     }
 
     /** Newest first, drafts and releases without the 32-bit Android build skipped. */
-    public static java.util.List<Release> fetchReleases(int limit) throws Exception {
-        JSONArray array = new JSONArray(get(RELEASES_URL + "?per_page=" + limit));
+    public static java.util.List<Release> fetchReleases(Context c, int limit) throws Exception {
+        JSONArray array = new JSONArray(get(c, RELEASES_URL + "?per_page=" + limit));
         java.util.List<Release> releases = new java.util.ArrayList<Release>();
         for (int i = 0; i < array.length(); i++) {
             JSONObject json = array.getJSONObject(i);
@@ -87,7 +87,7 @@ public final class PlezyRepo {
         return releases;
     }
 
-    private static String get(String url) throws Exception {
+    private static String get(Context c, String url) throws Exception {
         HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
         try {
             conn.setConnectTimeout(15000);
@@ -97,7 +97,7 @@ public final class PlezyRepo {
 
             int code = conn.getResponseCode();
             if (code != 200) {
-                throw new IllegalStateException("GitHub API returned HTTP " + code);
+                throw new IllegalStateException(c.getString(R.string.err_repo_http, code));
             }
 
             StringBuilder sb = new StringBuilder();

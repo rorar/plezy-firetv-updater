@@ -14,7 +14,7 @@
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
 
     <application
-        android:label="Plezy Updater"
+        android:label="@string/app_name"
         android:icon="@mipmap/ic_launcher"
         android:banner="@drawable/tv_banner"
         android:allowBackup="false"
@@ -34,22 +34,27 @@
         <activity
             android:name=".SettingsActivity"
             android:exported="false"
-            android:label="Settings" />
+            android:label="@string/settings_title" />
 
         <activity
             android:name=".IntervalActivity"
             android:exported="false"
-            android:label="Check interval" />
+            android:label="@string/interval_title" />
 
         <activity
             android:name=".VersionListActivity"
             android:exported="false"
-            android:label="Choose version" />
+            android:label="@string/picker_title" />
 
         <activity
             android:name=".ChangelogActivity"
             android:exported="false"
-            android:label="Release notes" />
+            android:label="@string/changelog_title" />
+
+        <activity
+            android:name=".LanguageActivity"
+            android:exported="false"
+            android:label="@string/language_title" />
 
         <!-- The alarm delivery and adb test both use explicit intents. -->
         <receiver

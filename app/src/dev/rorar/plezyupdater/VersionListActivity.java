@@ -66,13 +66,13 @@ public class VersionListActivity extends Activity {
 
         @Override
         public void onFailed(String message) {
-            progressView.setText("Install failed: " + message);
-            Notifier.toast(VersionListActivity.this, "Install failed: " + message);
+            progressView.setText(getString(R.string.toast_install_failed, message));
+            Notifier.toast(VersionListActivity.this, getString(R.string.toast_install_failed, message));
         }
 
         @Override
         public void onInstallCommitted() {
-            progressView.setText("Confirm the install on the TV.");
+            progressView.setText(getString(R.string.progress_confirm));
         }
 
         @Override
@@ -81,6 +81,11 @@ public class VersionListActivity extends Activity {
             updateHint();
         }
     };
+
+    @Override
+    protected void attachBaseContext(Context base) {
+        super.attachBaseContext(LocaleHelper.wrap(base));
+    }
 
     @Override
     protected void onCreate(Bundle state) {
@@ -138,8 +143,8 @@ public class VersionListActivity extends Activity {
         if (current != null) {
             installedVersion = current;
         }
-        if (status == PackageInstaller.STATUS_SUCCESS) {
-            progressView.setText("Installed " + (installedVersion == null ? "" : installedVersion + "."));
+        if (status == PackageInstaller.STATUS_SUCCESS && installedVersion != null) {
+            progressView.setText(getString(R.string.progress_installed, installedVersion));
         }
         // On failure the InstallResultReceiver toast already says what went wrong; leave the
         // progress line as it was rather than repeating it.
@@ -161,7 +166,7 @@ public class VersionListActivity extends Activity {
         root.setBackgroundColor(Ui.BG);
         root.setPadding(pad, pad, pad, pad);
 
-        TextView title = Ui.title(this, "Choose version");
+        TextView title = Ui.title(this, getString(R.string.picker_title));
         Ui.leadingIcon(title, Ui.icon(this, R.drawable.ic_versions, Ui.ACCENT_BRIGHT), 26);
         root.addView(title);
 
@@ -190,7 +195,7 @@ public class VersionListActivity extends Activity {
         listFrame.addView(list, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
 
-        empty = Ui.text(this, "Loading releases…", 18, Ui.TEXT_MUTED);
+        empty = Ui.text(this, getString(R.string.picker_loading), 18, Ui.TEXT_MUTED);
         empty.setGravity(Gravity.CENTER);
         listFrame.addView(empty, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
@@ -202,7 +207,7 @@ public class VersionListActivity extends Activity {
         columns.addView(changelogColumn, new LinearLayout.LayoutParams(0,
                 LinearLayout.LayoutParams.MATCH_PARENT, 1.3f));
 
-        TextView changelogHeading = Ui.sectionHeading(this, "Release notes");
+        TextView changelogHeading = Ui.sectionHeading(this, getString(R.string.changelog_heading));
         changelogHeading.setPadding(0, Ui.dp(this, 8), 0, Ui.dp(this, 6));
         changelogColumn.addView(changelogHeading);
 
@@ -218,7 +223,7 @@ public class VersionListActivity extends Activity {
         scrollParams.topMargin = Ui.dp(this, 8);
         changelogColumn.addView(changelogScroll, scrollParams);
 
-        changelog = Ui.body(this, "Select a version to see its release notes.");
+        changelog = Ui.body(this, getString(R.string.picker_select));
         changelogScroll.addView(changelog);
 
         // The download/install progress line, shared by every install started from this screen.
@@ -236,9 +241,8 @@ public class VersionListActivity extends Activity {
         if (hint == null) {
             return;
         }
-        hint.setText("Newest first. Installed: "
-                + (installedVersion == null ? "none" : installedVersion)
-                + "   —   press OK to install the highlighted version.");
+        hint.setText(getString(R.string.picker_hint,
+                installedVersion == null ? getString(R.string.picker_none) : installedVersion));
     }
 
     private void loadReleases() {
@@ -246,7 +250,8 @@ public class VersionListActivity extends Activity {
             @Override
             public void run() {
                 try {
-                    final List<PlezyRepo.Release> loaded = PlezyRepo.fetchReleases(MAX_RELEASES);
+                    final List<PlezyRepo.Release> loaded =
+                            PlezyRepo.fetchReleases(VersionListActivity.this, MAX_RELEASES);
                     ui.post(new Runnable() {
                         @Override
                         public void run() {
@@ -257,9 +262,9 @@ public class VersionListActivity extends Activity {
                     ui.post(new Runnable() {
                         @Override
                         public void run() {
-                            empty.setText("Could not load releases:\n"
-                                    + (e.getMessage() == null
-                                    ? e.getClass().getSimpleName() : e.getMessage()));
+                            empty.setText(getString(R.string.picker_could_not_load,
+                                    e.getMessage() == null
+                                            ? e.getClass().getSimpleName() : e.getMessage()));
                         }
                     });
                 }
@@ -271,7 +276,7 @@ public class VersionListActivity extends Activity {
         releases.clear();
         releases.addAll(loaded);
         if (releases.isEmpty()) {
-            empty.setText("No releases found.");
+            empty.setText(getString(R.string.picker_empty));
             return;
         }
         list.setAdapter(new ReleaseAdapter());
@@ -308,7 +313,7 @@ public class VersionListActivity extends Activity {
         CharSequence notes = Markdown.toStyled(release.body,
                 getResources().getDisplayMetrics().density);
         if (notes.length() == 0) {
-            notes = "No release notes for this version.";
+            notes = getString(R.string.changelog_no_notes);
         }
         changelog.setText(notes);
         changelogScroll.scrollTo(0, 0);
@@ -344,7 +349,7 @@ public class VersionListActivity extends Activity {
             String label = release.tag;
             if (installedVersion != null
                     && PlezyRepo.compareVersions(release.tag, installedVersion) == 0) {
-                label += "   (installed)";
+                label += "   " + getString(R.string.picker_installed_suffix);
             }
             row.setText(label);
             row.setTextColor(Ui.TEXT);

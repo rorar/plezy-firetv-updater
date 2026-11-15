@@ -44,7 +44,7 @@ public final class UpdateChecker {
     public static Result check(Context c) {
         String installed = PlezyRepo.installedVersion(c);
         try {
-            PlezyRepo.Release release = PlezyRepo.fetchLatest();
+            PlezyRepo.Release release = PlezyRepo.fetchLatest(c);
             Prefs.setLastCheckMs(c, System.currentTimeMillis());
             return new Result(installed, release.tag, release, null);
         } catch (Exception e) {
@@ -58,9 +58,10 @@ public final class UpdateChecker {
     public static void checkAndNotify(Context c) {
         Result r = check(c);
         if (r.release != null && r.isNewer()) {
+            Context ctx = LocaleHelper.wrap(c);
             Notifier.notification(c,
-                    "Plezy " + r.latestVersion + " available",
-                    "Press OK to install");
+                    ctx.getString(R.string.notif_available_title, r.latestVersion),
+                    ctx.getString(R.string.notif_available_text));
         }
     }
 }

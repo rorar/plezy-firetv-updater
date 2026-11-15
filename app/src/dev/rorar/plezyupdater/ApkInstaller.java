@@ -79,7 +79,8 @@ public final class ApkInstaller {
     }
 
     /** Streams the tarball to {@code dest}; never buffers more than one chunk in memory. */
-    public static void download(String url, File dest, Progress progress) throws IOException {
+    public static void download(Context c, String url, File dest, Progress progress)
+            throws IOException {
         HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
         try {
             conn.setConnectTimeout(15000);
@@ -89,10 +90,10 @@ public final class ApkInstaller {
 
             int code = conn.getResponseCode();
             if (code != 200) {
-                throw new IOException("Download failed: HTTP " + code);
+                throw new IOException(c.getString(R.string.err_download_http, code));
             }
             long total = conn.getContentLength();
-            requireSpace(dest.getParentFile(), total > 0 ? requiredBytes(total) : MIN_FREE_BYTES);
+            requireSpace(c, dest.getParentFile(), total > 0 ? requiredBytes(total) : MIN_FREE_BYTES);
 
             InputStream in = new BufferedInputStream(conn.getInputStream(), 64 * 1024);
             OutputStream out = new BufferedOutputStream(new FileOutputStream(dest), 64 * 1024);
@@ -117,7 +118,8 @@ public final class ApkInstaller {
                 in.close();
             }
             if (total > 0 && dest.length() != total) {
-                throw new IOException("Download truncated: " + dest.length() + "/" + total + " bytes");
+                throw new IOException(c.getString(R.string.err_download_truncated,
+                        dest.length(), total));
             }
         } finally {
             conn.disconnect();
@@ -136,11 +138,11 @@ public final class ApkInstaller {
     }
 
     /** Throws with a readable message when there is not enough room. */
-    public static void requireSpace(File dir, long needed) throws IOException {
+    public static void requireSpace(Context c, File dir, long needed) throws IOException {
         long free = freeBytes(dir);
         if (free >= 0 && free < needed) {
-            throw new IOException("Not enough free space: " + mb(free) + " free, need about "
-                    + mb(needed) + ". Free up space on the Fire TV and try again");
+            throw new IOException(c.getString(R.string.err_not_enough_space,
+                    mb(free), mb(needed)));
         }
     }
 
@@ -161,14 +163,14 @@ public final class ApkInstaller {
      * Pulls the single {@code plezy.apk} out of the gzip'd tar without a tar library:
      * 512-byte header, octal size at offset 124, payload padded to 512 bytes.
      */
-    public static void extractApk(File tarGz, File apkOut) throws IOException {
+    public static void extractApk(Context c, File tarGz, File apkOut) throws IOException {
         InputStream in = new GZIPInputStream(
                 new BufferedInputStream(new FileInputStream(tarGz), 64 * 1024), 64 * 1024);
         try {
             byte[] header = new byte[512];
             while (true) {
                 if (!readFully(in, header)) {
-                    throw new IOException("Archive contains no .apk entry");
+                    throw new IOException(c.getString(R.string.err_archive_no_apk));
                 }
                 if (isZeroBlock(header)) {
                     continue; // trailing zero padding before EOF
@@ -184,7 +186,7 @@ public final class ApkInstaller {
                 if (regularFile && name.toLowerCase(Locale.US).endsWith(".apk")) {
                     OutputStream out = new BufferedOutputStream(new FileOutputStream(apkOut), 64 * 1024);
                     try {
-                        copyExactly(in, out, size);
+                        copyExactly(c, in, out, size);
                     } finally {
                         out.close();
                     }
@@ -208,10 +210,10 @@ public final class ApkInstaller {
         PackageInfo candidate = pm.getPackageArchiveInfo(apk.getAbsolutePath(),
                 PackageManager.GET_SIGNATURES);
         if (candidate == null) {
-            throw new IOException("Downloaded file is not a valid APK");
+            throw new IOException(c.getString(R.string.err_invalid_apk));
         }
         if (!PlezyRepo.PACKAGE_NAME.equals(candidate.packageName)) {
-            throw new IOException("Wrong package: " + candidate.packageName);
+            throw new IOException(c.getString(R.string.err_wrong_package, candidate.packageName));
         }
 
         PackageInfo installed = null;
@@ -223,36 +225,35 @@ public final class ApkInstaller {
         }
 
         if (installed != null && candidate.versionCode < installed.versionCode && !allowOlder) {
-            throw new IOException("Downloaded build " + candidate.versionCode
-                    + " is older than installed " + installed.versionCode
-                    + " — enable \"Allow older versions\" to install it anyway");
+            throw new IOException(c.getString(R.string.err_older_build,
+                    candidate.versionCode, installed.versionCode));
         }
 
         if (candidate.applicationInfo != null
                 && candidate.applicationInfo.minSdkVersion > android.os.Build.VERSION.SDK_INT) {
-            throw new IOException("Requires Android API " + candidate.applicationInfo.minSdkVersion
-                    + ", this device is API " + android.os.Build.VERSION.SDK_INT);
+            throw new IOException(c.getString(R.string.err_needs_api,
+                    candidate.applicationInfo.minSdkVersion, android.os.Build.VERSION.SDK_INT));
         }
 
         if (!hasArmLibraries(apk)) {
-            throw new IOException("APK has no armeabi-v7a libraries");
+            throw new IOException(c.getString(R.string.err_no_arm));
         }
 
         if (candidate.signatures == null || candidate.signatures.length == 0) {
-            throw new IOException("Missing signature information");
+            throw new IOException(c.getString(R.string.err_missing_signature));
         }
         byte[] expected;
         if (installed != null) {
             if (installed.signatures == null || installed.signatures.length == 0) {
-                throw new IOException("Missing signature information");
+                throw new IOException(c.getString(R.string.err_missing_signature));
             }
-            expected = digest(installed.signatures[0]);
+            expected = digest(c, installed.signatures[0]);
         } else {
             expected = hexToBytes(PINNED_SIGNER_SHA256);
         }
-        byte[] actual = digest(candidate.signatures[0]);
+        byte[] actual = digest(c, candidate.signatures[0]);
         if (!MessageDigest.isEqual(expected, actual)) {
-            throw new IOException("Signer mismatch — refusing to install");
+            throw new IOException(c.getString(R.string.err_signer_mismatch));
         }
 
         Log.i(TAG, "verified " + candidate.versionName + " (" + candidate.versionCode
@@ -264,7 +265,7 @@ public final class ApkInstaller {
     public static void install(Context c, File apk, boolean allowDowngrade) throws IOException {
         // The system copies the APK into its own staging area, so there has to be room for a
         // second copy on top of the one already in the cache.
-        requireSpace(c.getCacheDir(), apk.length() + 50 * MB);
+        requireSpace(c, c.getCacheDir(), apk.length() + 50 * MB);
 
         PackageManager pm = c.getPackageManager();
         PackageInstaller installer = pm.getPackageInstaller();
@@ -404,12 +405,12 @@ public final class ApkInstaller {
         }
     }
 
-    private static byte[] digest(Signature s) throws IOException {
+    private static byte[] digest(Context c, Signature s) throws IOException {
         try {
             MessageDigest md = MessageDigest.getInstance("SHA-256");
             return md.digest(s.toByteArray());
         } catch (Exception e) {
-            throw new IOException("Could not hash signer", e);
+            throw new IOException(c.getString(R.string.err_hash_signer), e);
         }
     }
 
@@ -443,13 +444,14 @@ public final class ApkInstaller {
         return true;
     }
 
-    private static void copyExactly(InputStream in, OutputStream out, long size) throws IOException {
+    private static void copyExactly(Context c, InputStream in, OutputStream out, long size)
+            throws IOException {
         byte[] buf = new byte[64 * 1024];
         long left = size;
         while (left > 0) {
             int n = in.read(buf, 0, (int) Math.min(buf.length, left));
             if (n < 0) {
-                throw new IOException("Unexpected end of archive");
+                throw new IOException(c.getString(R.string.err_unexpected_eof));
             }
             out.write(buf, 0, n);
             left -= n;

@@ -13,6 +13,7 @@ public final class Prefs {
     public static final String KEY_AUTO_CHECK = "auto_check_enabled";
     public static final String KEY_ALLOW_OLDER = "allow_older_versions";
     public static final String KEY_DELETE_APK = "delete_apk_after_install";
+    private static final String KEY_LANGUAGE = "app_language";
     private static final String KEY_LAST_CHECK = "last_check_ms";
     private static final String KEY_PENDING_DOWNGRADE = "pending_downgrade_tag";
     private static final String KEY_INTERVAL_VALUE = "interval_value";
@@ -73,6 +74,19 @@ public final class Prefs {
 
     public static void set(Context c, String key, boolean value) {
         sp(c).edit().putBoolean(key, value).apply();
+    }
+
+    // ---- language -----------------------------------------------------------
+
+    /** The picked language code, or {@link LocaleHelper#SYSTEM} to follow the device. */
+    public static String appLanguage(Context c) {
+        String code = sp(c).getString(KEY_LANGUAGE, LocaleHelper.SYSTEM);
+        return code == null ? LocaleHelper.SYSTEM : code;
+    }
+
+    public static void setAppLanguage(Context c, String code) {
+        sp(c).edit().putString(KEY_LANGUAGE,
+                code == null ? LocaleHelper.SYSTEM : code).apply();
     }
 
     public static long lastCheckMs(Context c) {
@@ -155,11 +169,24 @@ public final class Prefs {
     /** "every 12 hours", "every 1 day" — for summaries. */
     public static String intervalLabel(Context c) {
         int value = intervalValue(c);
-        String unit = intervalUnit(c);
-        if (value == 1) {
-            // "hour", "day", "week", "month"
-            unit = unit.substring(0, unit.length() - 1);
+        return c.getString(R.string.interval_every, value, unitWord(c, intervalUnit(c), value));
+    }
+
+    /**
+     * The word for a unit at count {@code n}, correctly pluralised for the current language
+     * ("hour"/"hours", "Stunde"/"Stunden", "heure"/"heures", …).
+     */
+    public static String unitWord(Context c, String unit, int n) {
+        int id;
+        if (UNIT_DAYS.equals(unit)) {
+            id = R.plurals.unit_days;
+        } else if (UNIT_WEEKS.equals(unit)) {
+            id = R.plurals.unit_weeks;
+        } else if (UNIT_MONTHS.equals(unit)) {
+            id = R.plurals.unit_months;
+        } else {
+            id = R.plurals.unit_hours;
         }
-        return "every " + value + " " + unit;
+        return c.getResources().getQuantityString(id, n);
     }
 }
