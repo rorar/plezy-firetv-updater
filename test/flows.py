@@ -17,6 +17,7 @@ The `all` sequence in run.py runs them in the order above, which starts from
 
 import time
 
+import harness
 from harness import HarnessError
 
 
@@ -123,6 +124,98 @@ class Flows:
                     return screen, n
             time.sleep(1)
         raise HarnessError(f"picker never listed version {version}")
+
+    # ------------------------------------------------------------------ #
+    # language
+    # ------------------------------------------------------------------ #
+
+    def read_app_language(self):
+        """The language the updater is in now, read off its own main screen.
+
+        Every language names the Settings button differently, so whichever label is on
+        screen tells us the current language — no stored state or per-run flag needed.
+        """
+        screen = self.d.dump()
+        labels = set(screen.labels())
+        for code in harness.APP_LANGS:
+            if harness.load_app_strings(code)["main"]["settings"] in labels:
+                return code
+        raise HarnessError(
+            f"could not tell the app's language from the main screen:\n{screen.pretty()}")
+
+    def set_app_language(self, target, from_lang=None):
+        """Set Settings → Language to ``target`` (a code, or ``'system'``) with the D-pad.
+
+        The picker's rows are each language's *own* name (English, Deutsch, Français,
+        Español), so once it is open we can step to the target without knowing the current
+        language. The labels we click on the way there (Settings, Language) do depend on
+        the current language, which we detect first.
+        """
+        rows = self.c["language_rows"]
+        order, native = rows["order"], rows["native"]
+        if target not in order:
+            raise HarnessError(f"unknown language {target!r} (pick one of {order})")
+
+        self.open_updater()
+        current = from_lang or self.read_app_language()
+        if current == target:
+            self.log(f"  app language is already {target} — nothing to change")
+            return target
+
+        self.log(f"  app language {current} → {target} (Settings → Language)")
+        src = harness.load_app_strings(current)
+
+        settings_label = src["main"]["settings"]
+        self._tap(self._require(self.d.dump(), f"Settings button {settings_label!r}",
+                                exact=settings_label), settings_label)
+        self.d.wait_focus("SettingsActivity", timeout=20)
+        time.sleep(1)
+
+        lang_label = src["lang"]["label"]
+        node = self._scroll_to(lang_label, enabled=True, timeout=30)
+        self._tap(node, lang_label)
+        self.d.wait_focus("LanguageActivity", timeout=20)
+        time.sleep(1)
+
+        self._select_language_row(target, order, native)
+
+        # The picker finishes back into the app; reopen the main screen and confirm.
+        self.open_updater()
+        got = self.read_app_language()
+        if target != "system" and got != target:
+            raise HarnessError(f"asked for language {target!r}, the app came back in {got!r}")
+        self.log(f"    ✓ the app is now in {got} ({target})")
+        return target
+
+    def _select_language_row(self, target, order, native):
+        """Step the open language picker to ``target`` and press OK."""
+        target_index = order.index(target)
+        for _ in range(len(order) + 2):
+            screen = self.d.dump()
+            current = self._focused_language_row(screen, order, native)
+            if current == target_index:
+                self.d.key("KEYCODE_DPAD_CENTER")
+                time.sleep(2.5)
+                return
+            if current is None:
+                raise HarnessError(
+                    f"no language-picker row is focused:\n{screen.pretty()}")
+            self.d.key("KEYCODE_DPAD_DOWN" if target_index > current else "KEYCODE_DPAD_UP")
+            time.sleep(0.5)
+        raise HarnessError(f"could not move the language picker to {target!r}")
+
+    @staticmethod
+    def _focused_language_row(screen, order, native):
+        """Index into ``order`` of the focused picker row, or None if none is focused."""
+        system_labels = {harness.load_app_strings(code)["lang"]["system"]
+                         for code in harness.APP_LANGS}
+        for label in screen.focused_texts():
+            for i, code in enumerate(order):
+                if code != "system" and native.get(code) == label:
+                    return i
+            if label in system_labels:
+                return 0
+        return None
 
     # ------------------------------------------------------------------ #
     # the install pipeline's dialogs

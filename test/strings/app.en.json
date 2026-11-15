@@ -1,6 +1,6 @@
 {
   "language": "English",
-  "_comment": "The updater app's own UI strings, as built. One file per language the app can be built in.",
+  "_comment": "The updater app's own UI strings in English, matching res/values/strings.xml. The app is runtime-switchable, so a run sets this language before driving the flows.",
 
   "main": {
     "title": "Plezy Updater",
@@ -27,6 +27,12 @@
     "uninstall_confirm_title": "Uninstall Plezy?",
     "uninstall_confirm_button": "Uninstall",
     "not_installed_summary": "Plezy is not installed."
+  },
+
+  "lang": {
+    "label": "Language",
+    "title": "Language",
+    "system": "System default"
   },
 
   "dialog": {

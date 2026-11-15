@@ -1,0 +1,43 @@
+{
+  "language": "Spanish",
+  "_comment": "The updater app's own UI strings in Spanish, matching res/values-es/strings.xml. The app is runtime-switchable, so a run sets this language before driving the flows.",
+
+  "main": {
+    "title": "Plezy Updater",
+    "install_update": "Instalar actualización",
+    "install_version": "Instalar {version}",
+    "whats_new": "Novedades",
+    "check_for_updates": "Buscar actualizaciones",
+    "choose_version": "Elegir versión…",
+    "settings": "Ajustes",
+    "not_installed_headline": "Plezy no está instalado"
+  },
+
+  "picker": {
+    "title": "Elegir versión",
+    "installed_suffix": "(instalado)",
+    "progress_installed": "{version} instalado.",
+    "progress_confirm": "Confirma la instalación en el televisor."
+  },
+
+  "settings": {
+    "title": "Ajustes",
+    "advanced_section": "Ajustes avanzados",
+    "uninstall_row": "Desinstalar Plezy…",
+    "uninstall_confirm_title": "¿Desinstalar Plezy?",
+    "uninstall_confirm_button": "Desinstalar",
+    "not_installed_summary": "Plezy no está instalado."
+  },
+
+  "lang": {
+    "label": "Idioma",
+    "title": "Idioma",
+    "system": "Predeterminado del sistema"
+  },
+
+  "dialog": {
+    "cancel": "Cancelar",
+    "downgrade_title": "¿Volver a {version}?",
+    "downgrade_button": "Desinstalar e instalar"
+  }
+}

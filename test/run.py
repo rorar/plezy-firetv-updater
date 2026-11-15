@@ -3,11 +3,13 @@
 
     python3 test/run.py install
     python3 test/run.py all --yes
-    python3 test/run.py install --app-lang de           # German build
+    python3 test/run.py install --app-lang de           # set the app to German, then run
     python3 test/run.py all --yes --build               # build + install the updater first
 
-Labels come from strings/: --app-lang picks the app's language, --system-lang
-picks the Fire OS dialogs' language (auto-detected from the device by default).
+The updater is runtime-switchable, so --app-lang is the language to *set* before the
+flows run (via Settings → Language), not a build variant. Labels come from strings/:
+--app-lang picks the app's language, --system-lang picks the Fire OS dialogs' language
+(auto-detected from the device by default).
 """
 
 import argparse
@@ -45,7 +47,12 @@ def main(argv=None):
         epilog=__doc__,
     )
     ap.add_argument("flows", nargs="+", choices=FLOW_ORDER + ["all"])
-    ap.add_argument("--app-lang", default="en", help="language of the updater build (default: en)")
+    ap.add_argument("--app-lang", default="en", choices=list(harness.APP_LANGS),
+                    help="language to set the updater to before the flows (default: en)")
+    ap.add_argument("--from-lang", default=None, choices=list(harness.APP_LANGS) + ["system"],
+                    help="the app's language now, if it should not be auto-detected")
+    ap.add_argument("--no-set-language", action="store_true",
+                    help="skip the Settings → Language step (assume --app-lang is already set)")
     ap.add_argument("--system-lang", default="auto",
                     help="language of the Fire OS dialogs (default: auto-detect)")
     ap.add_argument("--serial", default=None, help="adb serial, e.g. 192.168.1.50:5555")
@@ -83,7 +90,8 @@ def main(argv=None):
 
     print("plezy-firetv-updater — on-device flow tests")
     print(f"  device      : {args.serial or '(default)'}")
-    print(f"  app language: {strings.app_language} ({args.app_lang})")
+    print(f"  app language: {strings.app_language} ({args.app_lang})"
+          + ("  [not set]" if args.no_set_language else ""))
     print(f"  sys language: {strings.system_language} ({system_lang})")
     print(f"  latest/older: {config['versions']['latest']} / {config['versions']['older']}")
     print(f"  flows       : {', '.join(runs)}")
@@ -100,6 +108,15 @@ def main(argv=None):
         build_and_install(device, args)
 
     flows = Flows(device, strings, config)
+
+    if not args.no_set_language:
+        print("\n=== set the app language ===")
+        try:
+            flows.set_app_language(args.app_lang, from_lang=args.from_lang)
+        except HarnessError as exc:
+            print(f"  ✗ could not set the language: {exc}")
+            return 1
+
     results = []
     for name in runs:
         print(f"\n=== {name} ===")

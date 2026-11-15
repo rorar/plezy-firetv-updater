@@ -1,0 +1,43 @@
+{
+  "language": "French",
+  "_comment": "The updater app's own UI strings in French, matching res/values-fr/strings.xml. The app is runtime-switchable, so a run sets this language before driving the flows.",
+
+  "main": {
+    "title": "Plezy Updater",
+    "install_update": "Installer la mise à jour",
+    "install_version": "Installer {version}",
+    "whats_new": "Nouveautés",
+    "check_for_updates": "Rechercher des mises à jour",
+    "choose_version": "Choisir la version…",
+    "settings": "Paramètres",
+    "not_installed_headline": "Plezy n'est pas installé"
+  },
+
+  "picker": {
+    "title": "Choisir la version",
+    "installed_suffix": "(installé)",
+    "progress_installed": "{version} installé.",
+    "progress_confirm": "Confirmez l'installation sur le téléviseur."
+  },
+
+  "settings": {
+    "title": "Paramètres",
+    "advanced_section": "Paramètres avancés",
+    "uninstall_row": "Désinstaller Plezy…",
+    "uninstall_confirm_title": "Désinstaller Plezy ?",
+    "uninstall_confirm_button": "Désinstaller",
+    "not_installed_summary": "Plezy n'est pas installé."
+  },
+
+  "lang": {
+    "label": "Langue",
+    "title": "Langue",
+    "system": "Par défaut du système"
+  },
+
+  "dialog": {
+    "cancel": "Annuler",
+    "downgrade_title": "Rétrograder vers {version} ?",
+    "downgrade_button": "Désinstaller et installer"
+  }
+}

@@ -8,6 +8,12 @@
   "installer_activity": "com.android.packageinstaller/.PackageInstallerActivity",
   "uninstaller_activity": "com.android.packageinstaller/.UninstallerActivity",
 
+  "language_rows": {
+    "_comment": "The Settings -> Language picker's rows, in order (row 0 is the title). 'system' follows the device; the rest are language codes. The names are each language's own name, so the list reads the same whatever the app is currently set to — that is what lets the harness pick a row without knowing the current language.",
+    "order": ["system", "en", "de", "fr", "es"],
+    "native": {"en": "English", "de": "Deutsch", "fr": "Français", "es": "Español"}
+  },
+
   "versions": {
     "_comment": "The two releases the flows use. Bump these (or pass --latest/--older) when upstream moves on.",
     "latest": "2.26.0",

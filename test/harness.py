@@ -72,6 +72,16 @@ def load_strings(app_lang, system_lang):
     return Strings(app, system)
 
 
+# The languages the updater ships (LocaleHelper.CODES). Kept here so the harness can
+# recognise the app's current language without a per-run flag.
+APP_LANGS = ("en", "de", "fr", "es")
+
+
+def load_app_strings(lang):
+    """The app-side labels for one language, without the system dialogs."""
+    return _load_json(os.path.join(HERE, "strings", f"app.{lang}.json"))
+
+
 def load_config():
     return _load_json(os.path.join(HERE, "config.json"))
 
@@ -118,6 +128,7 @@ class Screen:
 
     def __init__(self, xml):
         root = ET.fromstring(xml)
+        self.root = root
         self.nodes = [Node(el.attrib) for el in root.iter("node")]
 
     def find(self, exact=None, startswith=None, contains=None, regex=None,
@@ -153,6 +164,27 @@ class Screen:
 
     def focused_labels(self):
         return [n.label for n in self.nodes if n.focused and n.label]
+
+    def focused_texts(self):
+        """Text of each focused node, falling back to the first labelled descendant.
+
+        A TV row often has focus on a container while the language name sits on a child,
+        so reading only the focused node's own text can come back empty.
+        """
+        out = []
+        for el in self.root.iter("node"):
+            if el.attrib.get("focused") != "true":
+                continue
+            own = el.attrib.get("text", "")
+            if own:
+                out.append(own)
+                continue
+            for child in el.iter("node"):
+                text = child.attrib.get("text", "")
+                if text:
+                    out.append(text)
+                    break
+        return out
 
     def pretty(self):
         return "\n".join(
