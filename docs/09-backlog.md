@@ -9,6 +9,15 @@ _None. The last open request — main-screen icons — landed on 2026-11-14 (see
 
 ## Already implemented
 
+- **Install directly from the version picker.** Pressing OK on a version in **Choose version…**
+  installs it right there — download, verify, install, progress line and outcome — so the trip back
+  to the main screen just to press **Install update** is gone. The pipeline is now one shared
+  `InstallFlow` used by both screens, and the main screen keeps the initial-install flow for when
+  Plezy is not installed at all. A related bug was fixed on the way: a package *replacement* also
+  broadcasts `ACTION_PACKAGE_REMOVED`, which used to read as "Plezy is gone" (the picker's hint
+  flickered to *Installed: none*); the flow now ignores removals flagged `EXTRA_REPLACING`. See
+  [08](08-app-implementation.md#install-routine-shared) and
+  [08](08-app-implementation.md#finding-4--replacing-a-package-also-broadcasts-action_package_removed).
 - **Icons on the main screen.** The dashboard now reads at a glance: an up-arrow on the title, a
   state glyph beside the status headline (green check when up to date, bright accent up-arrow when
   an update exists, amber warning when Plezy is absent, red circled cross on a failed check,
@@ -72,3 +81,5 @@ _None. The last open request — main-screen icons — landed on 2026-11-14 (see
   picker's cross-column highlight was added the same day.
 - **Icons on the main screen** and the **original app icon / TV banner** landed on 2026-11-14.
   With those in, there are **no open requests**; new ones go under *Requested* above.
+- **Install directly from the version picker** landed on 2026-11-15 (shared `InstallFlow`; main
+  screen keeps the initial-install flow). Still **no open requests**.

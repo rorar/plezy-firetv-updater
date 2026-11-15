@@ -53,8 +53,9 @@ accent fill, everything else light grey on the dark surface).
 - The screen **takes focus on the most useful control** when it opens (the check button on the
   main screen; the version list in the picker; the value list in the interval picker).
 - Lists own the vertical axis; **left/right moves between panes** (version list ↔ notes, numbers ↔
-  units). OK advances (value → unit → Save). The remote's **Back key always cancels** — no screen
-  spends a button on it.
+  units). In the interval picker OK advances (value → unit → Save); in the version picker **OK
+  installs the highlighted version in place**, with the progress shown on the same screen. The
+  remote's **Back key always cancels** — no screen spends a button on it.
 - In a two-pane picker **each pane keeps its own selection visible** while the other has focus, so
   moving across never hides what was chosen: the focused row shows the full accent fill, the
   selected-but-unfocused row a dimmer fill. (The interval picker is the only two-pane screen with
@@ -101,6 +102,15 @@ top, **Save** at the bottom. The chosen number and the chosen unit each stay hig
 D-pad leaves their column, so the preview always matches something visible. This is the shape that
 stays usable with only a D-pad, and it needs no library (see
 [08](08-app-implementation.md#check-interval) for why a prebuilt picker is not an option here).
+
+### Choose version — two panes, install in place
+
+Versions newest-first on the left, the highlighted release's notes on the right. Up/down moves the
+version and the notes follow; right moves into the notes pane to scroll a long changelog, left comes
+back. **OK installs the highlighted version without leaving the screen** — the download/verify/install
+progress and the final "Installed 2.26.0." line appear at the bottom of this same view, so the user
+never bounces back to the dashboard to press Install. (The dashboard still owns the first install,
+when Plezy is not yet present.)
 
 ### Changelog — styled release notes
 

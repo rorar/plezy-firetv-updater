@@ -10,9 +10,9 @@ follows from it.
 
 > Status: **a working updater app** (`app/`) plus the findings that led to it (`docs/`), the
 > artwork sources (`design/`) and a throwaway probe (`probe/`). Verified end-to-end on the stick,
-> UI overhaul and original artwork included.
+> UI overhaul, original artwork and the shared install routine included.
 
-Verified on **2026-11-13/14** with Plezy `2.26.0`, ADB `1.0.41` (platform-tools `37.0.0`).
+Verified on **2026-11-13/15** with Plezy `2.26.0`, ADB `1.0.41` (platform-tools `37.0.0`).
 
 ---
 
@@ -38,8 +38,9 @@ Verified on **2026-11-13/14** with Plezy `2.26.0`, ADB `1.0.41` (platform-tools 
    installer confirmation dialog. See [docs/07](docs/07-notification-design.md).
 7. **The updater is built and works.** `app/` (`dev.rorar.plezyupdater`, plain Java, no Gradle)
    checks GitHub, downloads the upstream tarball, verifies the signer, and installs through the
-   stock dialog. It also shows per-version changelogs, can uninstall Plezy, and lets the user pick
-   the check interval. Two surprises are documented: on API 25 the app must launch the installer
+   stock dialog. It also shows per-version changelogs, can uninstall Plezy, lets the user pick
+   the check interval, and installs a chosen version straight from the version picker (one shared
+   `InstallFlow`). Two surprises are documented: on API 25 the app must launch the installer
    dialog itself, and Android 7.1 refuses downgrades of release builds — so a downgrade is done by
    uninstalling and reinstalling. The UI is a TV-first dashboard (large text, one primary action,
    unmistakable D-pad focus) with real release-notes typography and hand-drawn icons; the launcher
@@ -58,7 +59,7 @@ Verified on **2026-11-13/14** with Plezy `2.26.0`, ADB `1.0.41` (platform-tools 
 
 ## The updater app
 
-`app/` builds to a ~199 KB APK (the launcher icon and TV banner at every density are the bulk of
+`app/` builds to a ~207 KB APK (the launcher icon and TV banner at every density are the bulk of
 it; the code and vectors are small). It polls the upstream GitHub release on a user-set interval
 (default twice a day) and after boot, posts a notification when something newer exists, and
 installs it with one confirmation on the stock Fire OS installer screen. Settings are grouped into
@@ -77,6 +78,11 @@ User / Advanced / Developer sections:
 new** shows the selected release's notes. Release notes are rendered with real typography —
 coloured, larger section headings and hanging-indented bullets — through a hand-written
 `Markdown.toStyled`. It also shows free space and refuses to start a download that would not fit.
+
+The picker **installs in place**: pressing OK on a version downloads, verifies and installs it right
+there, showing the progress and the outcome on the same screen — no trip back to the dashboard. The
+dashboard keeps the first install for when Plezy is not yet present. Both screens drive the one
+shared `InstallFlow` (download → extract → verify → `PackageInstaller` → downgrade handshake).
 
 The dashboard reads at a glance: a status glyph beside the headline (green check, accent up-arrow,
 amber warning, red cross), a leading icon on every action row, and an original app icon and TV
@@ -104,7 +110,7 @@ adb install -r build/plezy-updater.apk
 | [05-update-strategies](docs/05-update-strategies.md) | Amazon store vs Obtainium vs PC cron vs own APK |
 | [06-own-updater-feasibility](docs/06-own-updater-feasibility.md) | What an own updater can and cannot do here |
 | [07-notification-design](docs/07-notification-design.md) | Notification infrastructure findings + architecture |
-| [08-app-implementation](docs/08-app-implementation.md) | The updater app as built: pending-user-action, downgrade, uninstall, changelog typography, check interval, the `Ui` toolkit, icons/artwork, storage, settings |
+| [08-app-implementation](docs/08-app-implementation.md) | The updater app as built: pending-user-action, the shared install routine, downgrade, uninstall, changelog typography, check interval, the `Ui` toolkit, icons/artwork, storage, settings |
 | [09-backlog](docs/09-backlog.md) | Done items (no open requests) |
 | [10-tv-ui-design](docs/10-tv-ui-design.md) | The TV UI plan: layout grid, focus model, icons, per-screen design, how the look is verified |
 

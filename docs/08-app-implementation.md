@@ -17,16 +17,20 @@ BOOT_COMPLETED re-arm                                             ─┤
                            newer → Notification "Plezy X available — press OK"
                                         │
                                         ▼
-                         MainActivity (TV UI, D-pad focus)
-                           [Install X] [What's new] [Check for updates]
-                           [Choose version…] [Settings]
-                           free-space line
-                           → download plezy-android-armeabi-v7a.tar.gz (~48 MB)
-                           → GZIPInputStream + 512-byte tar header → plezy.apk (~90 MB)
-                           → verify: package, versionCode, minSdk, ABI, signer SHA-256
-                           → PackageInstaller.Session.commit(IntentSender)
-                           → stock installer dialog → one remote press
-                           → InstallResultReceiver → toast + refresh
+                         MainActivity (TV UI, D-pad focus)          VersionListActivity
+                           [Install X] [What's new] [Check for updates]   ("Choose version…")
+                           [Choose version…] [Settings]                    OK on a version
+                           free-space line                                 │
+                                   │                                         │
+                                   └───────────────┬─────────────────────────┘
+                                                   ▼
+                                      InstallFlow (shared download/verify/install)
+                                        → download plezy-android-armeabi-v7a.tar.gz (~48 MB)
+                                        → GZIPInputStream + 512-byte tar header → plezy.apk (~90 MB)
+                                        → verify: package, versionCode, minSdk, ABI, signer SHA-256
+                                        → PackageInstaller.Session.commit(IntentSender)
+                                        → stock installer dialog → one remote press
+                                        → InstallResultReceiver → toast + INSTALL_FINISHED refresh
 ```
 
 ## Finding 1 — on API 25 the app must launch the installer dialog itself
@@ -99,6 +103,52 @@ file and checks space before it spends it:
   than an hour after a crash.
 - **Delete after install** (default **on**, see settings): a successful install frees the APK.
   The tarball is always deleted in a `finally`, even when extraction fails.
+
+## Finding 4 — replacing a package also broadcasts ACTION_PACKAGE_REMOVED
+
+The downgrade handshake waits for `ACTION_PACKAGE_REMOVED` to learn that Plezy is gone
+([Downgrade](#downgrade)). A normal **upgrade** through `PackageInstaller`, though, *also*
+broadcasts `ACTION_PACKAGE_REMOVED` for the package — immediately before `ACTION_PACKAGE_ADDED`
+installs the new one — and flags it with `Intent.EXTRA_REPLACING = true`.
+
+Treating that as "Plezy was uninstalled" made the version picker's hint flip to *Installed: none*
+for the whole time the installer dialog was up (and would have made a mid-upgrade state look like
+a pending downgrade). The fix is one guard in `InstallFlow`'s receiver:
+
+```java
+if (intent.getBooleanExtra(Intent.EXTRA_REPLACING, false)) {
+    return; // an upgrade, not an uninstall
+}
+```
+
+`EXTRA_REPLACING` is exactly the platform's signal for "this removal is part of a replace", so the
+handshake now only fires for a real uninstall. (Confirmed on the stick: `pm path` reported Plezy
+installed and unchanged throughout the session, so the null was purely a UI-state artefact.)
+
+## Install routine (shared)
+
+The "get an APK onto the TV" pipeline — download, extract, verify, `PackageInstaller` commit, the
+downgrade handshake — lived twice, once in `MainActivity` and once implied by the picker. It is now
+one class, **`InstallFlow`**, that both screens drive through a small `Callback` (`onProgress`,
+`onBusy`, `onFailed`, `onInstallCommitted`, `onPlezyRemoved`). The screens own only their own
+chrome; the flow owns the state machine.
+
+**The picker installs in place.** Pressing OK on a highlighted version in **Choose version…** runs
+the whole pipeline right there and leaves the user on the picker — there is no detour back to the
+main screen to press **Install update**. The picker shows the progress line itself ("Downloading…
+42 %", "Unpacking…", "Opening the installer…", "Confirm the install on the TV.", then
+"Installed 2.26.0.") and refreshes its hint and `(installed)` tag from the `INSTALL_FINISHED`
+broadcast, so the outcome is visible without navigating.
+
+**The main screen keeps the initial-install flow.** When Plezy is *not* installed at all, the
+dashboard's **Install update** button is the entry point and still runs the same `InstallFlow`
+(verification falls back to the pinned signer, [below](#verification-with-nothing-installed)). The
+version picker is a developer option (**Allow older versions**) and is not the intended path for a
+first install.
+
+`InstallResultReceiver` now always sends the in-app `INSTALL_FINISHED` broadcast (package-scoped),
+carrying the raw `EXTRA_STATUS`, and only starts the background `UpdateCheckService` when no screen
+is up. That is what lets the picker — not just `MainActivity` — word the outcome and refresh.
 
 ## Settings
 
@@ -179,8 +229,9 @@ Two places show the notes:
 
 - **`VersionListActivity`** is a two-pane picker: versions on the left, the highlighted version's
   notes on the right, updating as the D-pad moves. The list takes focus so up/down changes the
-  version; pressing right moves into the notes pane to scroll a long changelog. OK returns the tag,
-  asset URL, body and date to the main screen.
+  version; pressing right moves into the notes pane to scroll a long changelog. **OK installs the
+  highlighted version right here** (see [Install routine](#install-routine-shared)) — there is no
+  detour back to the main screen just to press Install.
 - **`ChangelogActivity`** is a single-release view opened from the main screen's **What's new**
   button, which is only visible while a release is selected.
 
@@ -256,7 +307,10 @@ Instead the app takes the only route Android 7.1 allows — uninstall, then inst
    (servers, settings, downloads) is erased — and then 2.25.0 installed").
 3. **Uninstall** via `ACTION_DELETE`.
 4. On `ACTION_PACKAGE_REMOVED` (or `onResume`, whichever comes first), **install** the cached APK
-   through the normal `PackageInstaller` session → the usual install dialog.
+   through the normal `PackageInstaller` session → the usual install dialog. The removal must be a
+   real uninstall — a replace also broadcasts `REMOVED`, so `InstallFlow` ignores anything flagged
+   with `EXTRA_REPLACING` ([Finding 4](#finding-4--replacing-a-package-also-broadcasts-action_package_removed)).
+   All of this lives in `InstallFlow`, so the picker can start a downgrade too.
 5. `InstallResultReceiver` re-checks as always, so the screen shows the new version (and, since
    the latest release is now newer again, offers the upgrade back).
 
@@ -347,6 +401,16 @@ Icon/artwork phase, same stick (2026-11-14):
 | Glyph shapes | each glyph crop printed as ASCII and matched its design (down-arrow-into-tray, circular arrow with a top gap, stacked layers, sliders) |
 | App icon + banner | packaged at all densities and declared: `aapt2 dump badging` of the **installed** APK reports `application-icon-{160,240,320,480,640}` and `banner='…/tv_banner.png'` |
 | Notification icon | `ic_stat` reworked to an alpha-only white up arrow |
+
+Install-routine phase, same stick (2026-11-15):
+
+| Step | Result |
+|---|---|
+| Picker opens | `Choose version` with title glyph, hint "…press OK to install the highlighted version.", the version list, the release-notes pane and a progress line |
+| Direct install from the picker | OK on `2.26.0` ran download → "Unpacking…" → "Opening the installer…" → `com.android.packageinstaller/.PackageInstallerActivity` opened **without leaving the picker** |
+| Confirm on the TV | the harness clicked **INSTALLIEREN**; `lastUpdateTime` jumped, focus returned to the picker |
+| Picker reports the outcome | progress line became "Installed 2.26.0."; hint stayed "Installed: 2.26.0" and the row `2.26.0 (installed)` — **no "Installed: none" flicker** (Finding 4) |
+| Nothing lost | `dumpsys package com.edde746.plezy` = `2.26.0` / `versionCode 1160` before and after; `pm path` unchanged throughout |
 
 ## Known limitations
 

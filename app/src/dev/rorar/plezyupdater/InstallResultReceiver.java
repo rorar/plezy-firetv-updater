@@ -56,20 +56,21 @@ public class InstallResultReceiver extends BroadcastReceiver {
 
         // A finished install (or a failed one) is the moment the shown state is most likely
         // stale, so ask GitHub again right away.
-        recheck(c);
+        recheck(c, status, message);
     }
 
     /**
-     * Re-runs the update check. The activity is asked to refresh when it is on screen, so the
-     * new version shows up immediately; otherwise a background check runs and only speaks up
-     * through a notification if something newer appeared.
+     * Re-runs the update check. The screens are told to refresh through an in-app broadcast (it
+     * carries the raw status so a screen can word the outcome itself); when no screen is up, a
+     * background check runs and only speaks up through a notification if something newer appeared.
      */
-    private static void recheck(Context c) {
-        if (MainActivity.isAlive()) {
-            Intent refresh = new Intent(MainActivity.ACTION_INSTALL_FINISHED);
-            refresh.setPackage(c.getPackageName());
-            c.sendBroadcast(refresh);
-        } else {
+    private static void recheck(Context c, int status, String message) {
+        Intent refresh = new Intent(MainActivity.ACTION_INSTALL_FINISHED);
+        refresh.setPackage(c.getPackageName());
+        refresh.putExtra(PackageInstaller.EXTRA_STATUS, status);
+        refresh.putExtra(PackageInstaller.EXTRA_STATUS_MESSAGE, message);
+        c.sendBroadcast(refresh);
+        if (!MainActivity.isAlive()) {
             UpdateCheckService.start(c, true);
         }
     }

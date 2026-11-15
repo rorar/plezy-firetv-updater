@@ -1,7 +1,11 @@
 package dev.rorar.plezyupdater;
 
 import android.app.Activity;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.pm.PackageInstaller;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -22,15 +26,13 @@ import java.util.List;
 
 /**
  * Release picker for the "Allow older versions" developer option. Two panes: the versions on the
- * left, the focused version's release notes on the right. Returns the chosen tag, its asset URL
- * and its changelog; the caller downloads and installs it exactly like a normal update.
+ * left, the focused version's release notes on the right.
+ *
+ * <p>Pressing OK on a version installs it right here through {@link InstallFlow} — there is no
+ * detour back to the main screen just to press Install. (The main screen keeps the plain
+ * "install the latest" flow for when Plezy is not installed at all.)
  */
 public class VersionListActivity extends Activity {
-
-    public static final String EXTRA_TAG = "tag";
-    public static final String EXTRA_URL = "url";
-    public static final String EXTRA_BODY = "body";
-    public static final String EXTRA_PUBLISHED = "published";
 
     private static final int MAX_RELEASES = 30;
 
@@ -39,17 +41,116 @@ public class VersionListActivity extends Activity {
 
     private ListView list;
     private TextView empty;
+    private TextView hint;
+    private TextView progressView;
     private TextView changelogHeader;
     private TextView changelog;
     private ScrollView changelogScroll;
     private String installedVersion;
+
+    private InstallFlow installFlow;
+    private BroadcastReceiver installFinishedReceiver;
+
+    /** The screen side of the shared download/verify/install pipeline. */
+    private final InstallFlow.Callback installCallback = new InstallFlow.Callback() {
+        @Override
+        public void onProgress(String text) {
+            progressView.setText(text);
+        }
+
+        @Override
+        public void onBusy(boolean busy) {
+            // A running download/install owns the screen: the list may not be re-triggered.
+            list.setEnabled(!busy);
+        }
+
+        @Override
+        public void onFailed(String message) {
+            progressView.setText("Install failed: " + message);
+            Notifier.toast(VersionListActivity.this, "Install failed: " + message);
+        }
+
+        @Override
+        public void onInstallCommitted() {
+            progressView.setText("Confirm the install on the TV.");
+        }
+
+        @Override
+        public void onPlezyRemoved() {
+            installedVersion = null;
+            updateHint();
+        }
+    };
 
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
         installedVersion = PlezyRepo.installedVersion(this);
         buildUi();
+        installFlow = new InstallFlow(this, installCallback);
+
+        // The PackageInstaller session reports its outcome here; without this the progress line
+        // would stay on "Confirm the install on the TV." after the install already finished.
+        installFinishedReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                onInstallFinished(intent.getIntExtra(PackageInstaller.EXTRA_STATUS,
+                        PackageInstaller.STATUS_FAILURE));
+            }
+        };
+        registerReceiver(installFinishedReceiver,
+                new IntentFilter(MainActivity.ACTION_INSTALL_FINISHED));
+
         loadReleases();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // An install (from here or elsewhere) may have finished while this screen was paused.
+        // A *null* read right around a PackageInstaller session is a transient — PackageManager
+        // briefly hides the package being replaced — so never downgrade a known version to null
+        // here. A real uninstall arrives through InstallFlow.onPlezyRemoved().
+        String current = PlezyRepo.installedVersion(this);
+        if (current != null) {
+            installedVersion = current;
+        }
+        installFlow.onResume(installedVersion);
+        refreshList();
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (installFinishedReceiver != null) {
+            unregisterReceiver(installFinishedReceiver);
+            installFinishedReceiver = null;
+        }
+        if (installFlow != null) {
+            installFlow.dispose();
+            installFlow = null;
+        }
+        super.onDestroy();
+    }
+
+    /** The installer session ended: word the outcome and re-read the installed version. */
+    private void onInstallFinished(int status) {
+        String current = PlezyRepo.installedVersion(this);
+        if (current != null) {
+            installedVersion = current;
+        }
+        if (status == PackageInstaller.STATUS_SUCCESS) {
+            progressView.setText("Installed " + (installedVersion == null ? "" : installedVersion + "."));
+        }
+        // On failure the InstallResultReceiver toast already says what went wrong; leave the
+        // progress line as it was rather than repeating it.
+        refreshList();
+    }
+
+    private void refreshList() {
+        updateHint();
+        if (list.getAdapter() instanceof BaseAdapter) {
+            ((BaseAdapter) list.getAdapter()).notifyDataSetChanged();
+        }
     }
 
     private void buildUi() {
@@ -60,16 +161,17 @@ public class VersionListActivity extends Activity {
         root.setBackgroundColor(Ui.BG);
         root.setPadding(pad, pad, pad, pad);
 
-        root.addView(Ui.title(this, "Choose version"));
+        TextView title = Ui.title(this, "Choose version");
+        Ui.leadingIcon(title, Ui.icon(this, R.drawable.ic_versions, Ui.ACCENT_BRIGHT), 26);
+        root.addView(title);
 
-        TextView hint = Ui.subtitle(this, "Newest first. Installed: "
-                + (installedVersion == null ? "none" : installedVersion)
-                + "   —   press OK to install the highlighted version.");
+        hint = Ui.subtitle(this, "");
         LinearLayout.LayoutParams hintParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         hintParams.topMargin = Ui.dp(this, 6);
         hintParams.bottomMargin = Ui.dp(this, 12);
         root.addView(hint, hintParams);
+        updateHint();
 
         LinearLayout columns = new LinearLayout(this);
         columns.setOrientation(LinearLayout.HORIZONTAL);
@@ -119,8 +221,24 @@ public class VersionListActivity extends Activity {
         changelog = Ui.body(this, "Select a version to see its release notes.");
         changelogScroll.addView(changelog);
 
+        // The download/install progress line, shared by every install started from this screen.
+        progressView = Ui.text(this, "", 17, Ui.LINK);
+        LinearLayout.LayoutParams progressParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        progressParams.topMargin = Ui.dp(this, 12);
+        root.addView(progressView, progressParams);
+
         setContentView(root);
         list.requestFocus();
+    }
+
+    private void updateHint() {
+        if (hint == null) {
+            return;
+        }
+        hint.setText("Newest first. Installed: "
+                + (installedVersion == null ? "none" : installedVersion)
+                + "   —   press OK to install the highlighted version.");
     }
 
     private void loadReleases() {
@@ -170,19 +288,18 @@ public class VersionListActivity extends Activity {
         list.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-                PlezyRepo.Release release = releases.get(position);
-                Intent result = new Intent();
-                result.putExtra(EXTRA_TAG, release.tag);
-                result.putExtra(EXTRA_URL, release.assetUrl);
-                result.putExtra(EXTRA_BODY, release.body);
-                result.putExtra(EXTRA_PUBLISHED, release.publishedAt);
-                setResult(RESULT_OK, result);
-                finish();
+                install(releases.get(position));
             }
         });
         // Take focus so the D-pad changes the version (and the notes follow). Press right to move
         // into the notes pane to scroll long changelogs, left to come back.
         list.requestFocus();
+    }
+
+    /** Install the highlighted version without leaving this screen. */
+    private void install(PlezyRepo.Release release) {
+        installedVersion = PlezyRepo.installedVersion(this);
+        installFlow.install(release, installedVersion);
     }
 
     private void showChangelog(PlezyRepo.Release release) {
