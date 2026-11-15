@@ -41,11 +41,15 @@ Verified on **2026-11-13/15** with Plezy `2.26.0`, ADB `1.0.41` (platform-tools 
    checks GitHub, downloads the upstream tarball, verifies the signer, and installs through the
    stock dialog. It also shows per-version changelogs, can uninstall Plezy, lets the user pick
    the check interval, and installs a chosen version straight from the version picker (one shared
-   `InstallFlow`). Two surprises are documented: on API 25 the app must launch the installer
-   dialog itself, and Android 7.1 refuses downgrades of release builds — so a downgrade is done by
-   uninstalling and reinstalling. The UI is a TV-first dashboard (large text, one primary action,
-   unmistakable D-pad focus) with real release-notes typography and hand-drawn icons; the launcher
-   icon and TV banner are original artwork. See
+   `InstallFlow`). It ships **English, German, French and Spanish** and follows the Fire TV's
+   language, with a **Settings → Language** override. Two surprises are documented: on API 25 the
+   app must launch the installer dialog itself, and Android 7.1 refuses downgrades of release
+   builds — so a downgrade is done by uninstalling and reinstalling. It also **stays under
+   GitHub's 60-requests/hour API limit**: the latest check uses the unmetered web feed and the
+   picker's API call is conditional, so the updater keeps working with the quota spent. The UI is a
+   TV-first dashboard
+   (large text, one primary action, unmistakable D-pad focus) with real release-notes typography
+   and hand-drawn icons; the launcher icon and TV banner are original artwork. See
    [docs/08](docs/08-app-implementation.md) and [docs/10](docs/10-tv-ui-design.md).
 
 ## Current state of the stick
@@ -60,15 +64,17 @@ Verified on **2026-11-13/15** with Plezy `2.26.0`, ADB `1.0.41` (platform-tools 
 
 ## The updater app
 
-`app/` builds to a ~207 KB APK (the launcher icon and TV banner at every density are the bulk of
-it; the code and vectors are small). It polls the upstream GitHub release on a user-set interval
-(default twice a day) and after boot, posts a notification when something newer exists, and
-installs it with one confirmation on the stock Fire OS installer screen. Settings are grouped into
-User / Advanced / Developer sections:
+`app/` builds to a ~276 KB APK (the launcher icon, TV banner and the language flags at every density
+are the bulk of it; the code and vectors are small). It polls the upstream GitHub release on a
+user-set interval (default twice a day) and after boot, posts a notification when something newer
+exists, and installs it with one confirmation on the stock Fire OS installer screen. Settings are
+grouped into User / Advanced / Developer sections:
 
 - **Toast notifications** and **Notifications** — each output can be turned off independently.
 - **Check automatically** — enables the interval alarm + boot re-arm.
 - **Check interval** — every *n* hours / days / weeks / months (1–30), default 12 hours.
+- **Language** — **System default** (follows the Fire TV) or English / Deutsch / Français /
+  Español, each with a bundled flag. The choice is stored and applied on the next screen.
 - **Delete APK after installing** — on by default, frees the downloaded APK once installed.
 - **Uninstall Plezy…** — removes Plezy through the stock uninstaller, after a confirm.
 - **Allow older versions** — developer option: pick any release, not just newer ones. A downgrade
@@ -111,9 +117,9 @@ adb install -r build/plezy-updater.apk
 | [05-update-strategies](docs/05-update-strategies.md) | Amazon store vs Obtainium vs PC cron vs own APK |
 | [06-own-updater-feasibility](docs/06-own-updater-feasibility.md) | What an own updater can and cannot do here |
 | [07-notification-design](docs/07-notification-design.md) | Notification infrastructure findings + architecture |
-| [08-app-implementation](docs/08-app-implementation.md) | The updater app as built: pending-user-action, the shared install routine, downgrade, uninstall, changelog typography, check interval, the `Ui` toolkit, icons/artwork, storage, settings |
-| [09-backlog](docs/09-backlog.md) | Done items, plus the one open request (translate the app to German) |
-| [10-tv-ui-design](docs/10-tv-ui-design.md) | The TV UI plan: layout grid, focus model, icons, per-screen design, how the look is verified |
+| [08-app-implementation](docs/08-app-implementation.md) | The updater app as built: pending-user-action, the shared install routine, downgrade, uninstall, changelog typography, check interval, staying under GitHub's rate limit, language, the `Ui` toolkit, icons/artwork, storage, settings |
+| [09-backlog](docs/09-backlog.md) | Done items; the backlog is currently empty |
+| [10-tv-ui-design](docs/10-tv-ui-design.md) | The TV UI plan: layout grid, focus model, icons, per-screen design (including the language picker), how the look is verified |
 
 ## Flow tests
 
@@ -124,12 +130,14 @@ remote would (find the labelled button, tap it), so they double as a record of w
 ```bash
 python3 test/run.py install          # forward path (non-destructive)
 python3 test/run.py all --yes        # the whole sequence
-python3 test/run.py install --app-lang de   # against a German build
+python3 test/run.py install --app-lang de   # set the app to German, then run
 ```
 
-Every label the flows look for lives in per-language JSON (`test/strings/app.<lang>.json` for the
-app, `test/strings/system.<lang>.json` for the stock Fire OS dialogs), so no label is hard-coded and
-the same flows run against any app language and any device locale.
+The updater is runtime-switchable, so `--app-lang` sets the app's language (via Settings →
+Language) before the flows run — one build is exercised in every language. Every label the flows
+look for lives in per-language JSON (`test/strings/app.<lang>.json` for the app,
+`test/strings/system.<lang>.json` for the stock Fire OS dialogs), so no label is hard-coded and the
+same flows run against any app language and any device locale.
 
 ## Quick start (reproduce the install)
 

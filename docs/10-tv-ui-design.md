@@ -118,6 +118,19 @@ Headings are bold, `#6EA8C8` and 120 % of body size; bullets hang-indent under t
 bold/code/links keep emphasis. The same renderer feeds both the two-pane picker's notes pane and
 the single-release **What's new** screen.
 
+### Language — one row per shipped language
+
+**Settings → Language** opens a picker listing **System default** (the default) followed by
+English, Deutsch, Français and Español. Each language is shown by its **own name** — not translated
+into the current one — so the list reads the same whatever the app is set to; the D-pad focus starts
+on the current choice. Every row carries a flag, and **System default** a drawn globe
+(`ic_globe`). Choosing a language stores it and rebuilds the app in it immediately.
+
+The flags are the MIT-licensed [`lipis/flag-icons`](https://github.com/lipis/flag-icons) 4×3 SVGs,
+rendered to PNGs at each density and bundled in the APK — the picker works offline. English uses
+the Union-Jack asset (`flag_en.png`), matching the icon set's convention. There is no flag pack
+dependency: the handful of PNGs ship as ordinary `drawable-*dpi` resources.
+
 ## Icons
 
 Every glyph is a hand-written `<vector>` drawable in `app/res/drawable/`. There is no icon pack
@@ -138,6 +151,10 @@ and sized for the couch (22–28 dp), never smaller than the text beside them.
 | ⚠ triangle | `ic_warning` | Plezy is not installed |
 | ⊗ circled cross | `ic_error` | the update check failed |
 | ⓘ circled i | `ic_info` | a release is selected |
+| ⊕ globe | `ic_globe` | the **System default** language row |
+
+(The language flags are not vectors — they are PNGs rendered from `lipis/flag-icons`, see
+[Language](#language--one-row-per-shipped-language).)
 
 Two rules:
 

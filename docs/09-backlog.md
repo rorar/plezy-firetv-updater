@@ -5,14 +5,27 @@ parking lot. Status is checked against the code in `app/`.
 
 ## Requested — not started
 
-- **Translate the app to German.** The updater's UI is English today; a German build is wanted.
-  The app has no resource merging (hand-rolled `aapt2`, no Gradle), so the strings live in the
-  Java. The flow tests already carry the *target* German strings in
-  [`test/strings/app.de.json`](../test/strings/app.de.json) — once the Java is translated to match,
-  re-run the flows with `--app-lang de` (see [test/README](../test/README.md)). Keep the Java and
-  that file in step.
+_None right now._
 
 ## Already implemented
+
+- **App languages: English, German, French and Spanish, with a Settings → Language picker.** All
+  user-visible text now lives in string resources (`res/values/strings.xml` is the English default;
+  `values-de|fr|es` override it), so the app follows the Fire TV's language out of the box and can
+  be overridden per app. `LocaleHelper.wrap()` applies the stored choice in each activity's
+  `attachBaseContext`; `""` means "follow the system". The picker lists **System default** plus each
+  language by its own name with a bundled flag (no network — the flags ship in the APK). Units are
+  `<plurals>`, and even the low-level download/verify errors are localised. See
+  [08](08-app-implementation.md#language) and [10](10-tv-ui-design.md#language).
+
+- **Staying under GitHub's 60-requests/hour API limit.** The updater no longer depends on the
+  metered API: the latest check reads the unmetered `releases/latest` `302` and `releases.atom`,
+  the asset URL is built from the tag, and the picker's remaining API call is conditional
+  (`ETag` / `If-None-Match`; `304`s are free) with a 15-minute TTL on top. When the quota *is*
+  spent it falls back to the web feed and shows the last known version with a calm *"trying again
+  after 12:08"* note instead of a bare `403`. Verified with `remaining: 0/60` — the Spanish
+  `install` flow passes. See
+  [08](08-app-implementation.md#staying-under-githubs-rate-limit).
 
 - **Install directly from the version picker.** Pressing OK on a version in **Choose version…**
   installs it right there — download, verify, install, progress line and outcome — so the trip back
@@ -91,4 +104,13 @@ parking lot. Status is checked against the code in `app/`.
 - **Flow tests** landed on 2026-11-15: the four flows (install / downgrade / uninstall /
   clean-install) are written down as code in [`test/`](../test/README.md), with all labels loaded
   from per-language JSON so the same flows run against any app language and device locale.
-- The only open request is now the **German translation** (see *Requested* above).
+- **Localisation** landed on 2026-11-15: English + German + French + Spanish resources, a
+  **Settings → Language** picker with bundled flags, and a runtime override (`LocaleHelper`). The
+  app follows the device by default. That closed the last request — the backlog is empty again.
+- The flow tests now **set the app language themselves** (`--app-lang`) by driving
+  Settings → Language with the D-pad, so the same runtime-switchable build is exercised in each
+  language: English and German ran the full `all` sequence, French and Spanish the non-destructive
+  `install` flow.
+- **Rate-limit handling** landed on 2026-11-15, after a flow run failed with *"GitHub API returned
+  HTTP 403"* in the picker: the unmetered web feed is now the primary source, the picker's API call
+  is conditional, and a spent quota degrades to the last known version instead of an error.

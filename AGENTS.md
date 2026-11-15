@@ -34,6 +34,23 @@ adb install -r build/plezy-updater.apk
   opens it.
 - The main screen's button order is **Install update**, **What's new**, **Check for updates**,
   **Choose version…**, **Settings**.
+- The app is **runtime-switchable** (Settings → Language: System default, English, Deutsch,
+  Français, Español). The language persists in `Prefs` and survives `adb install -r`, so the app can
+  come up in a language you did not build for. Read the current language off the main screen (the
+  Settings button's wording) instead of assuming English.
+- **Picker rows do not respond to `input tap`** (they are `focusableInTouchMode`); a tap only moves
+  focus. Use `KEYCODE_DPAD_DOWN/UP` + `KEYCODE_DPAD_CENTER`. Buttons (Settings rows, main-screen
+  buttons, dialog buttons) do respond to taps.
+- The GitHub API allows **60 unauthenticated requests/hour**. The app now avoids the metered API:
+  the latest check uses the unmetered `github.com/.../releases/latest` redirect + `releases.atom`,
+  the picker's API call is conditional (`If-None-Match`; `304`s are free), and a spent quota falls
+  back to the web feed and the last known version. So a flow run should **not** hit 403 any more.
+  If you do see *"GitHub API returned HTTP 403"* (or the calm rate-limit wording), check
+  `curl -s https://api.github.com/rate_limit` and wait for the reset — it is the quota, not the
+  harness.
+- **The updater must work with the API quota spent.** Verify it by reading `rate_limit` first and
+  running the flows while `remaining` is `0`; that is the point of the web-feed fallback
+  ([docs/08](../docs/08-app-implementation.md#staying-under-githubs-rate-limit)).
 
 ## Testing an install: click the installer button yourself
 

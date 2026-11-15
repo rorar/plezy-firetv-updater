@@ -167,6 +167,8 @@
     <!-- network / release feed errors -->
     <string name="err_repo_no_asset">Release %1$s has no %2$s</string>
     <string name="err_repo_http">GitHub API returned HTTP %1$d</string>
+    <string name="err_rate_limited">GitHub\'s hourly request limit is reached. Trying again after %1$s.</string>
+    <string name="err_rate_limited_soon">GitHub\'s hourly request limit is reached. Trying again shortly.</string>
 
     <!-- download / verify errors -->
     <string name="err_download_http">Download failed: HTTP %1$d</string>

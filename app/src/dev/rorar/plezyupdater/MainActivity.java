@@ -54,6 +54,8 @@ public class MainActivity extends Activity {
     private String installedVersion;
     private String latestVersion;
     private String lastError;
+    /** A muted note shown under a version we kept from a previous check (e.g. rate-limited). */
+    private String lastNote;
     /** The installed version seen by the last completed check, to spot install/uninstall. */
     private String checkedInstalledVersion;
     private boolean hasChecked;
@@ -375,6 +377,10 @@ public class MainActivity extends Activity {
         statusHeadline.setText(headline);
         statusHeadline.setTextColor(headlineColor);
         Ui.leadingIcon(statusHeadline, Ui.icon(this, headlineIcon, headlineColor), 26);
+        // A kept-from-last-time version still shows its status, with the reason underneath.
+        if (lastNote != null && !lastNote.isEmpty()) {
+            detail = detail + "\n" + lastNote;
+        }
         statusView.setText(detail);
         // While a download/install is running, the progress line belongs to that flow.
         if (!busy) {
@@ -425,6 +431,7 @@ public class MainActivity extends Activity {
         }
         setBusy(true);
         lastError = null;
+        lastNote = null;
         if (manual) {
             progressView.setText(getString(R.string.status_checking));
         }
@@ -433,7 +440,7 @@ public class MainActivity extends Activity {
         new Thread(new Runnable() {
             @Override
             public void run() {
-                final UpdateChecker.Result result = UpdateChecker.check(app);
+                final UpdateChecker.Result result = UpdateChecker.check(app, manual);
                 ui.post(new Runnable() {
                     @Override
                     public void run() {
@@ -448,12 +455,16 @@ public class MainActivity extends Activity {
         setBusy(false);
         installedVersion = result.installedVersion;
         latestVersion = result.latestVersion;
-        lastError = result.error;
+        // A release we could still name (even if it came from the last check) is shown normally;
+        // the reason it may be stale rides along as a note. Only a check with no version at all
+        // is an error.
+        lastError = result.release == null ? result.error : null;
+        lastNote = result.release != null ? result.error : null;
         pendingRelease = result.isNewer() ? result.release : null;
         hasChecked = true;
         checkedInstalledVersion = result.installedVersion;
 
-        if (result.error != null) {
+        if (result.release == null && result.error != null) {
             if (manual) {
                 Notifier.toast(this, getString(R.string.toast_check_failed));
             }

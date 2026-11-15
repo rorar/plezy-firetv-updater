@@ -19,6 +19,14 @@ public final class Prefs {
     private static final String KEY_INTERVAL_VALUE = "interval_value";
     private static final String KEY_INTERVAL_UNIT = "interval_unit";
 
+    // The last "latest release" we saw, kept so a rate-limited or offline check can still show a
+    // version instead of a bare HTTP error.
+    private static final String KEY_LATEST_TAG = "latest_tag";
+    private static final String KEY_LATEST_ASSET = "latest_asset";
+    private static final String KEY_LATEST_BODY = "latest_body";
+    private static final String KEY_LATEST_PUBLISHED = "latest_published";
+    private static final String KEY_LATEST_MS = "latest_ms";
+
     /** Units the user can pick for the check interval. */
     public static final String UNIT_HOURS = "hours";
     public static final String UNIT_DAYS = "days";
@@ -95,6 +103,47 @@ public final class Prefs {
 
     public static void setLastCheckMs(Context c, long value) {
         sp(c).edit().putLong(KEY_LAST_CHECK, value).apply();
+    }
+
+    // ---- last known latest release ------------------------------------------
+
+    public static String cachedLatestTag(Context c) {
+        return sp(c).getString(KEY_LATEST_TAG, null);
+    }
+
+    public static String cachedLatestAsset(Context c) {
+        return sp(c).getString(KEY_LATEST_ASSET, null);
+    }
+
+    public static String cachedLatestBody(Context c) {
+        return sp(c).getString(KEY_LATEST_BODY, null);
+    }
+
+    public static String cachedLatestPublished(Context c) {
+        return sp(c).getString(KEY_LATEST_PUBLISHED, null);
+    }
+
+    public static long cachedLatestMs(Context c) {
+        return sp(c).getLong(KEY_LATEST_MS, 0L);
+    }
+
+    public static void setCachedLatest(Context c, String tag, String assetUrl, String body,
+            String publishedAt, long ms) {
+        SharedPreferences.Editor e = sp(c).edit()
+                .putString(KEY_LATEST_TAG, tag)
+                .putString(KEY_LATEST_ASSET, assetUrl)
+                .putLong(KEY_LATEST_MS, ms);
+        if (body == null) {
+            e.remove(KEY_LATEST_BODY);
+        } else {
+            e.putString(KEY_LATEST_BODY, body);
+        }
+        if (publishedAt == null) {
+            e.remove(KEY_LATEST_PUBLISHED);
+        } else {
+            e.putString(KEY_LATEST_PUBLISHED, publishedAt);
+        }
+        e.apply();
     }
 
     /**

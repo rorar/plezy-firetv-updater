@@ -148,6 +148,8 @@
 
     <string name="err_repo_no_asset">Release %1$s hat kein %2$s</string>
     <string name="err_repo_http">GitHub-API lieferte HTTP %1$d</string>
+    <string name="err_rate_limited">GitHubs stündliches Anfragelimit ist erreicht. Neuer Versuch nach %1$s.</string>
+    <string name="err_rate_limited_soon">GitHubs stündliches Anfragelimit ist erreicht. Neuer Versuch in Kürze.</string>
 
     <string name="err_download_http">Download fehlgeschlagen: HTTP %1$d</string>
     <string name="err_download_truncated">Download unvollständig: %1$d/%2$d Bytes</string>

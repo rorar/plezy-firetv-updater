@@ -147,6 +147,8 @@
 
     <string name="err_repo_no_asset">La versión %1$s no tiene %2$s</string>
     <string name="err_repo_http">La API de GitHub devolvió HTTP %1$d</string>
+    <string name="err_rate_limited">Se alcanzó el límite horario de solicitudes de GitHub. Se reintentará después de las %1$s.</string>
+    <string name="err_rate_limited_soon">Se alcanzó el límite horario de solicitudes de GitHub. Se reintentará en breve.</string>
 
     <string name="err_download_http">Error de descarga: HTTP %1$d</string>
     <string name="err_download_truncated">Descarga incompleta: %1$d/%2$d bytes</string>

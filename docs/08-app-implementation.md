@@ -165,6 +165,7 @@ dark background.
 | Check automatically | Advanced | `auto_check_enabled` | on | Interval alarm + boot re-arm |
 | Check interval | Advanced | `interval_value` / `interval_unit` | 12 hours | Opens the interval picker (below) |
 | Delete APK after installing | Advanced | `delete_apk_after_install` | **on** | Removes the downloaded APK once installed |
+| Language | User | `app_language` | System default | Opens the language picker (below) |
 | Allow older versions | Developer | `allow_older_versions` | off | Shows **Choose version…** and sets the hidden downgrade flag |
 
 Every message goes through `Notifier`, so a switched-off channel stays silent everywhere,
@@ -203,6 +204,85 @@ The backlog asked for a prebuilt picker library. That is not possible here: the 
 `aapt2` + `javac` + `d8` with **no resource merging**, so an AAR carrying layouts and themes
 cannot be linked in. The hand-built picker is the same amount of code and matches the app's look
 (the reasoning is repeated in `IntervalActivity`'s javadoc).
+
+## Staying under GitHub's rate limit
+
+GitHub's REST API is **metered**: 60 requests per hour for an unauthenticated client, per IP. The
+updater spends one on every screen and every boot, so a burst of checks (and the flow tests, which
+open the picker and re-check several times) can exhaust the hour and leave the picker showing
+`GitHub API returned HTTP 403`. The fix is to stop treating the API as the only source.
+
+**The unmetered web endpoints are now the primary source.** `github.com/edde746/plezy/releases/latest`
+is a `302` to `/releases/tag/<tag>`, and `releases.atom` is the release feed — both on `github.com`,
+not `api.github.com`, so **neither counts against the API quota**. The latest tag comes from the
+redirect's `Location`; the notes come from the Atom entry for that tag (its HTML is turned into the
+Markdown subset `Markdown` renders by `Html.toMarkdown`); and the asset URL is built from the tag
+(`…/releases/download/<tag>/plezy-android-armeabi-v7a.tar.gz`), because Plezy ships that asset name
+on every release. `api.github.com` is only the fallback.
+
+The API calls that remain — the version picker, which wants 30 entries and Markdown notes — are
+**conditional**: `PlezyRepo` stores the `ETag` and body per URL in `HttpCache` and sends
+`If-None-Match`, so an unchanged feed is answered with a `304` that is served from disk and, per
+GitHub, **does not count against the limit**. A `LATEST_TTL_MS` (15 min) cache in `Prefs` collapses
+the launch/resume/boot burst into one request.
+
+When the quota *is* spent and the web path also fails, the check no longer shows a bare `403`. The
+last version seen is persisted (`Prefs.cachedLatest*`), `PlezyRepo` throws a
+`RateLimitedException` carrying the reset time, and the main screen keeps the version with a muted
+note — *"GitHub's hourly request limit is reached. Trying again after 12:08."* — instead of losing
+the status. The same calm wording reaches the picker's error line.
+
+The behaviour is verified against a **spent** quota: with `remaining: 0/60`, the main screen reports
+*Plezy is up to date* and the Spanish `install` flow passes end to end — see
+[test/README](../test/README.md).
+
+## Language
+
+The app follows the Fire TV's language by default and can be overridden per app. The choice lives
+in one preference, `app_language` (`Prefs.appLanguage` / `setAppLanguage`), where the empty string
+means **System default**.
+
+Everything the user can read is a string resource: `res/values/strings.xml` is the English default
+and `values-de|fr|es/strings.xml` override it. There are no user-visible Java literals left — even
+the low-level download/verify errors (`ApkInstaller`, `PlezyRepo`) and the installer-result wording
+(`InstallResultReceiver.describe`) take a `Context` and resolve a string, and the notification is
+built with the picked language. Units are `<plurals>`, so the interval preview reads "1 hour" /
+"2 hours" ("1 Stunde" / "2 Stunden") rather than "1 hour(s)".
+
+The override is applied in each activity's `attachBaseContext`:
+
+```java
+@Override protected void attachBaseContext(Context base) {
+    super.attachBaseContext(LocaleHelper.wrap(base));
+}
+```
+
+`LocaleHelper.wrap()` reads the stored code, and when it is set, returns a context whose
+`Configuration` (and default `Locale`) carry it; `getString` then resolves to that language.
+`LocaleHelper` also owns the language list — `CODES`, the native names and the flag drawables — so
+the picker and the resources cannot drift apart. `systemCode()` reads the device language from
+`Resources.getSystem()` for the "System default (Deutsch)" summary line.
+
+**Settings → Language** opens `LanguageActivity`: **System default** followed by English, Deutsch,
+Français and Español, each by its own name and with a bundled flag. The focus starts on the current
+choice (`LocaleHelper.SYSTEM` → row 1, otherwise `indexOf(code) + 2`, because child 0 is the title).
+Picking one stores the code and returns to the app, which rebuilds in the new language. The flags
+are `lipis/flag-icons` 4×3 SVGs rendered to PNGs per density (plus a drawn globe for **System
+default**); they ship in the APK, so the picker needs no network.
+
+### Build note — resources are linked positionally
+
+`build.sh` compiles `res/` to `build/res.zip` and hands it to `aapt2 link` **positionally**, not
+with `-R`:
+
+```sh
+"$BT/aapt2" link -o build/unsigned.apk -I "$AJ" \
+  --manifest AndroidManifest.xml build/res.zip --java build/gen …
+```
+
+`-R` marks the archive as an *overlay*, and aapt2 then rejects `values-de|fr|es` with
+*"resource … does not override an existing resource"* — it expects an overlay to replace, not a
+locale variant to merge. Positionally, the per-locale configs merge with `values/` as intended.
 
 ## Changelog
 
@@ -437,13 +517,25 @@ Install-routine phase, same stick (2026-11-15):
 | **Clean install (main screen)** | dashboard showed "Plezy is not installed" / "Latest upstream: 2.26.0" / **Install 2.26.0**; OK → fresh-install dialog ("Möchtest du diese App installieren?") → **INSTALLIEREN** → Plezy `2.26.0`, `lastUpdateTime` fresh; dashboard refreshed to "Plezy is up to date" |
 | **Delete-after-install** | with the setting on, `/data` free space rose across each run (e.g. `939 932` → `960 580` KB after the downgrade), so the downloaded tarball/APK was removed once the install succeeded |
 
+Rate-limit phase, same stick (2026-11-15), run **with the quota spent**:
+
+| Step | Result |
+|---|---|
+| Quota | `curl https://api.github.com/rate_limit` → `remaining: 0/60`, `used: 60`, both before and after the run |
+| Main screen at 0 quota | the unmetered `releases/latest` `302` + Atom feed filled it in: "Plezy is up to date" / "Installed 2.26.0 · latest 2.26.0" — **no HTTP 403** |
+| Picker at 0 quota | **Choose version** listed the releases (from the Atom feed) and installed `2.26.0` — the exact path that failed with *"GitHub API returned HTTP 403"* before |
+| Spanish `install` flow | `python3 test/run.py install --app-lang es` → **1/1 PASS** at `0/60` (the failing run from the previous batch) |
+| Atom notes render | `Html.toMarkdown` run on the real `2.26.0` Atom `<content>`: `## New features`, `- ` bullets, no leftover tags — compiled and executed from the shipped `Html.java` |
+
 ## Known limitations
 
 - One remote confirmation per install (silent install is impossible; [06](06-own-updater-feasibility.md)).
 - A downgrade costs two confirmations and **erases Plezy's data**; the app warns before starting
   ([Downgrade](#downgrade)).
 - Self-update is not implemented yet: a new updater build is installed with `adb install -r`.
-- GitHub's unauthenticated limit is 60 req/h; the app polls at most hourly (the minimum the picker
-  offers), which is far below it.
+- GitHub's unauthenticated limit is 60 req/h. The app no longer spends it: the latest check uses
+  the unmetered web endpoints and a 15-minute TTL, the picker's API call is conditional
+  (`304`s are free), and a spent quota falls back to the web feed and the last known version
+  ([Staying under GitHub's rate limit](#staying-under-githubs-rate-limit)).
 - The ADB link drops out periodically on this stick; toggling **ADB debugging** off/on in Fire TV
   developer options is the reliable fix ([01](01-adb-access.md#the-adb-daemon-stops-on-its-own--toggle-it-off-and-on)).
