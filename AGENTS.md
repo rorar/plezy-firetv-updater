@@ -60,7 +60,20 @@ adb shell input tap 1115 984
 `KEYCODE_DPAD_CENTER`.) After the click, confirm the outcome: `dumpsys package com.edde746.plezy`
 should show a fresh `lastUpdateTime`, and the updater's own screen should report the new version.
 
-## Destructive flows — ask first
+## Driving the whole install / uninstall / downgrade flow
 
-An **uninstall** and a **downgrade** (which uninstalls then installs) **erase Plezy's data**
-(servers, settings, downloads). Do not run them against the user's device without asking.
+The user has **authorised the agent to drive the entire flow by itself** while verifying — no need
+to ask before each click. That includes:
+
+- clicking the app's own dialogs, e.g. **Uninstall & install** on the "Downgrade to …?" confirm;
+- confirming the stock uninstaller (`ACTION_DELETE` → `UninstallerActivity`);
+- clicking **`INSTALLIEREN`** on the stock installer (see above).
+
+The buttons are German-locale; the app's own dialogs are English. Find the target node's `bounds`
+with `uiautomator dump` and `adb shell input tap <cx> <cy>` its centre (or D-pad to it and press
+`KEYCODE_DPAD_CENTER`).
+
+**Still destructive:** an uninstall and a downgrade (uninstall-then-install) **erase Plezy's data**
+(servers, settings, downloads). That is expected and allowed for testing, but say so in the
+result — and when the test is done, leave Plezy back on the latest release rather than on the
+downgraded build.
