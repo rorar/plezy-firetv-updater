@@ -52,7 +52,7 @@ adb install -r build/plezy-updater.apk
   harness.
 - **The updater must work with the API quota spent.** Verify it by reading `rate_limit` first and
   running the flows while `remaining` is `0`; that is the point of the web-feed fallback
-  ([docs/08](../docs/08-app-implementation.md#staying-under-githubs-rate-limit)).
+  ([docs/08](docs/08-app-implementation.md#staying-under-githubs-rate-limit)).
 
 ## Testing an install: click the installer button yourself
 
