@@ -296,6 +296,11 @@ class Device:
         m = re.search(r"versionCode=(\d+)", out)
         return int(m.group(1)) if m else None
 
+    def first_install_time(self, pkg):
+        out = self.shell(f"dumpsys package {pkg}", check=False)
+        m = re.search(r"firstInstallTime=(.+)", out)
+        return m.group(1).strip() if m else None
+
     def last_update_time(self, pkg):
         out = self.shell(f"dumpsys package {pkg}", check=False)
         m = re.search(r"lastUpdateTime=(.+)", out)

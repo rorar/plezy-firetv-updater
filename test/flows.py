@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The four verification flows, written the way a person with the remote does them.
+"""The five verification flows, written the way a person with the remote does them.
 
 Every step is "find the labelled button on screen, tap its centre, wait for the
 next window" — no coordinates are hard-coded, so the same flows run against an
@@ -8,6 +8,7 @@ a German or English Fire OS (strings/system.<lang>.json).
 
     install        pick the latest version in the picker and install it
     downgrade      pick an older version and drive uninstall-then-install
+    upgrade        back to the Main View and install the latest again
     uninstall      Settings -> Advanced -> Uninstall Plezy…
     clean-install  install from the main screen when nothing is installed
 
@@ -15,6 +16,7 @@ The `all` sequence in run.py runs them in the order above, which starts from
 "latest installed" and ends back on "latest installed".
 """
 
+import re
 import time
 
 import harness
@@ -261,6 +263,70 @@ class Flows:
             self.log(f"    (note: expected dialog title {title!r})")
         self._tap(node, button)
 
+    def _dismiss_open_prompt(self, timeout=15):
+        """Dismiss the "Open Plezy?" dialog that follows a successful install.
+
+        Returns True when a dialog was dismissed. The prompt is on by default; a flow
+        tolerates its absence (the setting can be off) but must clear it when present —
+        the dialog is the *only* window in a `uiautomator dump`, so everything underneath
+        is invisible until it is gone. Tapping "Not now" is the deterministic dismissal;
+        the buttons take a tap, and the tap does not depend on where the focus landed.
+        """
+        title = self.s.app("open_prompt.title")
+        not_now = self.s.app("open_prompt.not_now")
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            screen = self.d.dump()
+            if screen.find(exact=title) is not None:
+                self.log(f"    dismiss the {title!r} prompt")
+                node = screen.find(exact=not_now)
+                if node is not None:
+                    self._tap(node, not_now)
+                else:
+                    self.d.key("KEYCODE_DPAD_CENTER")
+                time.sleep(1.5)
+                return True
+            time.sleep(1)
+        return False
+
+    def _back_to_main(self, timeout=25):
+        """Walk back to the updater's Main View with BACK — never force-stops or relaunches.
+
+        The upgrade flow must exercise the *Main View* path, so this is deliberately not
+        ``open_updater()``. BACK is only sent while the updater itself is in front, so a
+        mis-timed press cannot escape into the Fire TV launcher.
+        """
+        main = f"{self.c['updater_package']}.MainActivity"
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            focus = self.d.current_focus()
+            if main in focus:
+                self.log("    ✓ back on the Main View")
+                return
+            if self.c["updater_package"] not in focus:
+                raise HarnessError(
+                    f"left the updater, cannot press BACK (focus: {focus!r})")
+            self.d.key("KEYCODE_BACK")
+            time.sleep(1.5)
+        raise HarnessError(f"could not reach the Main View (focus: {self.d.current_focus()!r})")
+
+    def check_quota(self):
+        """Ask the updater for its GitHub quota over the diagnostics broadcast (A3).
+
+        This is the "a script triggers a check and reads a report" path the feature was
+        built for: the receiver answers in the ordered-broadcast result data, which adb
+        prints as ``result=-1, data="status=ok;remaining=…;…"``. Returns the report as a
+        dict, or None when the receiver did not answer.
+        """
+        action = self.c["diagnostics_action"]
+        out = self.d.shell(f"am broadcast --include-stopped-packages -a {action}", check=False)
+        last = out.strip().splitlines()[-1] if out.strip() else "(no output)"
+        self.log(f"    quota broadcast: {last}")
+        m = re.search(r'result=(-?\d+)(?:,\s*data="(.*)")?', out)
+        if not m or not m.group(2):
+            return None
+        return dict(p.split("=", 1) for p in m.group(2).split(";") if "=" in p)
+
     # ------------------------------------------------------------------ #
     # assertions
     # ------------------------------------------------------------------ #
@@ -302,7 +368,10 @@ class Flows:
             raise HarnessError(f"installing {version} should open the installer, saw {kind!r}")
         self._confirm_system_install()
         self.assert_installed(version)
-        self._expect_text(self.s.app("picker.progress_installed", version=version))
+        # Clear the "Open Plezy?" dialog before reading the picker: while it is up it is the
+        # only window in the dump, so the progress line underneath is invisible.
+        self._dismiss_open_prompt()
+        self._expect_text(self.s.app("picker.progress_installed", version=version), fatal=True)
         self.log(self._space_note(before))
         return version
 
@@ -321,9 +390,59 @@ class Flows:
         self._confirm_system_uninstall()
         self._confirm_system_install()
         self.assert_installed(older)
-        self._expect_text(self.s.app("picker.progress_installed", version=older))
+        self._dismiss_open_prompt()
+        self._expect_text(self.s.app("picker.progress_installed", version=older), fatal=True)
         self.log(self._space_note(before))
         return older
+
+    def upgrade(self, version=None, older=None):
+        """Upgrade from the Main View — the path a user takes after a downgrade.
+
+        Precondition: Plezy is installed and older than ``version``. If it is not on
+        ``older`` already the flow downgrades first, so it also runs on its own. The
+        install is started from the Main View's "Install <version>" button, *not* the
+        picker: that is the whole point, it proves the dashboard path works. A replace is
+        proven from the package identity — firstInstallTime must not move, lastUpdateTime
+        must (a fresh install would move both).
+        """
+        version = version or self.c["versions"]["latest"]
+        older = older or self.c["versions"]["older"]
+        pkg = self.c["plezy_package"]
+
+        installed = self.d.installed_version(pkg)
+        if installed is None:
+            raise HarnessError("upgrade needs Plezy installed; run install or clean-install first")
+        if installed != older:
+            self.log(f"[upgrade] Plezy is {installed}, not {older} — downgrading first")
+            self.downgrade(older)
+        # The picker is in front now; the upgrade itself must go through the Main View.
+
+        before_first = self.d.first_install_time(pkg)
+        before_last = self.d.last_update_time(pkg)
+        self.log(f"  install identity before: first={before_first} last={before_last}")
+
+        self.log(f"[upgrade] Main View → install {version}")
+        self._back_to_main()
+        label = self.s.app("main.install_version", version=version)
+        screen, node = self._wait_for(label, what=f"Main View button {label!r}", timeout=60)
+        if not node.enabled:
+            raise HarnessError(f"the {label!r} button is disabled:\n{screen.pretty()}")
+        self._tap(node, label)
+        self._confirm_system_install(timeout=180)
+        self.assert_installed(version)
+        self._dismiss_open_prompt()
+
+        after_first = self.d.first_install_time(pkg)
+        after_last = self.d.last_update_time(pkg)
+        if before_first and after_first and before_first != after_first:
+            raise HarnessError(
+                f"expected an in-place replace, but firstInstallTime moved: "
+                f"{before_first!r} → {after_first!r}")
+        if before_last and after_last and before_last == after_last:
+            raise HarnessError(f"lastUpdateTime did not change: still {after_last!r}")
+        self.log(f"    ✓ replaced in place — firstInstallTime {after_first}, "
+                 f"lastUpdateTime {after_last}")
+        return version
 
     def uninstall(self):
         """Uninstall Plezy from Settings → Advanced."""
@@ -365,6 +484,7 @@ class Flows:
         self._tap(node, node.label)
         self._confirm_system_install(timeout=180)
         self.assert_installed(version)
+        self._dismiss_open_prompt()
         self.log(self._space_note(before))
         return version
 

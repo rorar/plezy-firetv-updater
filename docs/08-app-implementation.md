@@ -1,8 +1,8 @@
 # 08 — The updater app, as built
 
-`app/` is the working updater: `dev.rorar.plezyupdater`, minSdk/targetSdk **25**, plain Java,
-programmatic UI, **no Gradle and no AndroidX**. It was verified end-to-end on the stick
-(AFTMM, Fire OS 6.7.1.1 / API 25) on 2026-11-13/15.
+`app/` is the working updater: `dev.rorar.plezyupdater` **0.2.0** (`versionCode 2`),
+minSdk/targetSdk **25**, plain Java, programmatic UI, **no Gradle and no AndroidX**. It was verified
+end-to-end on the stick (AFTMM, Fire OS 6.7.1.1 / API 25) on 2026-11-13/16.
 
 ## What it does
 
@@ -12,7 +12,7 @@ BOOT_COMPLETED re-arm                                             ─┤
                                         ▼
                          UpdateCheckService (IntentService, API 25 has no
                          background-service limit)
-                           GET api.github.com/repos/edde746/plezy/releases/latest
+                           GET github.com/edde746/plezy/releases/latest (unmetered 302 → tag)
                            compare tag with the installed Plezy
                            newer → Notification "Plezy X available — press OK"
                                         │
@@ -25,12 +25,14 @@ BOOT_COMPLETED re-arm                                             ─┤
                                    └───────────────┬─────────────────────────┘
                                                    ▼
                                       InstallFlow (shared download/verify/install)
-                                        → download plezy-android-armeabi-v7a.tar.gz (~48 MB)
+                                        → download plezy-android-<abi>.tar.gz (~48 MB); ABI from
+                                          Build.SUPPORTED_ABIS (B2)
                                         → GZIPInputStream + 512-byte tar header → plezy.apk (~90 MB)
                                         → verify: package, versionCode, minSdk, ABI, signer SHA-256
                                         → PackageInstaller.Session.commit(IntentSender)
                                         → stock installer dialog → one remote press
                                         → InstallResultReceiver → toast + INSTALL_FINISHED refresh
+                                        → "Open Plezy?" prompt (A1, on by default)
 ```
 
 ## Finding 1 — on API 25 the app must launch the installer dialog itself
@@ -150,26 +152,127 @@ first install.
 carrying the raw `EXTRA_STATUS`, and only starts the background `UpdateCheckService` when no screen
 is up. That is what lets the picker — not just `MainActivity` — word the outcome and refresh.
 
+## The "Open Plezy?" prompt (A1)
+
+An install ends on the stock installer screen, which pauses the updater; when it closes the user is
+back in the updater and the app they just installed is not running. So after **every successful
+install** the app offers to start Plezy:
+
+```
+┌ Open Plezy? ─────────────────────────────┐
+│ Plezy 2.26.0 is installed. Start it now? │
+│                       [ Not now ] [ Open ]│   ← "Not now" holds the focus
+└───────────────────────────────────────────┘
+```
+
+It is a **toggle**, not an extra row: **Settings → User settings → Prompt to open Plezy** (pref
+`open_prompt_enabled`, **on** by default) turns the offer off entirely. There is no separate "Open
+Plezy" button anywhere — the prompt *is* the way to open it after an install.
+
+The state lives in `OpenPrompt`, not on a screen, because both the dashboard and the version picker
+listen for the same `INSTALL_FINISHED` broadcast and either could be the one underneath the
+installer. `OpenPrompt.onInstallFinished()` sets a static `pending` flag for a `STATUS_SUCCESS`; the
+**first screen that regains window focus** claims it (`maybeShow` is called from the finished
+handler, `onResume()` and `onWindowFocusChanged(true)`) and the other one finds it already taken.
+Only a *success* prompts, and only while the toggle is on.
+
+Two details were needed to make it behave on a TV remote:
+
+- **"Not now" holds the focus.** `AlertDialog` focuses the positive button after `onShow` returns,
+  so the request has to be **posted**, and the negative button has to be
+  `setFocusableInTouchMode(true)` first — the root cause was that an injected `input tap` (and any
+  phone) leaves the device in touch mode, where a bare `requestFocus()` is refused and the dialog
+  silently falls back to focusing **Open**. With both in place a stray OK cannot launch Plezy.
+- **The launch component is not hard-coded.** `OpenPrompt.open()` asks the `PackageManager` for
+  `getLeanbackLaunchIntentForPackage(PlezyRepo.PACKAGE_NAME)` and falls back to
+  `getLaunchIntentForPackage`. A `<queries>` element declares `com.edde746.plezy` in the manifest,
+  which is what package visibility needs from API 30 on (harmless on this API 25 stick, correct if
+  the updater is ever run on a newer TV).
+
+## About and the version line (A7)
+
+**Settings → About Plezy Updater…** opens `AboutActivity`: the version line, a **Licenses** block
+and a **Thanks** note. The version is read back from the `PackageManager`
+(`PackageInfo.versionName` / `versionCode`) rather than hard-coded, so it always matches the APK
+that is actually installed:
+
+> Plezy Updater 0.2.0 (build 2)
+
+`AboutActivity.versionLine(Context)` is the single source for that string; Settings shows the same
+line inline at the bottom, so the two cannot disagree. `build.sh` stamps `versionCode`/`versionName`
+at link time with `aapt2 link --version-code/--version-name --replace-version`, so bumping the
+version is one edit in the build script.
+
+The third-party notice is read from **`res/raw/licenses.txt`** and is deliberately **not
+translated** — licence text must not drift between languages. The only bundled third-party asset is
+the flag-icons set ([Language](#language)), and its MIT notice lives there.
+
+## Diagnostics and the remote quota check (A3)
+
+The app lives under GitHub's 60-requests/hour limit, and the reset time is otherwise invisible, so
+**Settings → Diagnostics → Check GitHub quota…** runs a live check and shows it as a summary line:
+
+```
+Check GitHub quota…       59 of 60 requests left · resets 13:21.
+```
+
+`/rate_limit` is exempt from the limit, so asking costs nothing. Both the Settings row and the
+remote trigger go through one method, `Diagnostics.checkQuota`, so they persist (`Prefs.setQuota`)
+and report identically; the row also renders the **last stored** values without a network call
+("Not checked yet." until the first check).
+
+**The check is remotely triggerable and answers back**, which is what a script needs:
+
+```bash
+adb shell am broadcast --include-stopped-packages \
+    -a dev.rorar.plezyupdater.action.DIAGNOSTICS
+# Broadcast completed: result=-1, data="status=ok;remaining=59;limit=60;reset_ms=…;checked_ms=…"
+```
+
+`DiagnosticsReceiver` is **exported** (so a shell broadcast reaches it) but guarded by
+`android.permission.DUMP`, which the adb shell holds and ordinary apps do not. The answer travels in
+the ordered-broadcast **result data** — `setResultCode(-1)` + `setResultData(report)`, printed by
+`am broadcast` as `data="…"` — because that is the one channel a script can read without `run-as`.
+The report is a **quote-free, space-free** `key=value;…` string (`status=ok;remaining=…;limit=…;
+reset_ms=…;checked_ms=…`, or `status=error;code=…` on failure) so it survives that channel intact,
+and the same report is written to **`quota.txt`** in the app's external cache dir
+(`getExternalCacheDir()`) as a second, permission-free way in. The check is a network call, so it
+runs off the main thread through `goAsync()`; `finish()` always runs, even on failure, or the
+broadcast would hang until the system times it out.
+
+The flow harness uses exactly this path: `run.py` fires the broadcast before the flows and prints
+the result ([test/README](../test/README.md)).
+
 ## Settings
 
 The switches are grouped into sections — **User settings**, **Advanced settings**, **Developer
-settings** and a bottom **Diagnostics** block (test toast, test notification, back). The rows are
-plain platform `Switch` widgets, so their focus colours are set explicitly: white text on the
-`#2F6E8F` highlight, instead of the Fire OS default of black-on-blue, which is unreadable on the
-dark background.
+settings**, then a bottom **Diagnostics** block (quota check, test toast, test notification) and an
+**About** block (the About row plus the version line). The rows are plain platform `Switch` widgets,
+so their focus colours are set explicitly: white text on the `#2F6E8F` highlight, instead of the
+Fire OS default of black-on-blue, which is unreadable on the dark background. The quota and About
+rows are action rows, not switches.
 
-| Switch | Section | Key | Default | Effect |
+| Row | Section | Key | Default | Effect |
 |---|---|---|---|---|
 | Toast notifications | User | `toast_enabled` | on | Bottom-of-screen toasts |
 | Notifications | User | `notification_enabled` | on | Fire TV notification-centre entry |
-| Check automatically | Advanced | `auto_check_enabled` | on | Interval alarm + boot re-arm |
-| Check interval | Advanced | `interval_value` / `interval_unit` | 12 hours | Opens the interval picker (below) |
-| Delete APK after installing | Advanced | `delete_apk_after_install` | **on** | Removes the downloaded APK once installed |
+| Prompt to open Plezy | User | `open_prompt_enabled` | **on** | Offers to start Plezy after a successful install (A1) |
 | Language | User | `app_language` | System default | Opens the language picker (below) |
+| Check automatically | Advanced | `auto_check_enabled` | on | Interval alarm + boot re-arm |
+| Edit check interval… | Advanced | `interval_value` / `interval_unit` | 12 hours | Opens the interval picker (below) |
+| Delete APK after installing | Advanced | `delete_apk_after_install` | **on** | Removes the downloaded APK once installed |
+| Uninstall Plezy… | Advanced | — | — | Stock uninstaller, after a confirm (below) |
 | Allow older versions | Developer | `allow_older_versions` | off | Shows **Choose version…** and sets the hidden downgrade flag |
+| Check GitHub quota… | Diagnostics | `quota_*` | Not checked yet | Live `/rate_limit` check, also remotely triggerable (A3) |
+| About Plezy Updater… | About | — | — | About screen; the version line sits inline below it (A7) |
 
 Every message goes through `Notifier`, so a switched-off channel stays silent everywhere,
 including the "Test toast" / "Test notification" buttons.
+
+**Toggled rows align with button rows.** The rows that carry a `Switch` on the right and the rows
+that are plain buttons used to have different horizontal paddings, so their labels did not line up.
+Both now share one row helper (`Ui.switchRow` and the button rows take the same 11 dp vertical
+padding and inset), so a column of labels reads as one column however the rows are built (A4).
 
 After an install finishes (success *or* failure) the app **re-runs the check** automatically: if
 the screen is alive it is refreshed in place (via the in-app `INSTALL_FINISHED` broadcast),
@@ -177,7 +280,9 @@ otherwise a background check runs and only speaks up through a notification.
 
 ## Check interval
 
-The cadence is no longer fixed. **Check interval** opens `IntervalActivity`, a two-pane picker:
+The cadence is no longer fixed. The Settings row is labelled **Edit check interval…** (A6) — it is an
+*action* that opens `IntervalActivity`, not a value to flip, so it reads like the other opening
+rows; the picker's own title stays **Check interval**. It is a two-pane picker:
 numbers `1…30` on the left, units **Hours / Days / Weeks / Months** on the right, with a live
 "Every 3 days" preview at the top. Up/down changes the highlighted value, left/right switches
 column, OK advances to **Save**; the remote's Back key cancels (there is deliberately no Back
@@ -217,8 +322,9 @@ is a `302` to `/releases/tag/<tag>`, and `releases.atom` is the release feed —
 not `api.github.com`, so **neither counts against the API quota**. The latest tag comes from the
 redirect's `Location`; the notes come from the Atom entry for that tag (its HTML is turned into the
 Markdown subset `Markdown` renders by `Html.toMarkdown`); and the asset URL is built from the tag
-(`…/releases/download/<tag>/plezy-android-armeabi-v7a.tar.gz`), because Plezy ships that asset name
-on every release. `api.github.com` is only the fallback.
+and this device's ABI (`…/releases/download/<tag>/plezy-android-<abi>.tar.gz`, see
+[below](#which-build-for-this-device-b2)), because Plezy ships one tarball per ABI on every release.
+`api.github.com` is only the fallback.
 
 The API calls that remain — the version picker, which wants 30 entries and Markdown notes — are
 **conditional**: `PlezyRepo` stores the `ETag` and body per URL in `HttpCache` and sends
@@ -235,6 +341,39 @@ the status. The same calm wording reaches the picker's error line.
 The behaviour is verified against a **spent** quota: with `remaining: 0/60`, the main screen reports
 *Plezy is up to date* and the Spanish `install` flow passes end to end — see
 [test/README](../test/README.md).
+
+## Which build for this device (B2)
+
+Plezy publishes one Android tarball **per ABI** (`plezy-android-arm64-v8a.tar.gz`,
+`plezy-android-armeabi-v7a.tar.gz`, `plezy-android-x86_64.tar.gz`), and the updater used to name
+the 32-bit one unconditionally. `PlezyRepo.assetName()` now derives the file name from the device:
+
+```java
+for (String abi : Build.SUPPORTED_ABIS)        // best ABI first
+    for (String known : ASSET_ABIS)            // arm64-v8a, armeabi-v7a, x86_64
+        if (known.equals(abi)) return assetNameFor(known);
+return assetNameFor("armeabi-v7a");            // nothing matched: name the 32-bit build
+```
+
+So the same APK picks the 64-bit tarball on a modern Android TV / phone and the 32-bit one on this
+stick (`abilist = armeabi-v7a, armeabi` → `armeabi-v7a`). The URL is **derived from the tag and the
+ABI on every use and never cached** — an earlier version stored the asset URL in `Prefs`, which
+would have pinned a device to the wrong ABI after the setting was written once; every
+`ANDROID_ASSET` use now goes through `assetName()`. When nothing matches, the 32-bit name is used
+deliberately so the verify step rejects it with a readable message rather than the app silently
+downloading nothing.
+
+The verify step was generalised to match. `ApkInstaller.hasSupportedAbi()` **passes an APK with no
+`lib/` directory at all** (a pure-Java build is fine on any device) and otherwise accepts the APK
+when **any** of its `lib/<abi>` entries is in the device's `Build.SUPPORTED_ABIS` — not just ARM.
+A rejection now names the device's ABIs
+(`err_no_native_libs`: *"APK has no native libraries for this device (armeabi-v7a, armeabi)"*)
+instead of the old ARM-only wording.
+
+> Not verifiable on this stick: the `arm64-v8a` and `x86_64` asset URLs were confirmed reachable
+> (HTTP 200), but their signer hashes and the `err_no_native_libs` branch were checked by logic
+> only — this device is 32-bit, so it never exercises them. The `armeabi-v7a` path is exercised on
+> every install and flow run.
 
 ## Language
 
@@ -268,7 +407,10 @@ Français and Español, each by its own name and with a bundled flag. The focus 
 choice (`LocaleHelper.SYSTEM` → row 1, otherwise `indexOf(code) + 2`, because child 0 is the title).
 Picking one stores the code and returns to the app, which rebuilds in the new language. The flags
 are `lipis/flag-icons` 4×3 SVGs rendered to PNGs per density (plus a drawn globe for **System
-default**); they ship in the APK, so the picker needs no network.
+default**); they ship in the APK, so the picker needs no network. The flags are drawn in a 40×30 dp
+box so their labels line up; the globe (`ic_globe`) shares that viewport but draws its circle as a
+~30×30 **square** centred in it (A5), so the "System default" glyph is round rather than stretched
+to 4:3 like the flags.
 
 ### Build note — resources are linked positionally
 
@@ -429,25 +571,44 @@ no longer be replaced by a new build.
 
 ## Flow tests (`test/`)
 
-The four flows below are also written down as runnable code in [`test/`](../test/README.md). The
+The five flows below are also written down as runnable code in [`test/`](../test/README.md). The
 harness drives the real stick over ADB the way a person with the remote does — it reads the screen
 with `uiautomator dump`, finds the labelled button, and taps its centre — so the tests double as a
 record of *what to click* for each flow:
 
+| Flow | What it drives |
+|---|---|
+| `install` | open **Choose version…**, install the highlighted (latest) release |
+| `downgrade` | pick an older release and drive the uninstall-then-install handshake |
+| `upgrade` | from the Main View, install the latest again (A2) — an in-place replace |
+| `uninstall` | **Settings → Advanced → Uninstall Plezy…** plus the stock uninstaller |
+| `clean-install` | install from the main screen when Plezy is not installed |
+
 ```bash
 python3 test/run.py install                    # forward path (non-destructive)
-python3 test/run.py all --yes                   # install → downgrade → uninstall → clean-install
+python3 test/run.py all --yes                   # the whole sequence (five flows)
 python3 test/run.py install --app-lang de       # against a German build
 ```
 
+`all` runs them in that order and ends back on "latest installed". Every run also fires the
+diagnostics broadcast first, so the quota check (A3) is exercised on each invocation.
+
 **No label is hard-coded.** The app's own strings come from `test/strings/app.<lang>.json` (selected
 with `--app-lang`) and the stock installer/uninstaller strings from `test/strings/system.<lang>.json`
-(selected from the device locale with `--system-lang`, auto-detected). The same flows therefore run
-against an English or a German build and against a German or English Fire OS; adding a language is
-a matter of copying a pair of JSON files. The German app strings already exist as the *target* in
-`app.de.json` — see the backlog ([09](09-backlog.md)).
+(selected from the device locale with `--system-lang`, auto-detected). All four app languages
+(`en`/`de`/`fr`/`es`) ship as complete files, mirroring the `res/values*/strings.xml` they stand for;
+the same flows therefore run against any app language and any device locale, and adding a language
+is a matter of copying a pair of JSON files.
 
-## Verified on hardware (2026-11-14)
+The **`upgrade` flow (A2)** is the one the user asked for after the downgrade work: it proves the
+**Main View** path, not the picker. It goes back with the remote's BACK key — deliberately not a
+force-stop/relaunch — only while the updater itself is in front (`_back_to_main()`), so a mis-timed
+press cannot escape into the Fire TV launcher. It then presses **Install <version>** on the
+dashboard and proves a *replace* from the package identity: `firstInstallTime` must not move while
+`lastUpdateTime` must, because a fresh install would move both. If Plezy is not already on the older
+release the flow downgrades first, so `upgrade` also runs on its own.
+
+## Verified on hardware (2026-11-14/16)
 
 | Step | Result |
 |---|---|
@@ -527,12 +688,31 @@ Rate-limit phase, same stick (2026-11-15), run **with the quota spent**:
 | Spanish `install` flow | `python3 test/run.py install --app-lang es` → **1/1 PASS** at `0/60` (the failing run from the previous batch) |
 | Atom notes render | `Html.toMarkdown` run on the real `2.26.0` Atom `<content>`: `## New features`, `- ` bullets, no leftover tags — compiled and executed from the shipped `Html.java` |
 
+Round-1 features (A1–A7, B2), same stick (2026-11-16), updater `0.2.0` / `versionCode 2`:
+
+| Step | Result |
+|---|---|
+| Settings row alignment (A4) | toggled rows and button rows share one label inset, so a column of Settings labels lines up |
+| Globe not stretched (A5) | `ic_globe` keeps the 40×30 flag box but draws its circle as a ~30×30 square; the "System default" glyph is round, not 4:3 |
+| Interval row wording (A6) | the row reads **Edit check interval…**; the picker title stays **Check interval** |
+| About + version line (A7) | **Settings → About Plezy Updater…** shows "Plezy Updater 0.2.0 (build 2)"; the same line is inline at the bottom of Settings |
+| Quota — Settings row (A3) | row read "Not checked yet." then, after OK, "59 of 60 requests left · resets 1:21 PM." |
+| Quota — broadcast (A3) | `am broadcast --include-stopped-packages -a …action.DIAGNOSTICS` → `result=-1, data="status=ok;remaining=59;limit=60;reset_ms=…;checked_ms=…"`; `quota.txt` written to the external cache dir |
+| Open prompt (A1) | after **every** successful install the "Open Plezy?" dialog appeared, focus on **Not now**; the toggle suppresses it |
+| Per-ABI asset (B2) | `abilist = armeabi-v7a, armeabi` → the app fetched `plezy-android-armeabi-v7a.tar.gz`; a fresh install through it **replaced** Plezy (`firstInstallTime` unchanged, `lastUpdateTime` bumped) |
+| `upgrade` flow (A2) | `python3 test/run.py all --yes` → **5/5 PASS**; `upgrade` proved an in-place replace (`firstInstallTime 2026-11-16 12:32:49` unchanged, `lastUpdateTime 12:32:49 → 12:33:28`) |
+| All four languages | English `all` **5/5**, German `all` **5/5**, French `install` **1/1**, Spanish `install` **1/1** |
+
 ## Known limitations
 
 - One remote confirmation per install (silent install is impossible; [06](06-own-updater-feasibility.md)).
 - A downgrade costs two confirmations and **erases Plezy's data**; the app warns before starting
   ([Downgrade](#downgrade)).
-- Self-update is not implemented yet: a new updater build is installed with `adb install -r`.
+- Self-update is not implemented yet: a new updater build is installed with `adb install -r`. This
+  is the first item on the [roadmap](11-roadmap.md).
+- The `arm64-v8a` / `x86_64` asset URLs and the `err_no_native_libs` branch are **logic-only
+  verified**: this stick is 32-bit, so it never exercises them (the URLs return HTTP 200; the signer
+  hashes are unverified). See [Which build for this device](#which-build-for-this-device-b2).
 - GitHub's unauthenticated limit is 60 req/h. The app no longer spends it: the latest check uses
   the unmetered web endpoints and a 15-minute TTL, the picker's API call is conditional
   (`304`s are free), and a spent quota falls back to the web feed and the last known version

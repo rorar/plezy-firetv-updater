@@ -91,9 +91,11 @@ comparison is spelled out (`Installed … · latest …`) so the user never has 
 
 ### Settings — grouped rows
 
-Sections **User settings**, **Advanced settings**, **Developer settings**, **Diagnostics**. Each
-row is a `Switch` with a one-line description underneath, and dynamic rows (interval, uninstall)
-update their own summary. Grouping turns a flat list into something scannable.
+Sections **User settings**, **Advanced settings**, **Developer settings**, **Diagnostics** and
+**About**. Each switch row carries a one-line description underneath, and dynamic rows (interval,
+uninstall, quota, version) update their own summary. Grouping turns a flat list into something
+scannable. Switch rows and action rows share one label inset, so a column of labels lines up whether
+the row ends in a `Switch` or not.
 
 ### Check interval — two panes
 
@@ -126,10 +128,31 @@ into the current one — so the list reads the same whatever the app is set to; 
 on the current choice. Every row carries a flag, and **System default** a drawn globe
 (`ic_globe`). Choosing a language stores it and rebuilds the app in it immediately.
 
+Every glyph is drawn in the same **40×30 dp box** so the labels after them line up. The flags fill
+it (4:3); the globe deliberately does **not** — its circle is a ~30×30 square centred in the box,
+with a little transparent margin each side, so the "System default" glyph is round rather than
+stretched to the flags' aspect ratio.
+
 The flags are the MIT-licensed [`lipis/flag-icons`](https://github.com/lipis/flag-icons) 4×3 SVGs,
 rendered to PNGs at each density and bundled in the APK — the picker works offline. English uses
 the Union-Jack asset (`flag_en.png`), matching the icon set's convention. There is no flag pack
 dependency: the handful of PNGs ship as ordinary `drawable-*dpi` resources.
+
+### About — version, licences, credits
+
+**Settings → About Plezy Updater…** opens a plain screen: the version line read back from the
+package manager, then a **Licenses** block (monospaced, muted, from `res/raw/licenses.txt`) and a
+**Thanks** note, with a **Back** button that holds the focus. The version line is the same string
+Settings shows inline, so the two can never disagree.
+
+### Dialogs
+
+The **"Open Plezy?"** offer after an install is the one dialog with a deliberate default: the
+negative button **Not now** takes the focus, so a stray OK on the remote cannot launch the app. It
+needs two things to hold on a device that is in touch mode — `setFocusableInTouchMode(true)` and a
+**posted** `requestFocus()` — because `AlertDialog` reassigns the focus to the positive button after
+`onShow` returns and refuses a synchronous request in touch mode
+([08](08-app-implementation.md#the-open-plezy-prompt-a1)).
 
 ## Icons
 

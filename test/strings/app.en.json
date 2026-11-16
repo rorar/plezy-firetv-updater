@@ -39,5 +39,13 @@
     "cancel": "Cancel",
     "downgrade_title": "Downgrade to {version}?",
     "downgrade_button": "Uninstall & install"
+  },
+
+  "open_prompt": {
+    "_comment": "The 'Open Plezy?' offer shown after every successful install (A1).",
+    "title": "Open Plezy?",
+    "message": "Plezy {version} is installed. Start it now?",
+    "open": "Open",
+    "not_now": "Not now"
   }
 }

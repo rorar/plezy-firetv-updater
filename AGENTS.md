@@ -38,9 +38,11 @@ adb install -r build/plezy-updater.apk
   Français, Español). The language persists in `Prefs` and survives `adb install -r`, so the app can
   come up in a language you did not build for. Read the current language off the main screen (the
   Settings button's wording) instead of assuming English.
-- **Picker rows do not respond to `input tap`** (they are `focusableInTouchMode`); a tap only moves
-  focus. Use `KEYCODE_DPAD_DOWN/UP` + `KEYCODE_DPAD_CENTER`. Buttons (Settings rows, main-screen
-  buttons, dialog buttons) do respond to taps.
+- **Picker rows do respond to `input tap`.** The version rows are `focusableInTouchMode`, and an
+  earlier note here claimed a tap only moved focus; in practice tapping a row's centre installs it
+  (the `install` / `downgrade` / `upgrade` flows do exactly that, every run). `KEYCODE_DPAD_DOWN/UP`
+  + `KEYCODE_DPAD_CENTER` still works and is the fallback if a tap lands off-target. Buttons
+  (Settings rows, main-screen buttons, dialog buttons) respond to taps too.
 - The GitHub API allows **60 unauthenticated requests/hour**. The app now avoids the metered API:
   the latest check uses the unmetered `github.com/.../releases/latest` redirect + `releases.atom`,
   the picker's API call is conditional (`If-None-Match`; `304`s are free), and a spent quota falls
@@ -82,11 +84,16 @@ should show a fresh `lastUpdateTime`, and the updater's own screen should report
 - **The first D-pad key event after the installer/uninstaller window closes is swallowed** (a
   window-focus timing artefact). Press it again — the picker list otherwise ignores the first
   UP/DOWN, which silently re-installs the same version.
+- **The "Open Plezy?" dialog appears after every successful install** (on by default). While it is
+  up it is the **only window in a `uiautomator dump`**, so the screen underneath is invisible until
+  it is dismissed — dismiss it (tap **Not now**) before reading the progress line or the picker.
+  The harness does this in `Flows._dismiss_open_prompt`.
 - The dialog buttons and their centres on this stick (German locale):
   - installer `INSTALLIEREN` → `[998,936][1232,1032]` → tap `1115 984`;
   - uninstaller `OK` → `[536,701][956,781]` → tap `746 741`;
   - app "Downgrade to …?" → `Uninstall & install` → tap `746 718`;
-  - app "Uninstall Plezy?" → `Uninstall` → tap `746 694`.
+  - app "Uninstall Plezy?" → `Uninstall` → tap `746 694`;
+  - app "Open Plezy?" → `Not now` → tap `1174 646`.
   Re-read the bounds with `uiautomator dump` before tapping; they shift with the dialog height.
 
 ## Driving the whole install / uninstall / downgrade flow
@@ -106,3 +113,26 @@ with `uiautomator dump` and `adb shell input tap <cx> <cy>` its centre (or D-pad
 (servers, settings, downloads). That is expected and allowed for testing, but say so in the
 result — and when the test is done, leave Plezy back on the latest release rather than on the
 downgraded build.
+
+## The flow harness does all of this for you
+
+Prefer the harness over hand-driving when you can:
+
+```bash
+cd ~/Code/plezy-firetv-updater
+python3 -u test/run.py all --yes --serial 192.168.1.50:5555   # five flows
+python3 -u test/run.py upgrade --yes --serial 192.168.1.50:5555
+python3 -u test/run.py install --app-lang de --serial 192.168.1.50:5555
+```
+
+Run it from `test/` if you want to import `harness` / `flows` in an ad-hoc snippet. It drives
+Settings → Language, dismisses the "Open Plezy?" prompt, clicks `INSTALLIEREN`, and proves the
+upgrade was an in-place replace (`firstInstallTime` unchanged, `lastUpdateTime` moved). Every run
+also fires the quota diagnostics broadcast. Details in [`test/README.md`](test/README.md).
+
+To trigger a quota check by hand:
+
+```bash
+adb shell am broadcast --include-stopped-packages -a dev.rorar.plezyupdater.action.DIAGNOSTICS
+# → Broadcast completed: result=-1, data="status=ok;remaining=…;limit=60;reset_ms=…;checked_ms=…"
+```

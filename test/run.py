@@ -3,6 +3,7 @@
 
     python3 test/run.py install
     python3 test/run.py all --yes
+    python3 test/run.py upgrade --yes                         # downgrade → Main View → upgrade
     python3 test/run.py install --app-lang de           # set the app to German, then run
     python3 test/run.py all --yes --build               # build + install the updater first
 
@@ -22,8 +23,8 @@ import harness
 from harness import Device, HarnessError, load_config, load_strings
 from flows import Flows
 
-FLOW_ORDER = ["install", "downgrade", "uninstall", "clean-install"]
-DESTRUCTIVE = {"downgrade", "uninstall", "clean-install", "all"}
+FLOW_ORDER = ["install", "downgrade", "upgrade", "uninstall", "clean-install"]
+DESTRUCTIVE = {"downgrade", "upgrade", "uninstall", "clean-install", "all"}
 
 
 def build_and_install(device, args):
@@ -108,6 +109,15 @@ def main(argv=None):
         build_and_install(device, args)
 
     flows = Flows(device, strings, config)
+
+    # Exercise A3 the way it is meant to be used: a script triggers the check and reads the
+    # report back over the broadcast, without a screen.
+    print("\n=== diagnostics: GitHub quota ===")
+    quota = flows.check_quota()
+    if quota and quota.get("status") == "ok":
+        print(f"  GitHub API quota: {quota.get('remaining')}/{quota.get('limit')} requests left")
+    else:
+        print(f"  (no quota report — {quota})")
 
     if not args.no_set_language:
         print("\n=== set the app language ===")

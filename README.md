@@ -10,10 +10,10 @@ follows from it.
 
 > Status: **a working updater app** (`app/`) plus the findings that led to it (`docs/`), the
 > artwork sources (`design/`), the on-device **flow tests** (`test/`) and a throwaway probe
-> (`probe/`). Verified end-to-end on the stick, UI overhaul, original artwork and the shared
-> install routine included.
+> (`probe/`). Verified end-to-end on the stick, UI overhaul, original artwork, the shared
+> install routine, and the Round-1 feature set included.
 
-Verified on **2026-11-13/15** with Plezy `2.26.0`, ADB `1.0.41` (platform-tools `37.0.0`).
+Verified on **2026-11-13/16** with Plezy `2.26.0`, ADB `1.0.41` (platform-tools `37.0.0`).
 
 ---
 
@@ -40,11 +40,14 @@ Verified on **2026-11-13/15** with Plezy `2.26.0`, ADB `1.0.41` (platform-tools 
 7. **The updater is built and works.** `app/` (`dev.rorar.plezyupdater`, plain Java, no Gradle)
    checks GitHub, downloads the upstream tarball, verifies the signer, and installs through the
    stock dialog. It also shows per-version changelogs, can uninstall Plezy, lets the user pick
-   the check interval, and installs a chosen version straight from the version picker (one shared
-   `InstallFlow`). It ships **English, German, French and Spanish** and follows the Fire TV's
-   language, with a **Settings → Language** override. Two surprises are documented: on API 25 the
-   app must launch the installer dialog itself, and Android 7.1 refuses downgrades of release
-   builds — so a downgrade is done by uninstalling and reinstalling. It also **stays under
+   the check interval, installs a chosen version straight from the version picker (one shared
+   `InstallFlow`), offers to **open Plezy after an install**, shows its own **version/About**
+   screen, and can **report the GitHub quota on demand** (from Settings or by a broadcast a script
+   triggers). It picks the **right per-ABI tarball** for the device, so one APK works on this 32-bit
+   stick and on a 64-bit Android TV. It ships **English, German, French and Spanish** and follows
+   the Fire TV's language, with a **Settings → Language** override. Two surprises are documented: on
+   API 25 the app must launch the installer dialog itself, and Android 7.1 refuses downgrades of
+   release builds — so a downgrade is done by uninstalling and reinstalling. It also **stays under
    GitHub's 60-requests/hour API limit**: the latest check uses the unmetered web feed and the
    picker's API call is conditional, so the updater keeps working with the quota spent. The UI is a
    TV-first dashboard
@@ -60,7 +63,7 @@ Verified on **2026-11-13/15** with Plezy `2.26.0`, ADB `1.0.41` (platform-tools 
 | Launcher | 24 `LEANBACK_LAUNCHER` entries, app appears in the Fire TV home row |
 | APK used | `derFrisson/plezy-apks` `2.26.0` → `plezy-android-armeabi-v7a.apk` (90,748,577 bytes) |
 | Installed size | ~87 MB in `/data/app/com.edde746.plezy-1` |
-| Updater | `dev.rorar.plezyupdater` `0.1.0` — see [docs/08](docs/08-app-implementation.md) |
+| Updater | `dev.rorar.plezyupdater` `0.2.0` (`versionCode 2`) — see [docs/08](docs/08-app-implementation.md) |
 
 ## The updater app
 
@@ -71,8 +74,9 @@ exists, and installs it with one confirmation on the stock Fire OS installer scr
 grouped into User / Advanced / Developer sections:
 
 - **Toast notifications** and **Notifications** — each output can be turned off independently.
+- **Prompt to open Plezy** — on by default: after a successful install, offer to start Plezy.
 - **Check automatically** — enables the interval alarm + boot re-arm.
-- **Check interval** — every *n* hours / days / weeks / months (1–30), default 12 hours.
+- **Edit check interval…** — every *n* hours / days / weeks / months (1–30), default 12 hours.
 - **Language** — **System default** (follows the Fire TV) or English / Deutsch / Français /
   Español, each with a bundled flag. The choice is stored and applied on the next screen.
 - **Delete APK after installing** — on by default, frees the downloaded APK once installed.
@@ -80,6 +84,10 @@ grouped into User / Advanced / Developer sections:
 - **Allow older versions** — developer option: pick any release, not just newer ones. A downgrade
   uninstalls Plezy and reinstalls the older build (Android 7.1 cannot downgrade directly), so it
   costs two confirmations and erases Plezy's data; the app warns first.
+- **Check GitHub quota…** (Diagnostics) — the live `/rate_limit` value and reset time, also
+  triggerable by a script over a broadcast that returns the report.
+- **About Plezy Updater…** (Diagnostics) — the installed version, the third-party licence and a
+  thanks note.
 
 **Choose version…** opens a two-pane picker (versions left, release notes right), and **What's
 new** shows the selected release's notes. Release notes are rendered with real typography —
@@ -89,7 +97,10 @@ coloured, larger section headings and hanging-indented bullets — through a han
 The picker **installs in place**: pressing OK on a version downloads, verifies and installs it right
 there, showing the progress and the outcome on the same screen — no trip back to the dashboard. The
 dashboard keeps the first install for when Plezy is not yet present. Both screens drive the one
-shared `InstallFlow` (download → extract → verify → `PackageInstaller` → downgrade handshake).
+shared `InstallFlow` (download → extract → verify → `PackageInstaller` → downgrade handshake), and
+after a successful install the app offers to **open Plezy**. The tarball it downloads is chosen per
+device from `Build.SUPPORTED_ABIS` (`arm64-v8a` / `armeabi-v7a` / `x86_64`), so one APK fits a 32-bit
+stick and a 64-bit Android TV alike.
 
 The dashboard reads at a glance: a status glyph beside the headline (green check, accent up-arrow,
 amber warning, red cross), a leading icon on every action row, and an original app icon and TV
@@ -117,15 +128,17 @@ adb install -r build/plezy-updater.apk
 | [05-update-strategies](docs/05-update-strategies.md) | Amazon store vs Obtainium vs PC cron vs own APK |
 | [06-own-updater-feasibility](docs/06-own-updater-feasibility.md) | What an own updater can and cannot do here |
 | [07-notification-design](docs/07-notification-design.md) | Notification infrastructure findings + architecture |
-| [08-app-implementation](docs/08-app-implementation.md) | The updater app as built: pending-user-action, the shared install routine, downgrade, uninstall, changelog typography, check interval, staying under GitHub's rate limit, language, the `Ui` toolkit, icons/artwork, storage, settings |
-| [09-backlog](docs/09-backlog.md) | Done items; the backlog is currently empty |
-| [10-tv-ui-design](docs/10-tv-ui-design.md) | The TV UI plan: layout grid, focus model, icons, per-screen design (including the language picker), how the look is verified |
+| [08-app-implementation](docs/08-app-implementation.md) | The updater app as built: pending-user-action, the shared install routine, the open-Plezy prompt, About/version, quota diagnostics, per-ABI asset, downgrade, uninstall, changelog typography, check interval, staying under GitHub's rate limit, language, the `Ui` toolkit, icons/artwork, storage, settings |
+| [09-backlog](docs/09-backlog.md) | Done items; open ideas point at the roadmap |
+| [10-tv-ui-design](docs/10-tv-ui-design.md) | The TV UI plan: layout grid, focus model, icons, per-screen design (including the language picker, About and dialogs), how the look is verified |
+| [11-roadmap](docs/11-roadmap.md) | What comes next: self-update, device detection, Android TV/phone compatibility, the `targetSdk` bump matrix |
 
 ## Flow tests
 
-The four flows — **install**, **downgrade**, **uninstall**, **clean-install** — are written down as
-code in [`test/`](test/README.md). They drive the real stick over ADB exactly as a person with the
-remote would (find the labelled button, tap it), so they double as a record of what to click:
+The five flows — **install**, **downgrade**, **upgrade**, **uninstall**, **clean-install** — are
+written down as code in [`test/`](test/README.md). They drive the real stick over ADB exactly as a
+person with the remote would (find the labelled button, tap it), so they double as a record of what
+to click:
 
 ```bash
 python3 test/run.py install          # forward path (non-destructive)

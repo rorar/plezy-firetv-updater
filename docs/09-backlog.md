@@ -5,9 +5,45 @@ parking lot. Status is checked against the code in `app/`.
 
 ## Requested — not started
 
-_None right now._
+The forward-looking items now live in the [roadmap](11-roadmap.md), so this stays a short pointer:
+
+- **Self-update of the updater** — download and install a new `plezy-updater.apk` in place.
+- **Device detection** (Fire TV vs Android TV vs phone) with the notification wording adapted.
+- **Android TV / phone compatibility** (the layout is TV-first today).
+- **`targetSdk` bump matrix** (25 → 26 → 28 → … ) and what each step breaks.
+
+Nothing here is a commitment; the roadmap explains the order and the reasoning.
 
 ## Already implemented
+
+- **"Open Plezy?" prompt after every install (A1).** A successful install is followed by an offer to
+  start Plezy, with the focus on **Not now** so a stray OK cannot launch it; the launch intent is
+  resolved through the package manager (leanback first). **Settings → Prompt to open Plezy** (on by
+  default) turns it off. See [08](08-app-implementation.md#the-open-plezy-prompt-a1).
+
+- **About screen + inline version line (A7).** **Settings → About Plezy Updater…** shows the version
+  read back from the package manager, plus Licenses (an untranslated `res/raw/licenses.txt`) and a
+  Thanks note; the same version line sits inline in Settings. `build.sh` stamps the version at link
+  time. See [08](08-app-implementation.md#about-and-the-version-line-a7).
+
+- **GitHub quota check, remotely triggerable (A3).** **Settings → Diagnostics → Check GitHub quota…**
+  shows the live `/rate_limit` value and reset time; an exported, `DUMP`-guarded receiver answers
+  `am broadcast` with a quote-free `key=value;…` report (also written to `quota.txt`). See
+  [08](08-app-implementation.md#diagnostics-and-the-remote-quota-check-a3).
+
+- **Per-device ABI asset (B2).** The tarball name is derived from `Build.SUPPORTED_ABIS`
+  (arm64-v8a / armeabi-v7a / x86_64) and never cached, so one APK works on this 32-bit stick and on
+  a 64-bit Android TV; the native-lib check accepts any supported ABI (and passes a pure-Java APK).
+  See [08](08-app-implementation.md#which-build-for-this-device-b2).
+
+- **Settings polish (A4/A5/A6).** Toggled rows and button rows share one label inset so the column
+  aligns (A4); the "System default" globe is drawn square inside the flag box instead of stretched to
+  4:3 (A5); the row reads **Edit check interval…** because it opens a picker (A6).
+
+- **`upgrade` flow in the harness (A2).** The flow tests now drive Downgrade → **Main View** →
+  Upgrade and prove an in-place replace (`firstInstallTime` unchanged, `lastUpdateTime` moved). Five
+  flows total. See [08](08-app-implementation.md#flow-tests-test) and
+  [test/README](../test/README.md).
 
 - **App languages: English, German, French and Spanish, with a Settings → Language picker.** All
   user-visible text now lives in string resources (`res/values/strings.xml` is the English default;
@@ -114,3 +150,8 @@ _None right now._
 - **Rate-limit handling** landed on 2026-11-15, after a flow run failed with *"GitHub API returned
   HTTP 403"* in the picker: the unmetered web feed is now the primary source, the picker's API call
   is conditional, and a spent quota degrades to the last known version instead of an error.
+- **Round 1 (A1–A7 + B2)** landed on 2026-11-16 (updater `0.2.0`): the install prompt, the About
+  screen and version line, the quota diagnostics with its remote trigger, the per-ABI asset, the
+  Settings alignment/globe/wording fixes, and the `upgrade` flow. All five flows pass in English and
+  German; French and Spanish pass the non-destructive `install`. That left the backlog empty again —
+  the four forward-looking items now live in the [roadmap](11-roadmap.md).
