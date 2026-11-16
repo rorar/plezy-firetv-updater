@@ -10,8 +10,6 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.net.Uri;
 import android.os.Bundle;
-import android.util.TypedValue;
-import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
 import android.widget.CompoundButton;
@@ -284,15 +282,8 @@ public class SettingsActivity extends Activity {
 
     /** Returns the description view so callers can update it later. */
     private TextView addSwitch(String label, String description, final String key, boolean checked) {
-        Switch toggle = new Switch(this);
-        toggle.setText(label);
-        toggle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 22);
-        toggle.setTextColor(Ui.rowTextColors());
-        toggle.setBackground(Ui.focusBackground(this));
+        Switch toggle = Ui.switchRow(this, label);
         toggle.setChecked(checked);
-        toggle.setShowText(false);
-        toggle.setGravity(Gravity.CENTER_VERTICAL);
-        toggle.setPadding(Ui.dp(this, 12), Ui.dp(this, 12), Ui.dp(this, 12), Ui.dp(this, 12));
         toggle.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
@@ -314,7 +305,7 @@ public class SettingsActivity extends Activity {
 
     private TextView summary() {
         TextView t = Ui.muted(this, "");
-        t.setPadding(Ui.dp(this, 12), 0, 0, Ui.dp(this, 4));
+        t.setPadding(Ui.dp(this, 24), 0, 0, Ui.dp(this, 4));
         return t;
     }
 

@@ -52,7 +52,7 @@
     <string name="set_notification_desc">Entrée dans le centre de notifications du Fire TV.</string>
     <string name="set_auto_label">Vérifier automatiquement</string>
     <string name="set_auto_desc">S\'exécute à l\'intervalle ci-dessous et après le démarrage du téléviseur.</string>
-    <string name="set_interval_label">Intervalle de vérification</string>
+    <string name="set_interval_label">Modifier l\'intervalle de vérification…</string>
     <string name="set_interval_now">Maintenant %1$s.</string>
     <string name="set_interval_runs">S\'exécute %1$s et après le démarrage du téléviseur.</string>
     <string name="set_delete_label">Supprimer l\'APK après l\'installation</string>

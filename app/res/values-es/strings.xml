@@ -52,7 +52,7 @@
     <string name="set_notification_desc">Entrada en el centro de notificaciones de Fire TV.</string>
     <string name="set_auto_label">Comprobar automáticamente</string>
     <string name="set_auto_desc">Se ejecuta en el intervalo de abajo y tras el arranque del televisor.</string>
-    <string name="set_interval_label">Intervalo de comprobación</string>
+    <string name="set_interval_label">Editar el intervalo de comprobación…</string>
     <string name="set_interval_now">Ahora %1$s.</string>
     <string name="set_interval_runs">Se ejecuta %1$s y tras el arranque del televisor.</string>
     <string name="set_delete_label">Eliminar el APK tras instalar</string>

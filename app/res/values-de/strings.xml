@@ -53,7 +53,7 @@
     <string name="set_notification_desc">Eintrag im Fire-TV-Benachrichtigungscenter.</string>
     <string name="set_auto_label">Automatisch prüfen</string>
     <string name="set_auto_desc">Läuft im folgenden Intervall und nach dem Start des Fernsehers.</string>
-    <string name="set_interval_label">Prüfintervall</string>
+    <string name="set_interval_label">Prüfintervall bearbeiten…</string>
     <string name="set_interval_now">Jetzt %1$s.</string>
     <string name="set_interval_runs">Läuft %1$s und nach dem Start des Fernsehers.</string>
     <string name="set_delete_label">APK nach der Installation löschen</string>

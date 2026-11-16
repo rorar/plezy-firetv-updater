@@ -11,6 +11,7 @@ import android.util.TypedValue;
 import android.view.Gravity;
 import android.widget.Button;
 import android.widget.LinearLayout;
+import android.widget.Switch;
 import android.widget.TextView;
 
 import java.util.Locale;
@@ -101,6 +102,27 @@ public final class Ui {
             leadingIcon(b, stateIcon(c, iconRes), 22);
         }
         return b;
+    }
+
+    /**
+     * A full-width row whose control is a {@link Switch}. It is built to the same metrics as
+     * {@link #actionButton} — the same 24 dp text inset, 11 dp vertical padding and 50 dp minimum
+     * height — so a toggled row's label lines up with a button row's label instead of drifting left
+     * by the switch's own padding. The caller sets the checked state and the listener.
+     */
+    public static Switch switchRow(Context c, String label) {
+        Switch s = new Switch(c);
+        s.setText(label);
+        s.setAllCaps(false);
+        s.setTextSize(TypedValue.COMPLEX_UNIT_SP, 20);
+        s.setTextColor(rowTextColors());
+        s.setBackground(focusBackground(c));
+        s.setShowText(false);
+        s.setGravity(Gravity.CENTER_VERTICAL);
+        s.setPadding(dp(c, 24), dp(c, 11), dp(c, 24), dp(c, 11));
+        s.setMinimumHeight(dp(c, 50));
+        s.setFocusable(true);
+        return s;
     }
 
     /** The one action the screen wants you to press. */

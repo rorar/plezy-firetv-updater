@@ -59,7 +59,7 @@
     <string name="set_notification_desc">Entry in the Fire TV notification center.</string>
     <string name="set_auto_label">Check automatically</string>
     <string name="set_auto_desc">Runs on the interval below and after the TV boots.</string>
-    <string name="set_interval_label">Check interval</string>
+    <string name="set_interval_label">Edit check interval…</string>
     <string name="set_interval_now">Now %1$s.</string>
     <string name="set_interval_runs">Runs %1$s and after the TV boots.</string>
     <string name="set_delete_label">Delete APK after installing</string>

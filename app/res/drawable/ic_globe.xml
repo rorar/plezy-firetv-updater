@@ -1,24 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- A globe: the "System default" language. -->
+<!-- A globe: the "System default" language.
+     The viewport is 40x30 to match the box the flags are drawn in (LanguageActivity.row), so the
+     label after the icon lines up with the flag rows. The globe itself is drawn as a ~30x30 square
+     in the middle (a little transparent margin on each side), so it is not stretched to 4:3. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="24dp"
-    android:height="24dp"
-    android:viewportWidth="24"
-    android:viewportHeight="24">
+    android:width="40dp"
+    android:height="30dp"
+    android:viewportWidth="40"
+    android:viewportHeight="30">
     <path
-        android:pathData="M12,3 a9,9 0 1,0 0,18 a9,9 0 1,0 0,-18"
+        android:pathData="M20,1.5 a13.5,13.5 0 1,0 0,27 a13.5,13.5 0 1,0 0,-27"
         android:strokeColor="#FFFFFFFF"
-        android:strokeWidth="2.0"
+        android:strokeWidth="2.5"
         android:fillColor="#00000000" />
     <path
-        android:pathData="M12,3 a4.6,9 0 1,0 0,18 a4.6,9 0 1,0 0,-18"
+        android:pathData="M20,1.5 a6.9,13.5 0 1,0 0,27 a6.9,13.5 0 1,0 0,-27"
         android:strokeColor="#FFFFFFFF"
-        android:strokeWidth="1.8"
+        android:strokeWidth="2.25"
         android:fillColor="#00000000" />
     <path
-        android:pathData="M3.3,12 L20.7,12"
+        android:pathData="M6.95,15 L33.05,15"
         android:strokeColor="#FFFFFFFF"
-        android:strokeWidth="1.8"
+        android:strokeWidth="2.25"
         android:strokeLineCap="round"
         android:fillColor="#00000000" />
 </vector>
