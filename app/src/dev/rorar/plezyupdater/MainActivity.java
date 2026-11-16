@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.PackageInstaller;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -112,7 +113,8 @@ public class MainActivity extends Activity {
         installFinishedReceiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
-                onInstallFinished();
+                onInstallFinished(intent.getIntExtra(PackageInstaller.EXTRA_STATUS,
+                        PackageInstaller.STATUS_FAILURE));
             }
         };
         registerReceiver(installFinishedReceiver, new IntentFilter(ACTION_INSTALL_FINISHED));
@@ -168,6 +170,8 @@ public class MainActivity extends Activity {
                 && !same(installedVersion, checkedInstalledVersion)) {
             checkForUpdates(false);
         }
+        // An install may have finished while this screen was paused behind the installer.
+        OpenPrompt.maybeShow(this);
     }
 
     @Override
@@ -186,13 +190,23 @@ public class MainActivity extends Activity {
         super.onDestroy();
     }
 
-    /** The install dialog is done: take the new version and ask GitHub again. */
-    private void onInstallFinished() {
+    /** The install dialog is done: take the new version, ask GitHub again, offer to open Plezy. */
+    private void onInstallFinished(int status) {
         installedVersion = PlezyRepo.installedVersion(this);
         pendingRelease = null;
         installedAtInstallCommit = null;
         renderStatus();
         checkForUpdates(false);
+        OpenPrompt.onInstallFinished(this, status);
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) {
+            // The installer screen just closed: this is where a pending "Open Plezy?" lands.
+            OpenPrompt.maybeShow(this);
+        }
     }
 
     private void buildUi() {

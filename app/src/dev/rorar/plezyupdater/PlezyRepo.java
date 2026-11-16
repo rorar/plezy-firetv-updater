@@ -60,8 +60,11 @@ public final class PlezyRepo {
     private static final String WEB_DOWNLOAD =
             "https://github.com/edde746/plezy/releases/download/";
 
-    /** The 32-bit Android build that this stick needs. */
-    public static final String ANDROID_ASSET = "plezy-android-armeabi-v7a.tar.gz";
+    /** The quota endpoint. GitHub exempts it from the limit, so it costs nothing to ask. */
+    private static final String API_RATE_LIMIT = "https://api.github.com/rate_limit";
+
+    /** The Android ABIs Plezy publishes a tarball for, best first. */
+    private static final String[] ASSET_ABIS = {"arm64-v8a", "armeabi-v7a", "x86_64"};
 
     /** A "latest" answer is reused for this long, so a burst of checks costs one request. */
     private static final long LATEST_TTL_MS = 15L * 60L * 1000L;
@@ -97,6 +100,69 @@ public final class PlezyRepo {
             super(message);
             this.resetMs = resetMs;
         }
+    }
+
+    /** The unauthenticated REST quota, as reported by {@code /rate_limit}. */
+    public static final class Quota {
+        public final int remaining;
+        public final int limit;
+        /** Epoch millis the window resets at. */
+        public final long resetMs;
+
+        Quota(int remaining, int limit, long resetMs) {
+            this.remaining = remaining;
+            this.limit = limit;
+            this.resetMs = resetMs;
+        }
+    }
+
+    /**
+     * The asset file name for this device, e.g. {@code plezy-android-armeabi-v7a.tar.gz}. Plezy
+     * ships one tarball per ABI; the right one is picked from {@link android.os.Build#SUPPORTED_ABIS}
+     * (best ABI first), so the same APK works on a 32-bit Fire TV stick and on a 64-bit Android TV.
+     * When none of the shipped ABIs is supported the 32-bit build is named anyway — the verify step
+     * then rejects it with a readable message rather than silently downloading nothing.
+     */
+    public static String assetName() {
+        for (String abi : android.os.Build.SUPPORTED_ABIS) {
+            for (String known : ASSET_ABIS) {
+                if (known.equals(abi)) {
+                    return assetNameFor(known);
+                }
+            }
+        }
+        return assetNameFor("armeabi-v7a");
+    }
+
+    private static String assetNameFor(String abi) {
+        return "plezy-android-" + abi + ".tar.gz";
+    }
+
+    /** This device's ABIs, comma-separated, for the "no native libraries" message. */
+    public static String supportedAbis() {
+        StringBuilder sb = new StringBuilder();
+        for (String abi : android.os.Build.SUPPORTED_ABIS) {
+            if (sb.length() > 0) {
+                sb.append(", ");
+            }
+            sb.append(abi);
+        }
+        return sb.toString();
+    }
+
+    /**
+     * The current unauthenticated REST quota. {@code /rate_limit} is exempt from the limit, so
+     * this can be asked on demand without spending the budget it reports. Used by
+     * Settings → Diagnostics and its remote trigger.
+     */
+    public static Quota fetchQuota(Context c) throws Exception {
+        Resp r = request(c, API_RATE_LIMIT, null, false);
+        if (r.code != 200 || r.body == null) {
+            throw new IllegalStateException(c.getString(R.string.err_repo_http, r.code));
+        }
+        JSONObject core = new JSONObject(r.body).getJSONObject("resources").getJSONObject("core");
+        return new Quota(core.getInt("remaining"), core.getInt("limit"),
+                core.getLong("reset") * 1000L);
     }
 
     /** Version name of the installed Plezy, or null when it is not installed. */
@@ -292,7 +358,7 @@ public final class PlezyRepo {
         String tag = json.getString("tag_name");
         String assetUrl = assetUrl(json);
         if (assetUrl == null) {
-            throw new IllegalStateException(c.getString(R.string.err_repo_no_asset, tag, ANDROID_ASSET));
+            throw new IllegalStateException(c.getString(R.string.err_repo_no_asset, tag, assetName()));
         }
         return new Release(tag, assetUrl, body(json), publishedAt(json));
     }
@@ -458,7 +524,7 @@ public final class PlezyRepo {
 
     /** The download URL for a release tag, built without the API. */
     static String assetUrlForTag(String tag) {
-        return WEB_DOWNLOAD + tag + "/" + ANDROID_ASSET;
+        return WEB_DOWNLOAD + tag + "/" + assetName();
     }
 
     private static Release cachedLatest(Context c, long ttlMs) {
@@ -470,15 +536,13 @@ public final class PlezyRepo {
         if (ttlMs > 0 && (ms == 0L || System.currentTimeMillis() - ms > ttlMs)) {
             return null;
         }
-        String asset = Prefs.cachedLatestAsset(c);
-        if (asset == null) {
-            asset = assetUrlForTag(tag);
-        }
-        return new Release(tag, asset, Prefs.cachedLatestBody(c), Prefs.cachedLatestPublished(c));
+        // The URL is derived, never stored: it depends on the tag and on this device's ABI.
+        return new Release(tag, assetUrlForTag(tag),
+                Prefs.cachedLatestBody(c), Prefs.cachedLatestPublished(c));
     }
 
     private static void storeLatest(Context c, Release r) {
-        Prefs.setCachedLatest(c, r.tag, r.assetUrl, r.body, r.publishedAt, System.currentTimeMillis());
+        Prefs.setCachedLatest(c, r.tag, r.body, r.publishedAt, System.currentTimeMillis());
     }
 
     private static String body(JSONObject release) {
@@ -497,7 +561,7 @@ public final class PlezyRepo {
         }
         for (int i = 0; i < assets.length(); i++) {
             JSONObject a = assets.optJSONObject(i);
-            if (a != null && ANDROID_ASSET.equals(a.optString("name"))) {
+            if (a != null && assetName().equals(a.optString("name"))) {
                 String url = a.optString("browser_download_url", null);
                 if (url != null) {
                     return url;

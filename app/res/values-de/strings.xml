@@ -46,11 +46,14 @@
     <string name="section_advanced">Erweiterte Einstellungen</string>
     <string name="section_developer">Entwicklereinstellungen</string>
     <string name="section_diagnostics">Diagnose</string>
+    <string name="section_about">Über</string>
 
     <string name="set_toast_label">Toast-Benachrichtigungen</string>
     <string name="set_toast_desc">Kurze Meldung am unteren Bildschirmrand.</string>
     <string name="set_notification_label">Benachrichtigungen</string>
     <string name="set_notification_desc">Eintrag im Fire-TV-Benachrichtigungscenter.</string>
+    <string name="set_open_prompt_label">Zum Öffnen von Plezy auffordern</string>
+    <string name="set_open_prompt_desc">Nach einer Installation anbieten, Plezy zu starten.</string>
     <string name="set_auto_label">Automatisch prüfen</string>
     <string name="set_auto_desc">Läuft im folgenden Intervall und nach dem Start des Fernsehers.</string>
     <string name="set_interval_label">Prüfintervall bearbeiten…</string>
@@ -75,6 +78,19 @@
     <string name="toast_uninstalled">Plezy deinstalliert</string>
     <string name="toast_toast_on">Toast-Benachrichtigungen an</string>
     <string name="toast_notifications_on">Benachrichtigungen sind an</string>
+
+    <string name="set_quota_label">GitHub-Kontingent prüfen…</string>
+    <string name="set_quota_never">Noch nicht geprüft.</string>
+    <string name="set_quota_checking">Wird geprüft…</string>
+    <string name="set_quota_now">%1$d von %2$d Anfragen übrig · Zurücksetzung %3$s.</string>
+    <string name="set_quota_failed">Prüfung fehlgeschlagen: %1$s</string>
+
+    <string name="about_label">Über Plezy Updater…</string>
+    <string name="about_title">Über</string>
+    <string name="about_version">Plezy Updater %1$s (Build %2$d)</string>
+    <string name="about_licenses_heading">Lizenzen</string>
+    <string name="about_thanks_heading">Dank</string>
+    <string name="about_thanks_text">Plezy Updater ist ein kleines Sideload-Hilfsprogramm, das com.edde746.plezy auf diesem Fernseher aktuell hält. Dank an das Plezy-Projekt für die App, die es aktualisiert, und an GitHub für das Hosten der Releases.</string>
 
     <string name="language_label">Sprache</string>
     <string name="language_title">Sprache</string>
@@ -143,6 +159,12 @@
     <string name="toast_installed">Plezy %1$s installiert</string>
     <string name="toast_install_failed">Installation fehlgeschlagen: %1$s</string>
 
+    <string name="open_prompt_title">Plezy öffnen?</string>
+    <string name="open_prompt_message">Plezy %1$s ist installiert. Jetzt starten?</string>
+    <string name="open_prompt_open">Öffnen</string>
+    <string name="open_prompt_not_now">Nicht jetzt</string>
+    <string name="open_prompt_failed">Plezy konnte nicht geöffnet werden</string>
+
     <string name="notif_available_title">Plezy %1$s verfügbar</string>
     <string name="notif_available_text">OK zum Installieren drücken</string>
 
@@ -159,7 +181,7 @@
     <string name="err_wrong_package">Falsches Paket: %1$s</string>
     <string name="err_older_build">Heruntergeladener Build %1$d ist älter als der installierte %2$d — \"Ältere Versionen erlauben\" aktivieren, um ihn trotzdem zu installieren</string>
     <string name="err_needs_api">Benötigt Android-API %1$d, dieses Gerät hat API %2$d</string>
-    <string name="err_no_arm">APK enthält keine armeabi-v7a-Bibliotheken</string>
+    <string name="err_no_native_libs">APK enthält keine nativen Bibliotheken für dieses Gerät (%1$s)</string>
     <string name="err_missing_signature">Signaturinformationen fehlen</string>
     <string name="err_signer_mismatch">Signatur stimmt nicht überein — Installation abgelehnt</string>
     <string name="err_hash_signer">Signatur konnte nicht gehasht werden</string>

@@ -52,11 +52,14 @@
     <string name="section_advanced">Advanced settings</string>
     <string name="section_developer">Developer settings</string>
     <string name="section_diagnostics">Diagnostics</string>
+    <string name="section_about">About</string>
 
     <string name="set_toast_label">Toast notifications</string>
     <string name="set_toast_desc">Short message at the bottom of the screen.</string>
     <string name="set_notification_label">Notifications</string>
     <string name="set_notification_desc">Entry in the Fire TV notification center.</string>
+    <string name="set_open_prompt_label">Prompt to open Plezy</string>
+    <string name="set_open_prompt_desc">After an install, offer to start Plezy.</string>
     <string name="set_auto_label">Check automatically</string>
     <string name="set_auto_desc">Runs on the interval below and after the TV boots.</string>
     <string name="set_interval_label">Edit check interval…</string>
@@ -82,6 +85,21 @@
     <string name="toast_toast_on">Toast notifications on</string>
     <string name="toast_notifications_on">Notifications are on</string>
     <string name="notifications_title">Plezy Updater</string>
+
+    <!-- diagnostics: GitHub quota -->
+    <string name="set_quota_label">Check GitHub quota…</string>
+    <string name="set_quota_never">Not checked yet.</string>
+    <string name="set_quota_checking">Checking…</string>
+    <string name="set_quota_now">%1$d of %2$d requests left · resets %3$s.</string>
+    <string name="set_quota_failed">Check failed: %1$s</string>
+
+    <!-- about -->
+    <string name="about_label">About Plezy Updater…</string>
+    <string name="about_title">About</string>
+    <string name="about_version">Plezy Updater %1$s (build %2$d)</string>
+    <string name="about_licenses_heading">Licenses</string>
+    <string name="about_thanks_heading">Thanks</string>
+    <string name="about_thanks_text">Plezy Updater is a small sideload helper that keeps com.edde746.plezy current on this TV. Thanks to the Plezy project for the app it updates, and to GitHub for hosting the releases.</string>
 
     <!-- language -->
     <string name="language_label">Language</string>
@@ -160,6 +178,13 @@
     <string name="toast_installed">Plezy %1$s installed</string>
     <string name="toast_install_failed">Install failed: %1$s</string>
 
+    <!-- open prompt -->
+    <string name="open_prompt_title">Open Plezy?</string>
+    <string name="open_prompt_message">Plezy %1$s is installed. Start it now?</string>
+    <string name="open_prompt_open">Open</string>
+    <string name="open_prompt_not_now">Not now</string>
+    <string name="open_prompt_failed">Could not open Plezy</string>
+
     <!-- update notification -->
     <string name="notif_available_title">Plezy %1$s available</string>
     <string name="notif_available_text">Press OK to install</string>
@@ -179,7 +204,7 @@
     <string name="err_wrong_package">Wrong package: %1$s</string>
     <string name="err_older_build">Downloaded build %1$d is older than installed %2$d — enable \"Allow older versions\" to install it anyway</string>
     <string name="err_needs_api">Requires Android API %1$d, this device is API %2$d</string>
-    <string name="err_no_arm">APK has no armeabi-v7a libraries</string>
+    <string name="err_no_native_libs">APK has no native libraries for this device (%1$s)</string>
     <string name="err_missing_signature">Missing signature information</string>
     <string name="err_signer_mismatch">Signer mismatch — refusing to install</string>
     <string name="err_hash_signer">Could not hash signer</string>

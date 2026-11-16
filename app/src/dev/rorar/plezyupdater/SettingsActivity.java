@@ -38,6 +38,8 @@ public class SettingsActivity extends Activity {
     private TextView intervalSummary;
     private TextView autoCheckSummary;
     private TextView languageSummary;
+    private Button quotaButton;
+    private TextView quotaSummary;
     private BroadcastReceiver packageRemovedReceiver;
 
     @Override
@@ -63,6 +65,8 @@ public class SettingsActivity extends Activity {
                 Prefs.KEY_TOAST, Prefs.toastEnabled(this));
         addSwitch(getString(R.string.set_notification_label), getString(R.string.set_notification_desc),
                 Prefs.KEY_NOTIFICATION, Prefs.notificationEnabled(this));
+        addSwitch(getString(R.string.set_open_prompt_label), getString(R.string.set_open_prompt_desc),
+                Prefs.KEY_OPEN_PROMPT, Prefs.openPromptEnabled(this));
 
         addSection(getString(R.string.section_advanced));
         autoCheckSummary = addSwitch(getString(R.string.set_auto_label),
@@ -78,6 +82,7 @@ public class SettingsActivity extends Activity {
                 Prefs.KEY_ALLOW_OLDER, Prefs.allowOlderVersions(this));
 
         addSection(getString(R.string.section_diagnostics));
+        addQuota();
 
         Button testToast = Ui.actionButton(this, getString(R.string.set_test_toast));
         testToast.setOnClickListener(new View.OnClickListener() {
@@ -97,6 +102,19 @@ public class SettingsActivity extends Activity {
             }
         });
         content.addView(testNotification, buttonParams(12));
+
+        addSection(getString(R.string.section_about));
+        Button about = Ui.actionButton(this, getString(R.string.about_label));
+        about.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                startActivity(new Intent(SettingsActivity.this, AboutActivity.class));
+            }
+        });
+        content.addView(about, buttonParams(8));
+        TextView aboutVersion = summary();
+        aboutVersion.setText(AboutActivity.versionLine(this));
+        content.addView(aboutVersion);
 
         Button back = Ui.actionButton(this, getString(R.string.action_back));
         back.setOnClickListener(new View.OnClickListener() {
@@ -141,6 +159,7 @@ public class SettingsActivity extends Activity {
         super.onResume();
         refreshUninstallRow();
         refreshLanguageRow();
+        refreshQuotaRow();
     }
 
     @Override
@@ -269,6 +288,63 @@ public class SettingsActivity extends Activity {
         } catch (ActivityNotFoundException e) {
             Notifier.toast(this, getString(R.string.toast_no_uninstaller));
         }
+    }
+
+    /**
+     * The GitHub quota row. It is worth showing because the whole app budgets around that limit
+     * (see {@link PlezyRepo}) and the reset time is otherwise invisible. The same check can be
+     * triggered remotely with {@code am broadcast} — see {@link DiagnosticsReceiver}.
+     */
+    private void addQuota() {
+        quotaButton = Ui.actionButton(this, getString(R.string.set_quota_label));
+        quotaButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                checkQuota();
+            }
+        });
+        content.addView(quotaButton, buttonParams(8));
+
+        quotaSummary = summary();
+        content.addView(quotaSummary);
+        refreshQuotaRow();
+    }
+
+    /** Show the last stored quota, without a network call. */
+    private void refreshQuotaRow() {
+        if (quotaSummary == null) {
+            return;
+        }
+        quotaSummary.setText(Diagnostics.summary(this, Prefs.quotaRemaining(this),
+                Prefs.quotaLimit(this), Prefs.quotaResetMs(this)));
+    }
+
+    /** Ask GitHub for the quota off the main thread, then show the answer. */
+    private void checkQuota() {
+        if (quotaButton == null || !quotaButton.isEnabled()) {
+            return;
+        }
+        quotaButton.setEnabled(false);
+        quotaSummary.setText(getString(R.string.set_quota_checking));
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                final Diagnostics.QuotaResult result = Diagnostics.checkQuota(SettingsActivity.this);
+                Diagnostics.writeReport(SettingsActivity.this, result.report);
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (isFinishing()) {
+                            return;
+                        }
+                        quotaButton.setEnabled(true);
+                        quotaSummary.setText(result.ok
+                                ? result.message
+                                : getString(R.string.set_quota_failed, result.message));
+                    }
+                });
+            }
+        }, "quota-check").start();
     }
 
     private void addSection(String name) {

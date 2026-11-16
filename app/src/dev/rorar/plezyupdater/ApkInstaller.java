@@ -22,8 +22,10 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.security.MessageDigest;
+import java.util.Enumeration;
 import java.util.Locale;
 import java.util.zip.GZIPInputStream;
+import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 /**
@@ -235,8 +237,8 @@ public final class ApkInstaller {
                     candidate.applicationInfo.minSdkVersion, android.os.Build.VERSION.SDK_INT));
         }
 
-        if (!hasArmLibraries(apk)) {
-            throw new IOException(c.getString(R.string.err_no_arm));
+        if (!hasSupportedAbi(apk)) {
+            throw new IOException(c.getString(R.string.err_no_native_libs, PlezyRepo.supportedAbis()));
         }
 
         if (candidate.signatures == null || candidate.signatures.length == 0) {
@@ -394,12 +396,35 @@ public final class ApkInstaller {
         }
     }
 
-    private static boolean hasArmLibraries(File apk) throws IOException {
+    /**
+     * True when the APK can run here. An APK with no {@code lib/} at all carries no native code and
+     * runs on any ABI; otherwise at least one of its {@code lib/<abi>/} directories must be an ABI
+     * this device supports. Plezy is a Flutter build, so in practice there is always a {@code lib/}
+     * — the no-{@code lib/} case is a guard so an all-Java build would not be rejected.
+     */
+    private static boolean hasSupportedAbi(File apk) throws IOException {
         ZipFile zip = new ZipFile(apk);
         try {
-            return zip.getEntry("lib/armeabi-v7a/") != null
-                    || zip.getEntry("lib/armeabi-v7a/libflutter.so") != null
-                    || zip.getEntry("lib/armeabi-v7a/libapp.so") != null;
+            boolean sawNativeLib = false;
+            Enumeration<? extends ZipEntry> entries = zip.entries();
+            while (entries.hasMoreElements()) {
+                String name = entries.nextElement().getName();
+                if (!name.startsWith("lib/")) {
+                    continue;
+                }
+                sawNativeLib = true;
+                int slash = name.indexOf('/', "lib/".length());
+                if (slash < 0) {
+                    continue;
+                }
+                String abi = name.substring("lib/".length(), slash);
+                for (String supported : android.os.Build.SUPPORTED_ABIS) {
+                    if (supported.equals(abi)) {
+                        return true;
+                    }
+                }
+            }
+            return !sawNativeLib;
         } finally {
             zip.close();
         }

@@ -24,6 +24,12 @@ PKG="dev.rorar.plezyupdater"
 MIN_SDK=25
 TARGET_SDK=25
 
+# The app version, stamped into the manifest at link time (--replace-version), so the number in
+# the APK always comes from here and the About screen reads the same value back from PackageManager.
+# Override for a one-off build: VERSION_CODE=3 VERSION_NAME=0.3.0 ./build.sh
+VERSION_CODE="${VERSION_CODE:-2}"
+VERSION_NAME="${VERSION_NAME:-0.2.0}"
+
 cd "$(dirname "$0")"
 
 KEYSTORE="${KEYSTORE:-debug.keystore}"
@@ -43,6 +49,7 @@ echo "== resources"
   build/res.zip \
   --java build/gen \
   --min-sdk-version "$MIN_SDK" --target-sdk-version "$TARGET_SDK" \
+  --version-code "$VERSION_CODE" --version-name "$VERSION_NAME" --replace-version \
   --no-version-vectors
 
 echo "== java"

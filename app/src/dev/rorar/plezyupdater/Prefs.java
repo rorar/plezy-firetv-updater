@@ -13,6 +13,7 @@ public final class Prefs {
     public static final String KEY_AUTO_CHECK = "auto_check_enabled";
     public static final String KEY_ALLOW_OLDER = "allow_older_versions";
     public static final String KEY_DELETE_APK = "delete_apk_after_install";
+    public static final String KEY_OPEN_PROMPT = "open_prompt_enabled";
     private static final String KEY_LANGUAGE = "app_language";
     private static final String KEY_LAST_CHECK = "last_check_ms";
     private static final String KEY_PENDING_DOWNGRADE = "pending_downgrade_tag";
@@ -20,12 +21,19 @@ public final class Prefs {
     private static final String KEY_INTERVAL_UNIT = "interval_unit";
 
     // The last "latest release" we saw, kept so a rate-limited or offline check can still show a
-    // version instead of a bare HTTP error.
+    // version instead of a bare HTTP error. The asset URL is deliberately *not* stored: it is
+    // derived from the tag and the device ABI (see PlezyRepo.assetName), so a cached copy could
+    // point at the wrong ABI after a restore or a device swap.
     private static final String KEY_LATEST_TAG = "latest_tag";
-    private static final String KEY_LATEST_ASSET = "latest_asset";
     private static final String KEY_LATEST_BODY = "latest_body";
     private static final String KEY_LATEST_PUBLISHED = "latest_published";
     private static final String KEY_LATEST_MS = "latest_ms";
+
+    // The last GitHub quota we saw, for the Settings → Diagnostics row and its remote trigger.
+    private static final String KEY_QUOTA_REMAINING = "quota_remaining";
+    private static final String KEY_QUOTA_LIMIT = "quota_limit";
+    private static final String KEY_QUOTA_RESET = "quota_reset_ms";
+    private static final String KEY_QUOTA_CHECKED = "quota_checked_ms";
 
     /** Units the user can pick for the check interval. */
     public static final String UNIT_HOURS = "hours";
@@ -80,6 +88,14 @@ public final class Prefs {
         return sp(c).getBoolean(KEY_DELETE_APK, true);
     }
 
+    /**
+     * Offer to open Plezy once an install has finished. On by default: after sideloading an
+     * update the natural next step is to start the app, and the prompt is the one-tap way there.
+     */
+    public static boolean openPromptEnabled(Context c) {
+        return sp(c).getBoolean(KEY_OPEN_PROMPT, true);
+    }
+
     public static void set(Context c, String key, boolean value) {
         sp(c).edit().putBoolean(key, value).apply();
     }
@@ -111,10 +127,6 @@ public final class Prefs {
         return sp(c).getString(KEY_LATEST_TAG, null);
     }
 
-    public static String cachedLatestAsset(Context c) {
-        return sp(c).getString(KEY_LATEST_ASSET, null);
-    }
-
     public static String cachedLatestBody(Context c) {
         return sp(c).getString(KEY_LATEST_BODY, null);
     }
@@ -127,11 +139,10 @@ public final class Prefs {
         return sp(c).getLong(KEY_LATEST_MS, 0L);
     }
 
-    public static void setCachedLatest(Context c, String tag, String assetUrl, String body,
+    public static void setCachedLatest(Context c, String tag, String body,
             String publishedAt, long ms) {
         SharedPreferences.Editor e = sp(c).edit()
                 .putString(KEY_LATEST_TAG, tag)
-                .putString(KEY_LATEST_ASSET, assetUrl)
                 .putLong(KEY_LATEST_MS, ms);
         if (body == null) {
             e.remove(KEY_LATEST_BODY);
@@ -144,6 +155,37 @@ public final class Prefs {
             e.putString(KEY_LATEST_PUBLISHED, publishedAt);
         }
         e.apply();
+    }
+
+    // ---- GitHub quota (Settings → Diagnostics) ------------------------------
+
+    /** X-RateLimit-Remaining of the last quota check, or -1 when it has never run. */
+    public static int quotaRemaining(Context c) {
+        return sp(c).getInt(KEY_QUOTA_REMAINING, -1);
+    }
+
+    /** X-RateLimit-Limit of the last quota check, or -1. */
+    public static int quotaLimit(Context c) {
+        return sp(c).getInt(KEY_QUOTA_LIMIT, -1);
+    }
+
+    /** Epoch millis the quota resets at, or 0. */
+    public static long quotaResetMs(Context c) {
+        return sp(c).getLong(KEY_QUOTA_RESET, 0L);
+    }
+
+    /** Epoch millis of the last quota check, or 0. */
+    public static long quotaCheckedMs(Context c) {
+        return sp(c).getLong(KEY_QUOTA_CHECKED, 0L);
+    }
+
+    public static void setQuota(Context c, int remaining, int limit, long resetMs, long checkedMs) {
+        sp(c).edit()
+                .putInt(KEY_QUOTA_REMAINING, remaining)
+                .putInt(KEY_QUOTA_LIMIT, limit)
+                .putLong(KEY_QUOTA_RESET, resetMs)
+                .putLong(KEY_QUOTA_CHECKED, checkedMs)
+                .apply();
     }
 
     /**

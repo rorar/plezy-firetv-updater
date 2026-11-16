@@ -122,6 +122,17 @@ public class VersionListActivity extends Activity {
         }
         installFlow.onResume(installedVersion);
         refreshList();
+        // An install may have finished while this screen was paused behind the installer.
+        OpenPrompt.maybeShow(this);
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) {
+            // The installer screen just closed: this is where a pending "Open Plezy?" lands.
+            OpenPrompt.maybeShow(this);
+        }
     }
 
     @Override
@@ -149,6 +160,7 @@ public class VersionListActivity extends Activity {
         // On failure the InstallResultReceiver toast already says what went wrong; leave the
         // progress line as it was rather than repeating it.
         refreshList();
+        OpenPrompt.onInstallFinished(this, status);
     }
 
     private void refreshList() {
