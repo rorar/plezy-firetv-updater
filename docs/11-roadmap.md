@@ -123,23 +123,25 @@ stays a documented, unverified branch — the same honesty the B2 note uses.
 
 ## 4. 64-bit / `arm64-v8a`
 
-**Mostly done.** B2 already picks Plezy's tarball per device from `Build.SUPPORTED_ABIS`
-([08](08-app-implementation.md#which-build-for-this-device-b2)), and the **updater's own APK carries
-no native code** — it is pure Java + resources, so it is ABI-independent and already "armv8a
-compatible". There is nothing to port.
+**Done, except the on-device install.** B2 already picks Plezy's tarball per device from
+`Build.SUPPORTED_ABIS` ([08](08-app-implementation.md#which-build-for-this-device-b2)), and the
+**updater's own APK carries no native code** — it is pure Java + resources, so it is ABI-independent
+and already "armv8a compatible". There is nothing to port.
 
-**The one gap is verification.** The `arm64-v8a` asset's *signer hash* was never checked, only its
-URL reachability. That can be closed **without a 64-bit device**, on the PC:
+**The signer gap is closed** (2026-11-16). Both 64-bit tarballs were checked off-device, on the PC:
 
 ```bash
 curl -LO https://github.com/edde746/plezy/releases/download/2.26.0/plezy-android-arm64-v8a.tar.gz
 tar xzf plezy-android-arm64-v8a.tar.gz           # → plezy.apk
 apksigner verify --print-certs plezy.apk | grep SHA-256
-# compare with PINNED_SIGNER_SHA256 (docs/04)
+# → 903b862cf5e3a0bfbad9b5e049ec3de703f83422bba9c5559a7b019716316e72  (= PINNED_SIGNER_SHA256)
 ```
 
-If it matches the pinned value, the arm64 path is verified as far as the code goes; the on-device
-install still needs a 64-bit device. Worth doing first — it is cheap and needs no hardware.
+`arm64-v8a` and `x86_64` both extract to an APK signed with the pinned certificate
+(`CN=Edvard Wikhall, O=edde746`) and carrying `lib/arm64-v8a` / `lib/x86_64`, so the asset name and
+the signer assumption are correct for the 64-bit branch too. **Still open:** the actual *install* on
+a 64-bit device — this stick is 32-bit, so only real arm64 hardware (or an arm64 emulator) can
+exercise it end to end. That is a "when a device appears" item, not work to do now.
 
 ## 5. `targetSdk` bump matrix
 
@@ -168,7 +170,8 @@ actually changed.
 
 ## Suggested order
 
-1. **arm64 signer check** (item 4) — cheap, no device, closes a documented gap.
+1. ~~**arm64 signer check** (item 4)~~ — **done** 2026-11-16; both 64-bit tarballs match the pinned
+   signer. Only the on-device 64-bit install remains, and it needs hardware.
 2. **Self-update** (item 1) — the most-requested, and it makes every later change shippable without
    `adb`.
 3. **Device detection + notification wording** (items 2–3, wording half) — small, and the part the
@@ -182,6 +185,6 @@ actually changed.
   regression test.
 - **One build, one key.** The APK stays ABI-free, and everything is signed with the same key, so any
   build can replace any other ([Build and install](08-app-implementation.md#build-and-install)).
-- **Say what was not verified.** The docs already mark the arm64/x86_64 and `err_no_native_libs`
-  paths as logic-only; device detection and touch support would join that list until a second device
-  exists.
+- **Say what was not verified.** The arm64/x86_64 *signers* are now checked off-device, but their
+  *installs* and the `err_no_native_libs` path stay unverified on this 32-bit stick; device detection
+  and touch support would join that list until a second device exists.

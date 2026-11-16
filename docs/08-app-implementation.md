@@ -370,10 +370,12 @@ A rejection now names the device's ABIs
 (`err_no_native_libs`: *"APK has no native libraries for this device (armeabi-v7a, armeabi)"*)
 instead of the old ARM-only wording.
 
-> Not verifiable on this stick: the `arm64-v8a` and `x86_64` asset URLs were confirmed reachable
-> (HTTP 200), but their signer hashes and the `err_no_native_libs` branch were checked by logic
-> only — this device is 32-bit, so it never exercises them. The `armeabi-v7a` path is exercised on
-> every install and flow run.
+> The `arm64-v8a` and `x86_64` **signer hashes are verified** off-device (2026-11-16): both tarballs
+> extract to an APK signed with the same certificate as the 32-bit one
+> (`903b862c…316e72`, `CN=Edvard Wikhall, O=edde746`) and carry `lib/arm64-v8a` / `lib/x86_64`. What
+> is still unverified on this hardware is the **install** itself — the stick is 32-bit, so it never
+> exercises the 64-bit branch — and the `err_no_native_libs` branch stays logic-only. The
+> `armeabi-v7a` path is exercised on every install and flow run.
 
 ## Language
 
@@ -710,9 +712,10 @@ Round-1 features (A1–A7, B2), same stick (2026-11-16), updater `0.2.0` / `vers
   ([Downgrade](#downgrade)).
 - Self-update is not implemented yet: a new updater build is installed with `adb install -r`. This
   is the first item on the [roadmap](11-roadmap.md).
-- The `arm64-v8a` / `x86_64` asset URLs and the `err_no_native_libs` branch are **logic-only
-  verified**: this stick is 32-bit, so it never exercises them (the URLs return HTTP 200; the signer
-  hashes are unverified). See [Which build for this device](#which-build-for-this-device-b2).
+- The `arm64-v8a` / `x86_64` **installs** are unverified on hardware (this stick is 32-bit): both
+  tarballs' signer hashes match the pinned value off-device and they carry the expected native libs,
+  but only a 64-bit device can exercise the branch end to end. The `err_no_native_libs` branch stays
+  logic-only. See [Which build for this device](#which-build-for-this-device-b2).
 - GitHub's unauthenticated limit is 60 req/h. The app no longer spends it: the latest check uses
   the unmetered web endpoints and a 15-minute TTL, the picker's API call is conditional
   (`304`s are free), and a spent quota falls back to the web feed and the last known version
