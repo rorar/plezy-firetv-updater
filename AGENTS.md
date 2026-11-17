@@ -165,3 +165,26 @@ To trigger a quota check by hand:
 adb shell am broadcast --include-stopped-packages -a dev.rorar.plezyupdater.action.DIAGNOSTICS
 # → Broadcast completed: result=-1, data="status=ok;remaining=…;limit=60;reset_ms=…;checked_ms=…;device=fire_tv;tv=1;touch=0"
 ```
+
+## Verifying the background check (`JobScheduler`, since 0.5.0)
+
+The periodic check is a `JobScheduler` job, not an alarm, so `dumpsys alarm` no longer shows it.
+
+```bash
+adb shell dumpsys jobscheduler | grep -A16 "JOB #.*plezyupdater"   # job 2001 = periodic, 2002 = one-off
+adb shell cmd jobscheduler run -f dev.rorar.plezyupdater 2001       # force a run
+adb shell logcat -d -s PlezyUpdater                                 # "background check starting (manual=…)"
+```
+
+- **The job runs almost immediately when (re)scheduled** on this build, then every interval. So a
+  `periodic check armed every … ms` line in logcat is quickly followed by a check.
+- **`am kill` and `am kill-all` cannot evict the updater** — it keeps a non-cached adj while it owns
+  a task. To exercise the "no screen is up" path (`InstallResultReceiver` → `UpdateJob.runNow(c,
+  true)`), start an install from the picker, wait for the stock installer, then
+  `am force-stop dev.rorar.plezyupdater`. The session-result broadcast **is** still delivered to a
+  fresh process (verified), which then logs `background check starting (manual=true)`.
+- With `Check automatically` off, job 2001 is gone from `dumpsys jobscheduler`; the one-off 2002
+  still runs when armed with `manual=true`.
+- The updater targets **API 26** now. The channel path (`Notifier.ensureChannel`) and the
+  background-execution-limit behaviour are **not** reachable on this API 25 stick — they are
+  logic-verified only, and there is no emulator here.

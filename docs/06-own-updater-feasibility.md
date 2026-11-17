@@ -89,7 +89,9 @@ Why this beats Obtainium here:
 - **Storage**: 803 MB free; a download+extract+install cycle peaks around 250 MB. Delete cache.
 - **Background scheduling**: API 25 predates Android 8 background limits, so a plain
   `BroadcastReceiver` doing a short GET is legal. A foreground service is unnecessary — but
-  also verify that Fire OS does not suppress alarms on an idle TV.
+  also verify that Fire OS does not suppress alarms on an idle TV. *(Since `0.5.0` the app uses
+  `JobScheduler` rather than `AlarmManager`, so one code path also works at `targetSdk` 26; see
+  [08](08-app-implementation.md#background-checks-jobscheduler-targetsdk-26).)*
 - **Boot**: re-arm the alarm from `BOOT_COMPLETED`; receivers are otherwise lost on reboot.
 - **Installer of record** changes to the updater after the first update. Harmless, but it is
   one more reason the Amazon store will never manage this install.

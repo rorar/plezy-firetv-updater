@@ -101,6 +101,7 @@ class Node:
         self.focused = attrib.get("focused", "false") == "true"
         self.clickable = attrib.get("clickable", "false") == "true"
         self.selected = attrib.get("selected", "false") == "true"
+        self.checked = attrib.get("checked", "false") == "true"
         m = re.match(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]", attrib.get("bounds", ""))
         self.x1, self.y1, self.x2, self.y2 = (
             (int(m.group(1)), int(m.group(2)), int(m.group(3)), int(m.group(4)))

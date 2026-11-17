@@ -477,9 +477,9 @@ public class SettingsActivity extends Activity {
     private void apply(String key, boolean enabled) {
         if (Prefs.KEY_AUTO_CHECK.equals(key)) {
             if (enabled) {
-                UpdateAlarm.schedule(this);
+                UpdateJob.schedule(this);
             } else {
-                UpdateAlarm.cancel(this);
+                UpdateJob.cancel(this);
             }
         } else if (Prefs.KEY_TOAST.equals(key)) {
             if (enabled) {

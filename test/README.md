@@ -140,6 +140,11 @@ test/
 
 ## Notes
 
+- **"Choose version…" is a developer option and off by default**, so it is absent after a fresh
+  install or an uninstall (which wipes the prefs). Every picker flow therefore opens the updater
+  first and, if the button is missing, `Flows.open_picker()` turns on **Settings → Developer →
+  Allow older versions** itself (scrolling to the row, flipping the switch, going back) before
+  opening the picker. No manual setup is needed — but it does mean the flows touch that setting.
 - The updater is **not debuggable** and the harness cannot see images, so everything is verified
   through `uiautomator dump` (labels + bounds) and `dumpsys package` (version, `firstInstallTime`,
   `lastUpdateTime`). The `upgrade` flow uses the two timestamps to tell a **replace** from a fresh

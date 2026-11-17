@@ -24,6 +24,7 @@
     "title": "Settings",
     "advanced_section": "Advanced settings",
     "uninstall_row": "Uninstall Plezy…",
+    "allow_older_label": "Allow older versions",
     "uninstall_confirm_title": "Uninstall Plezy?",
     "uninstall_confirm_button": "Uninstall",
     "not_installed_summary": "Plezy is not installed."

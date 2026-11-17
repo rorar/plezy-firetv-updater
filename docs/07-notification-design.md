@@ -53,38 +53,45 @@ notification center.
 The updater is a **notifier**; the download happens only when the user acts.
 
 ```
-AlarmManager (inexactRepeating, 12 h)  ──┐
-BOOT_COMPLETED re-arm                  ──┤
+JobScheduler (periodic job 2001, 12 h)  ──┐
+BOOT_COMPLETED → re-arm + job 2002      ──┤
                                          ▼
-                              UpdateCheckReceiver
+                              CheckJobService (JobService)
                                          │
-              GET api.github.com/repos/edde746/plezy/releases/latest
-              (ETag cache → 304 = no work; 60 req/h unauthenticated limit)
+              GET github.com/edde746/plezy/releases/latest
+              (unmetered 302 → tag; Atom feed for the notes)
                                          │
                      versionName newer than installed?
                                          │ yes
                                          ▼
                   Notification "Plezy 2.27.0 available — press OK to open"
-                  legacy Notification builder (API 25 has no channels)
-                  contentIntent → UpdaterActivity        ← verified to work
+                  API 25: legacy Notification.Builder; API 26+: channel "updates"
+                  contentIntent → MainActivity            ← verified to work
                                          │
                                          ▼
-                  UpdaterActivity (leanback, one focusable button)
+                  MainActivity (leanback, one focusable button)
                   → download → extract → verify signer → PackageInstaller
                   → stock installer dialog → one remote press
 ```
 
-Why no foreground service: on **API 25** the Android 8 background-execution limits do not exist,
-so a short network call in a `BroadcastReceiver` is legal and cheap, and the notification is
-retained by the notification center without a service keeping it alive (verified above).
+Why a job and not a foreground service: the check is a short, deferred network call, which is exactly
+what `JobScheduler` is for. On **API 25** it also happens to be the cheapest legal option (the
+background-execution limits do not exist yet), and from **API 26** — the app's `targetSdk` since
+`0.5.0` — a job is the *supported* way to run that call, where a background-started service is not.
+Using it on both keeps one code path ([08](08-app-implementation.md#background-checks-jobscheduler-targetsdk-26)).
+The notification is retained by the notification center without a service keeping it alive
+(verified above).
 
 Why sync-on-notification rather than download-on-notification: 48–90 MB should not be pulled
 every 12 hours just to say that something is available.
 
 ## Details that matter on a TV
 
-- **No notification channels.** `NotificationChannel` is API 26+. Use
-  `Notification.Builder` (or the legacy constructor); verified working via the builder.
+- **Channels exist only from API 26.** `NotificationChannel` is API 26+, so `Notifier` creates the
+  `"updates"` channel (named by the new `notif_channel_name` string) and posts through
+  `new Notification.Builder(app, CHANNEL_ID)` when `SDK_INT >= O`, and uses the legacy
+  `Notification.Builder` on API 25 (verified working via the builder on the stick). Creating an
+  existing channel is a no-op, so it is safe to call on every post. Required from `targetSdk` 26.
 - **No `POST_NOTIFICATIONS` runtime permission.** Introduced in API 33.
 - **Content intent is the whole UX.** Verified: selecting the card and pressing OK opens the
   target activity directly. It must land on "Install 2.27.0", not on a generic home screen.
@@ -117,7 +124,9 @@ are separately switchable in the app's Settings.
 
 1. Does a notification show as a visible **heads-up banner** while video is playing, or only in
    the center? (Given `importance=2` + `demoted=1`, assume center-only until tested.)
-2. Does `AlarmManager` fire reliably on an idle TV with the screensaver running?
+2. ~~Does `AlarmManager` fire reliably on an idle TV with the screensaver running?~~ — moot since
+   `0.5.0`: the cadence is a `JobScheduler` job now, and a job deliberately does **not** wake a
+   sleeping TV. The check runs while the TV is on, which is what the UI says.
 3. ~~Default focus of the installer dialog~~ — settled: on API 25 the app must launch the dialog
    itself, and the confirmation is one press ([08](08-app-implementation.md#finding-1--on-api-25-the-app-must-launch-the-installer-dialog-itself)).
 4. Whether repeated notifications from the same package get demoted further over time.

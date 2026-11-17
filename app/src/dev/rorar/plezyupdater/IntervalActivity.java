@@ -239,9 +239,9 @@ public class IntervalActivity extends Activity {
 
     private void save() {
         Prefs.setInterval(this, selectedValue, selectedUnit);
-        // Re-arm the alarm with the new cadence (or leave it off if auto-check is disabled).
+        // Re-arm the job with the new cadence (or leave it off if auto-check is disabled).
         if (Prefs.autoCheckEnabled(this)) {
-            UpdateAlarm.schedule(this);
+            UpdateJob.schedule(this);
         }
         Notifier.toast(this, getString(R.string.interval_checking, Prefs.intervalLabel(this)));
         setResult(RESULT_OK);

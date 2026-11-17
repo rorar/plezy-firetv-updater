@@ -1,17 +1,16 @@
 # 08 — The updater app, as built
 
-`app/` is the working updater: `dev.rorar.plezyupdater` **0.4.0** (`versionCode 4`),
-minSdk/targetSdk **25**, plain Java, programmatic UI, **no Gradle and no AndroidX**. It was verified
-end-to-end on the stick (AFTMM, Fire OS 6.7.1.1 / API 25) on 2026-11-13/17.
+`app/` is the working updater: `dev.rorar.plezyupdater` **0.5.0** (`versionCode 5`),
+minSdk **25** / targetSdk **26**, plain Java, programmatic UI, **no Gradle and no AndroidX**. It was
+verified end-to-end on the stick (AFTMM, Fire OS 6.7.1.1 / API 25) on 2026-11-13/17.
 
 ## What it does
 
 ```
-AlarmManager (inexactRepeating, user-set interval, default 12 h)  ─┐
-BOOT_COMPLETED re-arm                                             ─┤
+JobScheduler (periodic job 2001, user-set interval, default 12 h)  ─┐
+BOOT_COMPLETED → re-arm + one-off job 2002 (manual=false)          ─┤
                                         ▼
-                         UpdateCheckService (IntentService, API 25 has no
-                         background-service limit)
+                         CheckJobService (JobService)
                            GET github.com/edde746/plezy/releases/latest (unmetered 302 → tag)
                            compare tag with the installed Plezy
                            newer → Notification "Plezy X available — press OK"
@@ -32,6 +31,7 @@ BOOT_COMPLETED re-arm                                             ─┤
                                         → PackageInstaller.Session.commit(IntentSender)
                                         → stock installer dialog → one remote press
                                         → InstallResultReceiver → toast + INSTALL_FINISHED refresh
+                                          (no screen up → one-off job 2002, manual=true)
                                         → "Open Plezy?" prompt (A1, on by default)
 ```
 
@@ -149,8 +149,9 @@ version picker is a developer option (**Allow older versions**) and is not the i
 first install.
 
 `InstallResultReceiver` now always sends the in-app `INSTALL_FINISHED` broadcast (package-scoped),
-carrying the raw `EXTRA_STATUS`, and only starts the background `UpdateCheckService` when no screen
-is up. That is what lets the picker — not just `MainActivity` — word the outcome and refresh.
+carrying the raw `EXTRA_STATUS`, and only arms the one-off background job (`UpdateJob.runNow(c,
+true)`) when no screen is up. That is what lets the picker — not just `MainActivity` — word the
+outcome and refresh.
 
 ## Self-update (the updater)
 
@@ -295,7 +296,7 @@ rows are action rows, not switches.
 | Notifications | User | `notification_enabled` | on | Fire TV notification-centre entry |
 | Prompt to open Plezy | User | `open_prompt_enabled` | **on** | Offers to start Plezy after a successful install (A1) |
 | Language | User | `app_language` | System default | Opens the language picker (below) |
-| Check automatically | Advanced | `auto_check_enabled` | on | Interval alarm + boot re-arm |
+| Check automatically | Advanced | `auto_check_enabled` | on | Periodic job + boot re-arm |
 | Edit check interval… | Advanced | `interval_value` / `interval_unit` | 12 hours | Opens the interval picker (below) |
 | Delete APK after installing | Advanced | `delete_apk_after_install` | **on** | Removes the downloaded APK once installed |
 | Uninstall Plezy… | Advanced | — | — | Stock uninstaller, after a confirm (below) |
@@ -323,8 +324,8 @@ rows; the picker's own title stays **Check interval**. It is a two-pane picker:
 numbers `1…30` on the left, units **Hours / Days / Weeks / Months** on the right, with a live
 "Every 3 days" preview at the top. Up/down changes the highlighted value, left/right switches
 column, OK advances to **Save**; the remote's Back key cancels (there is deliberately no Back
-button). Saving writes `interval_value`/`interval_unit`, re-arms the alarm
-(`UpdateAlarm.schedule` reads `Prefs.intervalMs`), fires a confirmation toast and updates both
+button). Saving writes `interval_value`/`interval_unit`, re-arms the job
+(`UpdateJob.schedule` reads `Prefs.intervalMs`), fires a confirmation toast and updates both
 summaries on the Settings screen and the footer hint on the main screen.
 
 Each column keeps its own choice highlighted while the D-pad is in the other one, so the selected
@@ -347,7 +348,42 @@ The backlog asked for a prebuilt picker library. That is not possible here: the 
 cannot be linked in. The hand-built picker is the same amount of code and matches the app's look
 (the reasoning is repeated in `IntervalActivity`'s javadoc).
 
-## Staying under GitHub's rate limit
+## Background checks: `JobScheduler` (`targetSdk` 26)
+
+The periodic check used to be an `AlarmManager` alarm plus a short `IntentService`
+(`UpdateAlarm` / `UpdateCheckService` / `CheckReceiver`). Raising `targetSdk` to **26** made that
+illegal: from Android 8 the platform stops a service started from the background after ~1 minute
+and treats an `IntentService` fired from an alarm as exactly that. The replacement is a
+**`JobScheduler` job** (`UpdateJob` + `CheckJobService`), chosen over `WorkManager` because it is
+platform API — no AndroidX, no resource merging — and because it exists since **API 21**, so the
+API 25 stick and any newer Android run the *same* code path (nothing here is behind a
+`VERSION.SDK_INT` guard; the whole point was to avoid a second branch).
+
+- **Two jobs, stable ids.** `2001` is the repeating check (`setPeriodic(Prefs.intervalMs)`); `2002`
+  is a one-off "check soon" (`runNow`). A stable id means re-scheduling *replaces* the job instead
+  of stacking a new one, so `schedule()` is idempotent and `cancel()` is a single call.
+- **The auto-check switch is the master.** `MainActivity.onCreate`, the Settings switch and the
+  interval picker call `UpdateJob.schedule` / `cancel`; `BootReceiver` re-arms and asks for one
+  immediate check. The one-off job carries `EXTRA_MANUAL` so a "check now" that the user
+  effectively asked for still runs when auto-check is off — the same distinction the old
+  `UpdateCheckService.start(c, true)` made.
+- **Constraints replace the delay.** The old alarm fired a fixed 2 minutes after boot; the job sets
+  `NETWORK_TYPE_ANY` and lets the platform hold it until the TV actually has connectivity.
+- **No channels below 26.** `Notifier.ensureChannel` creates the `"updates"` channel only when
+  `SDK_INT >= O` and posts through `new Notification.Builder(app, CHANNEL_ID)`; on API 25 it uses
+  the legacy `new Notification.Builder(app)` and does nothing else, so the stick is unchanged.
+
+Two behaviour differences worth knowing:
+
+- **A fresh job runs almost immediately.** On this API 25 build a newly scheduled periodic job runs
+  once within a few seconds, then settles into its interval — so a launch does a foreground check
+  (`checkForUpdates(false)`) *and* a background one. Harmless (the check is unmetered and cheap),
+  and it means a `schedule()` from Settings or the interval picker triggers a check straight away.
+- **A job does not wake a sleeping TV** the way the old `RTC_WAKEUP` alarm could. The check runs
+  while the TV is on; the UI wording ("Runs while the TV is on", "Checks every 12 hours while the
+  TV is on") already says so.
+
+
 
 GitHub's REST API is **metered**: 60 requests per hour for an unauthenticated client, per IP. The
 updater spends one on every screen and every boot, so a burst of checks (and the flow tests, which
@@ -877,8 +913,25 @@ Device detection + device-aware wording, same stick (2026-11-17), updater `0.4.0
 | German TV notification wording | posted the test notification from Settings → **Benachrichtigung testen**; `dumpsys notification --noredact` → `android.text=String (Test-Benachrichtigung — OK zum Öffnen drücken)` — the corrected *open*, not *install*, on the stick |
 | Self-update `0.3.0` → `0.4.0` | the stick was reset to `v0.3.0` (API 25 refuses an in-place downgrade of a release build — [Finding 2](#finding-2--android-71-refuses-downgrades-of-release-builds)), then **Settings → About → "Plezy Updater aktualisieren…"** with the D-pad: the check found `0.4.0`, downloaded and verified it, and the stock installer showed an **update** dialog ("Bestehende Daten gehen nicht verloren"). After **INSTALLIEREN**: `versionCode 3 → 4`, `firstInstallTime 2026-11-17 14:15:33` **unchanged**, `lastUpdateTime 14:19:29`; the relaunched About row reads `Plezy Updater 0.4.0 (Build 4)` |
 
-## Known limitations
+`targetSdk` 26 (`0.5.0`), same stick (2026-11-17), updater `0.5.0` / `versionCode 5`
+(APK 311 018 B, `sha256 22f59dc0…`):
 
+| Step | Result |
+|---|---|
+| Build identity | `dumpsys package dev.rorar.plezyupdater` → `versionCode=5 minSdk=25 targetSdk=26`, `versionName=0.5.0`; `aapt2 dump badging` → `targetSdkVersion:'26'`; the dex carries `CheckJobService` / `UpdateJob` and no removed class |
+| Periodic job on API 25 | `dumpsys jobscheduler` → `JOB #u0a257/2001 … .CheckJobService`, `PERIODIC: interval=+12h0m0s0ms flex=+12h0m0s0ms`, `Network type: 1` |
+| The job actually checks | `cmd jobscheduler run -f dev.rorar.plezyupdater 2001` → logcat `background check starting (manual=false)`; the next window advanced one full period (`jobFinished` ran) |
+| Auto-check OFF / ON | switch off → the job disappears from `dumpsys jobscheduler` (and the immediate check stops); switch on → `JOB #…/2001` re-appears |
+| Interval change re-arms | set to **1 hour**: `PERIODIC: interval=+1h0m0s0ms`, logcat `periodic check armed every 3600000 ms`; restored to 12 h → `+12h0m0s0ms` |
+| **One-off job 2002 (`runNow`)** | the app was **force-stopped while the stock installer was up** (the only way to evict it — `am kill` / `am kill-all` leave a process that still owns a task alone). Confirming the install delivered the session result into a *fresh* process, which logged `background check starting (manual=true)` |
+| …with auto-check **off** | repeated with `Check automatically` off (no job 2001 at all): the one-off path still ran `manual=true` — it is not silently skipped by the switch |
+| API 25 notification unchanged | Settings → **Test notification**: `dumpsys notification --noredact` → `android.title=String (Plezy Updater)`, `android.text=String (Test notification — press OK to open)`; no crash, legacy `Notification.Builder` path |
+| Quota / device report | every flow run asserts `data="status=ok;…;device=fire_tv;tv=1;touch=0"` — unchanged |
+| English `all` | **5/5 PASS** — install 58s, downgrade 66s, upgrade 34s, uninstall 72s, clean-install 43s |
+| German / French / Spanish smokes | `install --app-lang de\|fr\|es` → **1/1 each** (61/54/74s), then English restored |
+| **Not verifiable here** | the API 26+ branches: `NotificationChannel` creation and the background-execution-limit avoidance a job buys. No API 26+ device or emulator exists in this environment, so both are **logic**-verified only |
+
+## Known limitations
 - One remote confirmation per install (silent install is impossible; [06](06-own-updater-feasibility.md)).
 - A downgrade costs two confirmations and **erases Plezy's data**; the app warns before starting
   ([Downgrade](#downgrade)).
@@ -889,6 +942,16 @@ Device detection + device-aware wording, same stick (2026-11-17), updater `0.4.0
   TV-first (32–48 dp padding, ≥ 50 dp rows, D-pad focus, two-pane pickers that move left/right) — so
   a phone would get TV-sized UI. See
   [roadmap item 3](11-roadmap.md#3-android-tv--phone-compatibility).
+- **The API 26+ notification-channel and job-scheduling branches are logic-verified only.** The
+  stick is API 25, so `Notifier.ensureChannel` and `new Notification.Builder(app, CHANNEL_ID)` never
+  run here, and the API 25 job is exercised on a platform whose `JobScheduler` predates the
+  background-execution limits the bump is about. The API 25 path is what the flows cover; a second
+  device at API 26+ is needed to see the other one. See
+  [Background checks](#background-checks-jobscheduler-targetsdk-26).
+- **A job does not wake a sleeping TV.** The old `RTC_WAKEUP` alarm could; `JobScheduler` runs the
+  check while the TV is on, which the UI already promises ("Runs while the TV is on"). Also, a newly
+  scheduled periodic job runs once almost immediately on this build before settling into its
+  interval, so a launch checks twice (foreground + background) — harmless, the check is unmetered.
 - The `arm64-v8a` / `x86_64` **installs** are unverified on hardware (this stick is 32-bit): both
   tarballs' signer hashes match the pinned value off-device and they carry the expected native libs,
   but only a 64-bit device can exercise the branch end to end. The `err_no_native_libs` branch stays

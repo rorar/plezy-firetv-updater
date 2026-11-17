@@ -94,7 +94,7 @@ public class InstallResultReceiver extends BroadcastReceiver {
         refresh.putExtra(PackageInstaller.EXTRA_STATUS_MESSAGE, message);
         c.sendBroadcast(refresh);
         if (!MainActivity.isAlive()) {
-            UpdateCheckService.start(c, true);
+            UpdateJob.runNow(c, true);
         }
     }
 

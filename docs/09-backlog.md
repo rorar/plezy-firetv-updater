@@ -10,11 +10,22 @@ The forward-looking items now live in the [roadmap](11-roadmap.md), so this stay
 - **Android TV / phone compatibility — the layout half.** The wording half landed in `0.4.0`
   ([roadmap item 3](11-roadmap.md#3-android-tv--phone-compatibility)); the TV-first sizing and the
   two-pane pickers still assume a D-pad, and no touch device is available to verify them on.
-- **`targetSdk` bump matrix** (25 → 26 → 28 → … ) and what each step breaks.
+- **`targetSdk` bump, further steps** — the 25 → 26 step landed in `0.5.0`; 28 → 31 → 33 → … remain,
+  one step per release ([roadmap item 5](11-roadmap.md#5-targetsdk-bump-matrix)).
 
 Nothing here is a commitment; the roadmap explains the order and the reasoning.
 
 ## Already implemented
+
+- **`targetSdk` 25 → 26 (roadmap item 5, first step).** Landed 2026-11-17 (`0.5.0`): the notification
+  now lives in a platform channel on API 26+ (`Notifier.ensureChannel`, `notif_channel_name`) while
+  API 25 keeps the legacy builder, and the `AlarmManager` + `IntentService` pair was replaced by a
+  `JobScheduler` job (`UpdateJob` / `CheckJobService`, periodic 2001, one-off 2002) — chosen because
+  it exists since API 21, so the stick and newer Android share one code path with no AndroidX. The
+  API 25 side was re-verified on the stick (jobs armed/cancelled/re-armed, the `runNow` one-off path,
+  the legacy notification, all five flows, de/fr/es smokes); the API 26+ branches are logic-verified
+  only, with no newer device available. See [11 § 5](11-roadmap.md#5-targetsdk-bump-matrix) and
+  [08](08-app-implementation.md#background-checks-jobscheduler-targetsdk-26).
 
 - **Device detection (roadmap item 2).** Landed 2026-11-17 (`0.4.0`): `DeviceKind` (the decision, a
   pure enum with no `android.*` import) and `Device` (the Android wrapper) answer *what is this
@@ -189,3 +200,6 @@ Nothing here is a commitment; the roadmap explains the order and the reasoning.
   rides the `-finger` resource qualifier; the parts this stick cannot produce are covered by
   `test/jvm/run.sh` and `test/check_strings.py`, both device-free. What is left is the touch
   **layout** and the `targetSdk` bump.
+- **`targetSdk` 25 → 26** (roadmap item 5, first step) landed on 2026-11-17 (updater `0.5.0`):
+  notification channel on API 26+, `JobScheduler` in place of the alarm + service. The remaining
+  steps (28 → 31 → 33 → …) are still open, and the touch **layout** is still the last item.

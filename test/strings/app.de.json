@@ -24,6 +24,7 @@
     "title": "Einstellungen",
     "advanced_section": "Erweiterte Einstellungen",
     "uninstall_row": "Plezy deinstallieren…",
+    "allow_older_label": "Ältere Versionen erlauben",
     "uninstall_confirm_title": "Plezy deinstallieren?",
     "uninstall_confirm_button": "Deinstallieren",
     "not_installed_summary": "Plezy ist nicht installiert."

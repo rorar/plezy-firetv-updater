@@ -129,9 +129,9 @@ public class MainActivity extends Activity {
         renderStatus();
 
         if (Prefs.autoCheckEnabled(this)) {
-            UpdateAlarm.schedule(this);
+            UpdateJob.schedule(this);
         } else {
-            UpdateAlarm.cancel(this);
+            UpdateJob.cancel(this);
         }
         checkForUpdates(false);
     }

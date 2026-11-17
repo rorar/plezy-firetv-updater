@@ -209,13 +209,13 @@ exercise it end to end. That is a "when a device appears" item, not work to do n
 
 ## 5. `targetSdk` bump matrix
 
-The app targets **25** today, which is what the stick is. Raising it is only worth doing if the
+The app targets **26** today (it was 25 through `0.4.0`); raising it is only worth doing if the
 updater must also run well on newer Android (which items 2–3 imply). Each step is a known set of
 changes; all of them can be guarded by `Build.VERSION.SDK_INT` so the API 25 behaviour is unchanged.
 
 | `targetSdk` | Platform | What breaks / is required |
 |---|---|---|
-| 26 | Android 8.0 | **Notification channels are mandatory** — `Notifier` must create one and post into it; on API 25 it must keep the old path. **Background execution limits**: `UpdateCheckService` (an `IntentService` started from the alarm) is cut off after ~1 min and is the wrong tool — replace it with a `JobScheduler` job (no `WorkManager`, no AndroidX). |
+| 26 ✅ | Android 8.0 | **Done in `0.5.0`.** **Notification channels are mandatory** — `Notifier.ensureChannel` creates the `"updates"` channel and posts through `new Notification.Builder(app, CHANNEL_ID)` when `SDK_INT >= O`; on API 25 it keeps the legacy builder. **Background execution limits**: the `IntentService` started from an alarm (`UpdateCheckService` / `UpdateAlarm` / `CheckReceiver`) was replaced by a `JobScheduler` job (`UpdateJob` + `CheckJobService`, periodic id 2001, one-off id 2002) — no `WorkManager`, no AndroidX, and it exists on API 21 so there is no second code path. |
 | 27 | 8.1 | Minor; no change expected. |
 | 28 | 9.0 | **Cleartext HTTP is blocked** by default — all endpoints are already HTTPS, so fine. `Build.SERIAL` is restricted (unused). |
 | 29 | 10.0 | **Scoped storage** — the app uses `cacheDir` and `getExternalCacheDir()`, both app-specific, so fine; no legacy flag needed. **Background activity starts** are restricted: the install-confirmation activity is started from the app while it is in the foreground (the user just pressed a button), so allowed — but a future auto-install path would not be. |
@@ -230,7 +230,11 @@ API and each keeps an API 25 fallback.
 
 **Verify.** A bump must not change behaviour on the stick: re-run the five flows and the quota
 broadcast on API 25 after every step, and additionally on a newer emulator for the branch that
-actually changed.
+actually changed. For the 26 step the API 25 side was done in full (jobs armed / cancelled /
+re-armed, the one-off `runNow` path, the legacy notification, all five flows and the de/fr/es
+smokes); the API 26+ side — channel creation and the background-execution limit the job is there to
+avoid — had **no device or emulator to run on** and stays logic-verified
+([08](08-app-implementation.md#background-checks-jobscheduler-targetsdk-26)).
 
 ## Suggested order
 
@@ -242,8 +246,12 @@ actually changed.
    `0.4.0`; the classification is asserted over the diagnostics broadcast and the wording rides the
    `-finger` qualifier, so no Java decides it. The branches this stick cannot produce are covered by
    `test/jvm/run.sh`.
-4. **`targetSdk` bump** (item 5) — only if newer Android matters; the biggest single change.
-5. **Touch UI** (item 3, layout half) — last, because it is the one that cannot be verified here.
+4. ~~**`targetSdk` bump, step 1 (25 → 26)**~~ — **done** 2026-11-17, `0.5.0`; notification channel +
+   `JobScheduler` in place of the alarm + `IntentService`, with the API 25 path re-verified on the
+   stick and the API 26+ branches logic-verified only (no newer device exists here).
+5. **`targetSdk` bump, further steps** (28 → 31 → 33 → …) — item 5 continued, one step per release,
+   each with the API 25 flows as the regression test.
+6. **Touch UI** (item 3, layout half) — last, because it is the one that cannot be verified here.
 
 ## Guardrails
 
@@ -254,8 +262,9 @@ actually changed.
 - **Say what was not verified.** The arm64/x86_64 *signers* are now checked off-device, but their
   *installs* and the `err_no_native_libs` path stay unverified on this 32-bit stick; the Android TV
   and touch branches of device detection and the `-finger` wording are **logic**-verified (JVM tests,
-  string-parity check) but never seen on a real Android TV or phone, and the touch *layout* is not
-  done at all. They join the list until a second device exists.
+  string-parity check) but never seen on a real Android TV or phone; the API 26+ notification-channel
+  and background-execution-limit branches are **logic**-verified too (no newer device here); and the
+  touch *layout* is not done at all. They join the list until a second device exists.
 - **Testable decisions live outside `android.*`.** `DeviceKind` takes a plain `Signals` bundle and has
   no platform import, which is what lets `test/jvm/run.sh` cover the branches this stick cannot
   produce. Keep new decision logic on that side of the line.

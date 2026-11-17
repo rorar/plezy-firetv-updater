@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="dev.rorar.plezyupdater"
-    android:versionCode="4"
-    android:versionName="0.4.0">
+    android:versionCode="5"
+    android:versionName="0.5.0">
 
-    <uses-sdk android:minSdkVersion="25" android:targetSdkVersion="25" />
+    <uses-sdk android:minSdkVersion="25" android:targetSdkVersion="26" />
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
@@ -67,11 +67,6 @@
             android:exported="false"
             android:label="@string/about_title" />
 
-        <!-- Alarm delivery uses an explicit in-app intent, so this need not be exported. -->
-        <receiver
-            android:name=".CheckReceiver"
-            android:exported="false" />
-
         <receiver
             android:name=".BootReceiver"
             android:exported="true">
@@ -95,8 +90,11 @@
             </intent-filter>
         </receiver>
 
+        <!-- The background check. BIND_JOB_SERVICE is a signature permission, so exporting it
+             only lets the system (which holds the signature) start the job. -->
         <service
-            android:name=".UpdateCheckService"
-            android:exported="false" />
+            android:name=".CheckJobService"
+            android:exported="true"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
     </application>
 </manifest>

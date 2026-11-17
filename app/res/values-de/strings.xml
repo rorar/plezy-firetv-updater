@@ -175,6 +175,7 @@
     <string name="open_prompt_not_now">Nicht jetzt</string>
     <string name="open_prompt_failed">Plezy konnte nicht geöffnet werden</string>
 
+    <string name="notif_channel_name">Update-Benachrichtigungen</string>
     <string name="notif_available_title">Plezy %1$s verfügbar</string>
     <string name="notif_available_text">OK zum Öffnen drücken</string>
 

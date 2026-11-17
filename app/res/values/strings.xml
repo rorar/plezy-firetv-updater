@@ -197,6 +197,7 @@
     <string name="open_prompt_failed">Could not open Plezy</string>
 
     <!-- update notification -->
+    <string name="notif_channel_name">Update notifications</string>
     <string name="notif_available_title">Plezy %1$s available</string>
     <string name="notif_available_text">Press OK to open</string>
 

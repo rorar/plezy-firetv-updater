@@ -29,8 +29,9 @@ Network identifiers (MAC, LAN address) are redacted or shown as example values.
 question in this repo:
 
 - Obtainium `v1.4.0+` needs API 26 → cannot install (see [02](02-obtainium-on-fireos6.md)).
-- Android 8 background-execution limits do **not** apply → simple `AlarmManager` +
-  `BroadcastReceiver` scheduling is legal and reliable (see [07](07-notification-design.md)).
+- Android 8 background-execution limits do **not** apply → a short network call from a receiver is
+  legal, and scheduling is simple. The updater still uses `JobScheduler` (it exists since API 21) so
+  one code path works here and on newer Android (see [07](07-notification-design.md)).
 - `POST_NOTIFICATIONS` runtime permission does not exist yet (introduced in API 33).
 - Per-app "install unknown apps" grants do not exist yet (introduced in API 26);
   sideloading is governed by the global `install_non_market_apps` setting.

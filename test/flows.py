@@ -107,12 +107,37 @@ class Flows:
         time.sleep(2)  # let the update check fill in the buttons
 
     def open_picker(self):
-        self.open_updater()
         label = self.s.app("main.choose_version")
+        self.open_updater()
+        if self.d.dump().find(exact=label) is None:
+            # The picker is a developer option and is off by default, so a fresh install (or one
+            # whose settings were wiped by an uninstall) has no "Choose version…" button.
+            self._enable_allow_older()
+            self.open_updater()
         screen, node = self._wait_for(label, timeout=45)
         self._tap(node, label)
         self.d.wait_focus("VersionListActivity", timeout=20)
         time.sleep(2)  # let the release list download
+
+    def _enable_allow_older(self):
+        """Turn on Settings → Developer → "Allow older versions" (called with MainActivity up).
+
+        Every picker flow needs it: "Choose version…" only exists while it is on. Idempotent.
+        """
+        label = self.s.app("settings.allow_older_label")
+        self.log("  the picker is hidden — turning on Settings → Developer → Allow older versions")
+        settings = self.s.app("main.settings")
+        self._tap(self._require(self.d.dump(), f"Settings button {settings!r}", exact=settings),
+                  settings)
+        self.d.wait_focus("SettingsActivity", timeout=20)
+        time.sleep(1)
+        node = self._scroll_to_row(label, timeout=120, max_presses=25)
+        if not node.checked:
+            self._tap(node, label)
+            time.sleep(1)
+        self.d.key("KEYCODE_BACK")
+        self.d.wait_focus("MainActivity", timeout=20)
+        time.sleep(1)
 
     def _picker_row(self, version, timeout=45):
         suffix = self.s.app("picker.installed_suffix")
@@ -515,3 +540,21 @@ class Flows:
             if time.time() > deadline:
                 break
         raise HarnessError(f"could not reach {text!r} (enabled={enabled})")
+
+    def _scroll_to_row(self, label, timeout=40, max_presses=15):
+        """Like ``_scroll_to``, but matches a label *prefix*.
+
+        A Settings switch row carries the platform's on/off word after its label
+        ("Allow older versions OFF"), so an exact match never finds one.
+        """
+        deadline = time.time() + timeout
+        for _ in range(max_presses):
+            screen = self.d.dump()
+            node = next((n for n in screen.nodes if n.label.startswith(label)), None)
+            if node is not None:
+                return node
+            self.d.key("KEYCODE_DPAD_DOWN")
+            time.sleep(0.8)
+            if time.time() > deadline:
+                break
+        raise HarnessError(f"could not reach the row starting with {label!r}")
