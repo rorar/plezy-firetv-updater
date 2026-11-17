@@ -58,7 +58,7 @@ Obtainium pinned/ignored. Details in [02](02-obtainium-on-fireos6.md).
 ```bash
 #!/usr/bin/env bash
 set -euo pipefail
-SERIAL=192.168.1.50:5555
+SERIAL=${FIRE_TV_SERIAL:-192.168.1.50:5555}   # set FIRE_TV_SERIAL to your stick
 REPO=derFrisson/plezy-apks              # or edde746/plezy + tar extraction
 APK=plezy-android-armeabi-v7a.apk
 PKG=com.edde746.plezy

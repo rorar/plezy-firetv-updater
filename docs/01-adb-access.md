@@ -5,9 +5,13 @@
 | Component | Value |
 |---|---|
 | `adb` | 1.0.41, platform-tools `37.0.0p1-android-tools` (`/usr/bin/adb`) |
-| Host OS | Linux |
-| Host LAN address | `192.168.1.10/24`, gateway `192.168.1.1` |
+| Host OS | Linux (any recent distro; only `adb` and `curl` matter) |
+| Host LAN address | `192.168.1.10/24`, gateway `192.168.1.1` (example values) |
 | Device key | `~/.android/adbkey` (persisted, so authorisation survives reboots) |
+
+> **Addresses in this repo are examples.** The stick's real LAN address is deliberately not
+> published. Substitute your own wherever you see `192.168.1.50`. The test harness reads it from
+> the `FIRE_TV_SERIAL` environment variable instead (copy `local.env.example` to `local.env`).
 
 ## Connecting
 

@@ -4,3 +4,6 @@ build/
 *.iml
 __pycache__/
 *.pyc
+.serena/
+hs_err_pid*.log
+local.env

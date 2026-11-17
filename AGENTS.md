@@ -4,7 +4,9 @@
 
 - Fire TV Stick 4K (**AFTMM / mantis**), Fire OS `6.7.1.1` = Android `7.1.2` = **API 25**,
   `armeabi-v7a`, 2 GB RAM, no root, `ro.build.type=user`.
-- ADB: `adb connect 192.168.1.50:5555` (accept the RSA dialog once). Screen `1920x1080`,
+- ADB: the stick's address is **not** in this repo. It lives in the gitignored `local.env`
+  (`FIRE_TV_SERIAL`); `source local.env` then `adb connect "$FIRE_TV_SERIAL"` (accept the RSA
+  dialog once). The `192.168.1.50:5555` in the docs is a placeholder. Screen `1920x1080`,
   density `320` (2.0× → 960x540 dp).
 - **The TV sleeps.** Before any `screencap`/`uiautomator dump`, wake it:
   `adb shell input keyevent KEYCODE_WAKEUP` then `KEYCODE_HOME`. A sleeping screen gives an
@@ -120,10 +122,13 @@ Prefer the harness over hand-driving when you can:
 
 ```bash
 cd ~/Code/plezy-firetv-updater
-python3 -u test/run.py all --yes --serial 192.168.1.50:5555   # five flows
-python3 -u test/run.py upgrade --yes --serial 192.168.1.50:5555
-python3 -u test/run.py install --app-lang de --serial 192.168.1.50:5555
+source local.env                                   # sets FIRE_TV_SERIAL
+python3 -u test/run.py all --yes                   # five flows
+python3 -u test/run.py upgrade --yes
+python3 -u test/run.py install --app-lang de
 ```
+
+`--serial` defaults to `$FIRE_TV_SERIAL`; pass `--serial <ip>:5555` to override.
 
 Run it from `test/` if you want to import `harness` / `flows` in an ad-hoc snippet. It drives
 Settings → Language, dismisses the "Open Plezy?" prompt, clicks `INSTALLIEREN`, and proves the

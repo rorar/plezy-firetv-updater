@@ -1,6 +1,7 @@
 # 00 — Device profile
 
 All values read from the device with `adb shell getprop` / `dumpsys` on 2026-11-13.
+Network identifiers (MAC, LAN address) are redacted or shown as example values.
 
 ## Identity
 
@@ -10,7 +11,7 @@ All values read from the device with `adb shell getprop` / `dumpsys` on 2026-11-
 | Marketing name | Fire TV Stick 4K (1st gen, 2018), codename **"mantis"** |
 | `ro.product.manufacturer` | `Amazon` |
 | `ro.product.device` | `mantis` |
-| Network | `192.168.1.50`, MAC `MAC redacted`, mDNS `Android.local` |
+| Network | `192.168.1.50`, mDNS `Android.local` (MAC redacted) |
 | ADB endpoint | `192.168.1.50:5555` (ADB debugging permanently enabled) |
 
 ## OS

@@ -30,7 +30,8 @@ The updater is **runtime-switchable** (Settings → Language), so `--app-lang` i
 run *sets* before the flows — not a build variant. There is one build; the run drives
 **Settings → Language** with the D-pad first, then verifies the app came back in that language.
 
-Options: `--serial 192.168.1.50:5555`, `--latest` / `--older` (override the versions),
+Options: `--serial` (defaults to `$FIRE_TV_SERIAL` — copy `local.env.example` to `local.env`),
+`--latest` / `--older` (override the versions),
 `--system-lang` (default: auto-detected from `persist.sys.locale`), `--from-lang` (the app's
 language now, if it should not be auto-detected), `--no-set-language` (skip the switch),
 `-v` (echo every adb command).

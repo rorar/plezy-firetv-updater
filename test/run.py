@@ -56,7 +56,9 @@ def main(argv=None):
                     help="skip the Settings → Language step (assume --app-lang is already set)")
     ap.add_argument("--system-lang", default="auto",
                     help="language of the Fire OS dialogs (default: auto-detect)")
-    ap.add_argument("--serial", default=None, help="adb serial, e.g. 192.168.1.50:5555")
+    ap.add_argument("--serial", default=os.environ.get("FIRE_TV_SERIAL"),
+                    help="adb serial, e.g. 192.168.1.50:5555 "
+                         "(default: $FIRE_TV_SERIAL, see local.env.example)")
     ap.add_argument("--adb", default="adb", help="adb binary (default: adb)")
     ap.add_argument("--latest", default=None, help="override the 'latest' version")
     ap.add_argument("--older", default=None, help="override the 'older' version")

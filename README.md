@@ -155,7 +155,7 @@ same flows run against any app language and any device locale.
 ## Quick start (reproduce the install)
 
 ```bash
-adb connect 192.168.1.50:5555        # accept the RSA dialog on the TV once
+adb connect 192.168.1.50:5555        # your stick's address; accept the RSA dialog on the TV once
 adb install -r plezy-android-armeabi-v7a.apk
 adb shell am start -a android.intent.action.MAIN \
   -c android.intent.category.LEANBACK_LAUNCHER \
