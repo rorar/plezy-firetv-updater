@@ -10,6 +10,13 @@
 
   "diagnostics_action": "dev.rorar.plezyupdater.action.DIAGNOSTICS",
 
+  "expected_device": {
+    "_comment": "What Device.kind()/isTv()/isTouch() must report for THIS stick, asserted against the device=…;tv=…;touch=… fields the diagnostics broadcast now carries. The stick is an Amazon Fire TV (AFTMM, amazon.hardware.fire_tv) with no touchscreen.",
+    "kind": "fire_tv",
+    "tv": "1",
+    "touch": "0"
+  },
+
   "language_rows": {
     "_comment": "The Settings -> Language picker's rows, in order (row 0 is the title). 'system' follows the device; the rest are language codes. The names are each language's own name, so the list reads the same whatever the app is currently set to — that is what lets the harness pick a row without knowing the current language.",
     "order": ["system", "en", "de", "fr", "es"],

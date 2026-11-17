@@ -11,13 +11,18 @@ import android.content.Intent;
  * <pre>
  *   adb shell am broadcast --include-stopped-packages \
  *       -a dev.rorar.plezyupdater.action.DIAGNOSTICS
- *   # Broadcast completed: result=-1, data="status=ok;remaining=57;limit=60;reset_ms=…;checked_ms=…"
+ *   # Broadcast completed: result=-1, data="status=ok;remaining=57;limit=60;reset_ms=…;checked_ms=…;device=fire_tv;tv=1;touch=0"
  * </pre>
  *
  * <p>The answer travels in the ordered-broadcast <em>result data</em> (not extras): a shell
  * broadcast prints it as {@code data="…"}, which is the one channel a script can read without
  * {@code run-as}. The same report is written to {@code quota.txt} in the app's external cache dir
  * as a second, permission-free way in.
+ *
+ * <p>The report carries a {@link Device#report} suffix ({@code device=…;tv=…;touch=…}) as well as
+ * the quota: the device classification is the other thing a script cannot see from the outside,
+ * and it rides along on the check that was already happening. Both the result and the file carry
+ * it, so the two channels stay identical.
  *
  * <p>The check is a network call, so it runs off the main thread through {@link #goAsync()}; the
  * receiver stays alive until it finishes. {@code finish()} always runs, even on failure, or the
@@ -31,22 +36,25 @@ public class DiagnosticsReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context c, Intent i) {
         final Context app = c.getApplicationContext();
+        // Read on the main thread (cheap) so both the success and the failure branch report it.
+        final String device = Device.report(app);
         final PendingResult pending = goAsync();
         new Thread(new Runnable() {
             @Override
             public void run() {
                 try {
                     Diagnostics.QuotaResult r = Diagnostics.checkQuota(app);
-                    Diagnostics.writeReport(app, r.report);
+                    String report = r.report + ";" + device;
+                    Diagnostics.writeReport(app, report);
                     // setResultData carries a plain string out of the broadcast; setResultCode(-1)
                     // is the success code a shell broadcast prints as "result=-1".
                     pending.setResultCode(-1);
-                    pending.setResultData(r.report);
+                    pending.setResultData(report);
                 } catch (Throwable t) {
                     // checkQuota already swallows everything; this is belt and braces so a stray
                     // error still leaves a result rather than a hung broadcast.
                     pending.setResultCode(0);
-                    pending.setResultData("status=error;code=receiver");
+                    pending.setResultData("status=error;code=receiver;" + device);
                 } finally {
                     pending.finish();
                 }

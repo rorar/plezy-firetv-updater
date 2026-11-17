@@ -327,6 +327,19 @@ class Flows:
             return None
         return dict(p.split("=", 1) for p in m.group(2).split(";") if "=" in p)
 
+    def assert_device(self, report):
+        """The broadcast's device=…;tv=…;touch=… must match this stick (roadmap item 2).
+
+        Device detection is otherwise invisible from the outside, so it rides along on the
+        diagnostics report. Expected values live in config.json's "expected_device".
+        """
+        want = self.c["expected_device"]
+        got = {k: report.get(k) for k in ("device", "tv", "touch")}
+        expect = {"device": want["kind"], "tv": want["tv"], "touch": want["touch"]}
+        if got != expect:
+            raise HarnessError(f"device report {got} != expected {expect}")
+        self.log(f"    ✓ device: {got['device']} (tv={got['tv']}, touch={got['touch']})")
+
     # ------------------------------------------------------------------ #
     # assertions
     # ------------------------------------------------------------------ #

@@ -122,13 +122,23 @@ def main(argv=None):
     flows = Flows(device, strings, config)
 
     # Exercise A3 the way it is meant to be used: a script triggers the check and reads the
-    # report back over the broadcast, without a screen.
-    print("\n=== diagnostics: GitHub quota ===")
+    # report back over the broadcast, without a screen. The same report now carries the device
+    # classification (item 2), so it is asserted here rather than on a screen.
+    print("\n=== diagnostics: GitHub quota + device ===")
     quota = flows.check_quota()
     if quota and quota.get("status") == "ok":
         print(f"  GitHub API quota: {quota.get('remaining')}/{quota.get('limit')} requests left")
     else:
         print(f"  (no quota report — {quota})")
+    if quota:
+        try:
+            flows.assert_device(quota)
+        except HarnessError as exc:
+            print(f"  ✗ {exc}")
+            return 1
+    else:
+        print("  ✗ the diagnostics receiver did not answer — device detection not verified")
+        return 1
 
     if not args.no_set_language:
         print("\n=== set the app language ===")
