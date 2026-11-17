@@ -11,9 +11,11 @@ follows from it.
 > Status: **a working updater app** (`app/`) plus the findings that led to it (`docs/`), the
 > artwork sources (`design/`), the on-device **flow tests** (`test/`) and a throwaway probe
 > (`probe/`). Verified end-to-end on the stick, UI overhaul, original artwork, the shared
-> install routine, and the Round-1 feature set included.
+> install routine, the Round-1 feature set, and **self-update** (the updater updates itself).
 
-Verified on **2026-11-13/16** with Plezy `2.26.0`, ADB `1.0.41` (platform-tools `37.0.0`).
+Releases (the APK is attached to each): **<https://github.com/rorar/plezy-firetv-updater/releases>**.
+
+Verified on **2026-11-13/17** with Plezy `2.26.0`, ADB `1.0.41` (platform-tools `37.0.0`).
 
 ---
 
@@ -43,7 +45,8 @@ Verified on **2026-11-13/16** with Plezy `2.26.0`, ADB `1.0.41` (platform-tools 
    the check interval, installs a chosen version straight from the version picker (one shared
    `InstallFlow`), offers to **open Plezy after an install**, shows its own **version/About**
    screen, and can **report the GitHub quota on demand** (from Settings or by a broadcast a script
-   triggers). It picks the **right per-ABI tarball** for the device, so one APK works on this 32-bit
+   triggers). It can also **update itself** from its own GitHub releases (verifying the new build's
+   signer against the running app's before installing). It picks the **right per-ABI tarball** for the device, so one APK works on this 32-bit
    stick and on a 64-bit Android TV. It ships **English, German, French and Spanish** and follows
    the Fire TV's language, with a **Settings → Language** override. Two surprises are documented: on
    API 25 the app must launch the installer dialog itself, and Android 7.1 refuses downgrades of
@@ -63,7 +66,7 @@ Verified on **2026-11-13/16** with Plezy `2.26.0`, ADB `1.0.41` (platform-tools 
 | Launcher | 24 `LEANBACK_LAUNCHER` entries, app appears in the Fire TV home row |
 | APK used | `derFrisson/plezy-apks` `2.26.0` → `plezy-android-armeabi-v7a.apk` (90,748,577 bytes) |
 | Installed size | ~87 MB in `/data/app/com.edde746.plezy-1` |
-| Updater | `dev.rorar.plezyupdater` `0.2.0` (`versionCode 2`) — see [docs/08](docs/08-app-implementation.md) |
+| Updater | `dev.rorar.plezyupdater` `0.3.0` (`versionCode 3`) — see [docs/08](docs/08-app-implementation.md) |
 
 ## The updater app
 
@@ -86,6 +89,10 @@ grouped into User / Advanced / Developer sections:
   costs two confirmations and erases Plezy's data; the app warns first.
 - **Check GitHub quota…** (Diagnostics) — the live `/rate_limit` value and reset time, also
   triggerable by a script over a broadcast that returns the report.
+- **Update Plezy Updater…** (About) — checks this project's own GitHub releases and installs a
+  newer build of the updater itself, in place. The download is verified against the running app's
+  signer before anything is installed. The **first** self-updating build still arrives by
+  `adb install -r` once.
 - **About Plezy Updater…** (Diagnostics) — the installed version, the third-party licence and a
   thanks note.
 
@@ -128,10 +135,10 @@ adb install -r build/plezy-updater.apk
 | [05-update-strategies](docs/05-update-strategies.md) | Amazon store vs Obtainium vs PC cron vs own APK |
 | [06-own-updater-feasibility](docs/06-own-updater-feasibility.md) | What an own updater can and cannot do here |
 | [07-notification-design](docs/07-notification-design.md) | Notification infrastructure findings + architecture |
-| [08-app-implementation](docs/08-app-implementation.md) | The updater app as built: pending-user-action, the shared install routine, the open-Plezy prompt, About/version, quota diagnostics, per-ABI asset, downgrade, uninstall, changelog typography, check interval, staying under GitHub's rate limit, language, the `Ui` toolkit, icons/artwork, storage, settings |
+| [08-app-implementation](docs/08-app-implementation.md) | The updater app as built: pending-user-action, the shared install routine, self-update, the open-Plezy prompt, About/version, quota diagnostics, per-ABI asset, downgrade, uninstall, changelog typography, check interval, staying under GitHub's rate limit, language, the `Ui` toolkit, icons/artwork, storage, settings |
 | [09-backlog](docs/09-backlog.md) | Done items; open ideas point at the roadmap |
 | [10-tv-ui-design](docs/10-tv-ui-design.md) | The TV UI plan: layout grid, focus model, icons, per-screen design (including the language picker, About and dialogs), how the look is verified |
-| [11-roadmap](docs/11-roadmap.md) | What comes next: self-update, device detection, Android TV/phone compatibility, the `targetSdk` bump matrix |
+| [11-roadmap](docs/11-roadmap.md) | What comes next (and what is done): self-update, device detection, Android TV/phone compatibility, the `targetSdk` bump matrix |
 
 ## Flow tests
 

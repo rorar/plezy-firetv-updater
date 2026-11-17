@@ -7,7 +7,6 @@ parking lot. Status is checked against the code in `app/`.
 
 The forward-looking items now live in the [roadmap](11-roadmap.md), so this stays a short pointer:
 
-- **Self-update of the updater** — download and install a new `plezy-updater.apk` in place.
 - **Device detection** (Fire TV vs Android TV vs phone) with the notification wording adapted.
 - **Android TV / phone compatibility** (the layout is TV-first today).
 - **`targetSdk` bump matrix** (25 → 26 → 28 → … ) and what each step breaks.
@@ -15,6 +14,14 @@ The forward-looking items now live in the [roadmap](11-roadmap.md), so this stay
 Nothing here is a commitment; the roadmap explains the order and the reasoning.
 
 ## Already implemented
+
+- **Self-update of the updater (roadmap item 1).** Landed 2026-11-17 (`0.3.0`): **Settings → About →
+  "Update Plezy Updater…"** checks this repo's own GitHub releases and installs a newer
+  `plezy-updater.apk` in place, after verifying the download's package, `versionCode` and — the
+  check that matters — its **signer against the running app's**. Verified on the stick: `versionCode`
+  2 → 3 with `firstInstallTime` unchanged. See
+  [11 § 1](11-roadmap.md#1-self-update-of-the-updater) and
+  [08](08-app-implementation.md#self-update-the-updater).
 
 - **"Open Plezy?" prompt after every install (A1).** A successful install is followed by an offer to
   start Plezy, with the focus on **Not now** so a stray OK cannot launch it; the launch intent is

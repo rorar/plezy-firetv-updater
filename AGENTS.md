@@ -55,6 +55,17 @@ adb install -r build/plezy-updater.apk
 - **The updater must work with the API quota spent.** Verify it by reading `rate_limit` first and
   running the flows while `remaining` is `0`; that is the point of the web-feed fallback
   ([docs/08](docs/08-app-implementation.md#staying-under-githubs-rate-limit)).
+- **Self-update is a Settings row, and its tap is unreliable.** **Settings → About → "Update Plezy
+  Updater…"** checks this repo's own releases and installs a newer build in place. Drive it with the
+  **D-pad** (`KEYCODE_DPAD_DOWN` to the row, then `KEYCODE_DPAD_CENTER`): `input tap` on that row
+  often does not register even though it works on the rows above and below. While it runs the row
+  disables and its summary line shows `Downloading… n%` → `Opening the installer…` → the stock
+  installer appears (an *update* dialog for **Plezy Updater**). Confirm it like any install
+  (`INSTALLIEREN` @ `1115 984`), then prove the in-place replace:
+  `dumpsys package dev.rorar.plezyupdater` must show the new `versionCode` with `firstInstallTime`
+  unchanged and `lastUpdateTime` moved. The swap kills the app, so the launcher may come up — just
+  `am start` it again. To test end to end you need a **published release newer than the running
+  build**; the check is `releases/latest` vs the installed `versionName`.
 
 ## Testing an install: click the installer button yourself
 

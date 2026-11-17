@@ -11,41 +11,55 @@ called directly and guarded with `Build.VERSION.SDK_INT` — nothing here can le
 
 ## 1. Self-update of the updater
 
-The one item the user asked for that is still missing: today a new updater build is installed with
-`adb install -r`. Everything else can ship over the air, but not the app doing the shipping.
+**Done** (2026-11-17, updater `0.3.0`). The one item the user asked for that was missing: a new
+updater build used to need `adb install -r`. Everything else can ship over the air, but not the app
+doing the shipping — now it can. See
+[08 — Self-update](08-app-implementation.md#self-update-the-updater) for how it works.
 
-**Shape.** The updater already knows how to download a tarball, verify an APK and drive
+**Shape.** The updater already knew how to download a tarball, verify an APK and drive
 `PackageInstaller` ([08](08-app-implementation.md#install-routine-shared)). Self-update is the same
 pipeline pointed at its own APK, with three differences:
 
-- **A source for the APK.** The repo has no releases yet. The natural home is a GitHub release on
-  this repo carrying `plezy-updater.apk`, because the unmetered `releases/latest` redirect is
-  already the primary way the Plezy check works — so the updater's own check costs no API quota
-  either. A plain HTTPS URL works too, but then there is no tag to compare against.
-- **A version comparison against itself.** `PackageManager.getPackageInfo(getPackageName(), 0)`
-  gives the installed `versionCode`; the release tag gives the available one. Compare **versionCode**
-  (`0.2.0` → code `2`), never the name string.
-- **The same key.** A new build only installs over the running one if it is signed with
-  `app/debug.keystore` (or the real release key). So the published APK must be built from this repo
-  with that key, and the check should verify the download's signer SHA-256 up front for a readable
-  error instead of letting the platform fail with `INSTALL_FAILED_UPDATE_INCOMPATIBLE`.
+- **A source for the APK.** A GitHub release on this repo carrying `plezy-updater.apk`, because the
+  unmetered `releases/latest` redirect is already the primary way the Plezy check works — so the
+  updater's own check costs no API quota either (`PlezyRepo.latestTagFor`).
+- **A version comparison against itself.** The release tag is compared with the running
+  `versionName`; the download is then re-checked so its **`versionCode`** is strictly greater than
+  the installed one (`0.2.0` → code `2`), never the name string.
+- **The same key.** A new build only installs over the running one if it is signed with the same
+  certificate, so `ApkInstaller.verifySelfUpdate` compares the download's signer with the *running
+  app's* signer up front, for a readable error instead of `INSTALL_FAILED_UPDATE_INCOMPATIBLE`.
 
-**What can go wrong.**
+The check is deliberately **manual** — Settings → About → **Update Plezy Updater…** — and the last
+step is always the system installer's own confirmation.
+
+**What could go wrong (and how it is handled).**
 
 - **Replacing yourself while running.** The `PackageInstaller` session copies the APK before the
-  swap, so the running process may be killed mid-flight — the install must not depend on state held
-  only in memory, and the *delete after install* setting must not race the session's own copy.
-- **Strictly increasing `versionCode`.** `build.sh` already takes `VERSION_CODE` / `VERSION_NAME`
-  (`VERSION_CODE=3 VERSION_NAME=0.3.0 ./build.sh`); the release step must bump it every time.
-- **Chicken and egg.** The first self-updating build still has to arrive by `adb install -r` once.
-  That is fine — the user already does it — but it should be said in the release notes.
-- **Don't self-update mid-install.** If a Plezy install or downgrade is pending, wait: two
-  concurrent `PackageInstaller` sessions and a process restart is not worth reasoning about.
+  swap, so the running process may be killed mid-flight. The downloaded APK is left in the cache on
+  purpose so the session's copy never races a delete, and the result is worded by
+  `InstallResultReceiver`'s `self_update` branch (best-effort, since the swap may kill the process).
+- **Strictly increasing `versionCode`.** `build.sh` takes `VERSION_CODE` / `VERSION_NAME`
+  (`VERSION_CODE=4 VERSION_NAME=0.4.0 ./build.sh`); the release step bumps it every time, and
+  `verifySelfUpdate` refuses anything not strictly newer.
+- **Chicken and egg.** The first self-updating build still arrives by `adb install -r` once; the
+  `v0.3.0` release notes say so.
+- **Don't self-update mid-install.** Self-update is manual and lives on the Settings screen, away
+  from the install flow, so two concurrent `PackageInstaller` sessions are not a normal path.
 
-**Verify on the stick.** Build `0.3.0` (`versionCode 3`), publish the APK, trigger the check, click
-**INSTALLIEREN**, then `dumpsys package dev.rorar.plezyupdater` must show `versionCode 3` with
-`firstInstallTime` unchanged and `lastUpdateTime` moved — the same in-place-replace proof the
-`upgrade` flow uses for Plezy ([test/README](../test/README.md)).
+**Verified on the stick** (2026-11-17). Installed a code-2 build carrying the feature via
+`adb install -r`, published `v0.3.0` (code 3), then drove the row with the D-pad: the check found
+`v0.3.0`, downloaded `plezy-updater.apk`, verified it, and the stock installer showed an **update**
+dialog for Plezy Updater. After **INSTALLIEREN**:
+
+```
+versionCode=2 → 3        versionName=0.2.0 → 0.3.0
+firstInstallTime=2026-11-13 23:29:11   (unchanged — in-place replace)
+lastUpdateTime=2026-11-17 13:13:46 → 13:21:42
+```
+
+The relaunched build's About row reads `Plezy Updater 0.3.0 (build 3)`, and a second check reports
+`Up to date — 0.3.0 (build 3).`
 
 ## 2. Device detection (Fire TV vs Android TV vs phone)
 
@@ -172,8 +186,8 @@ actually changed.
 
 1. ~~**arm64 signer check** (item 4)~~ — **done** 2026-11-16; both 64-bit tarballs match the pinned
    signer. Only the on-device 64-bit install remains, and it needs hardware.
-2. **Self-update** (item 1) — the most-requested, and it makes every later change shippable without
-   `adb`.
+2. ~~**Self-update** (item 1)~~ — **done** 2026-11-17, `0.3.0`; verified in place on the stick. It
+   makes every later change shippable without `adb`.
 3. **Device detection + notification wording** (items 2–3, wording half) — small, and the part the
    user called out.
 4. **`targetSdk` bump** (item 5) — only if newer Android matters; the biggest single change.

@@ -1,8 +1,8 @@
 # 08 — The updater app, as built
 
-`app/` is the working updater: `dev.rorar.plezyupdater` **0.2.0** (`versionCode 2`),
+`app/` is the working updater: `dev.rorar.plezyupdater` **0.3.0** (`versionCode 3`),
 minSdk/targetSdk **25**, plain Java, programmatic UI, **no Gradle and no AndroidX**. It was verified
-end-to-end on the stick (AFTMM, Fire OS 6.7.1.1 / API 25) on 2026-11-13/16.
+end-to-end on the stick (AFTMM, Fire OS 6.7.1.1 / API 25) on 2026-11-13/17.
 
 ## What it does
 
@@ -151,6 +151,36 @@ first install.
 `InstallResultReceiver` now always sends the in-app `INSTALL_FINISHED` broadcast (package-scoped),
 carrying the raw `EXTRA_STATUS`, and only starts the background `UpdateCheckService` when no screen
 is up. That is what lets the picker — not just `MainActivity` — word the outcome and refresh.
+
+## Self-update (the updater)
+
+The one thing that used to need `adb` was replacing the updater itself. **`SelfUpdate`** points the
+same download/verify/install pipeline at the updater's own GitHub release
+(`rorar/plezy-firetv-updater`), so a new build can arrive over the air like everything else.
+
+- **The source is the unmetered redirect.** `PlezyRepo.latestTagFor(context, ownerRepo)` reads the
+  tag from `github.com/<repo>/releases/latest` (a 301/302 to `/releases/tag/<tag>`), so the check
+  costs **no API quota** — the same trick the Plezy check uses. The APK is the plain
+  `plezy-updater.apk` asset; no tarball, no extraction.
+- **Two checks against the running app.** `SelfUpdate.check` compares the release tag with the
+  running `versionName` (`PlezyRepo.compareVersions`) and does nothing when it is not newer.
+  `ApkInstaller.verifySelfUpdate` then re-checks the **downloaded** build: right package, a
+  `versionCode` **strictly greater** than the installed one, and — the check that actually matters —
+  the **same signing certificate as the running app** (`MessageDigest.isEqual` of the two signer
+  digests). A tampered or wrongly-signed APK is refused with a readable message instead of letting
+  the platform raise `INSTALL_FAILED_UPDATE_INCOMPATIBLE`.
+- **The result is worded for the updater.** `ApkInstaller.install(..., selfUpdate=true)` puts an
+  extra on the session's result intent; `InstallResultReceiver`'s `self_update` branch then skips the
+  Plezy re-check and the "Open Plezy?" prompt, cleans up the cached APK, and toasts
+  `Plezy Updater <version> installed`. The swap can kill the process, so that toast is best-effort.
+- **Manual, and last.** The entry point is **Settings → About → "Update Plezy Updater…"**; the last
+  step is the stock installer's own confirmation. It is deliberately not automatic — replacing the
+  running app is not something to do behind the user's back — and the row releases its busy state in
+  `onResume` if the user cancels at the installer.
+
+The **first** self-updating build still has to arrive by `adb install -r` once; the `v0.3.0` release
+notes say so. See the [roadmap](11-roadmap.md#1-self-update-of-the-updater) for the on-device proof
+(`versionCode` 2 → 3, `firstInstallTime` unchanged, `lastUpdateTime` moved).
 
 ## The "Open Plezy?" prompt (A1)
 
