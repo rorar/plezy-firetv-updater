@@ -1,6 +1,6 @@
 # 08 — The updater app, as built
 
-`app/` is the working updater: `dev.rorar.plezyupdater` **0.3.0** (`versionCode 3`),
+`app/` is the working updater: `dev.rorar.plezyupdater` **0.4.0** (`versionCode 4`),
 minSdk/targetSdk **25**, plain Java, programmatic UI, **no Gradle and no AndroidX**. It was verified
 end-to-end on the stick (AFTMM, Fire OS 6.7.1.1 / API 25) on 2026-11-13/17.
 
@@ -256,7 +256,7 @@ and report identically; the row also renders the **last stored** values without 
 ```bash
 adb shell am broadcast --include-stopped-packages \
     -a dev.rorar.plezyupdater.action.DIAGNOSTICS
-# Broadcast completed: result=-1, data="status=ok;remaining=59;limit=60;reset_ms=…;checked_ms=…"
+# Broadcast completed: result=-1, data="status=ok;remaining=59;limit=60;reset_ms=…;checked_ms=…;device=fire_tv;tv=1;touch=0"
 ```
 
 `DiagnosticsReceiver` is **exported** (so a shell broadcast reaches it) but guarded by
@@ -264,14 +264,21 @@ adb shell am broadcast --include-stopped-packages \
 the ordered-broadcast **result data** — `setResultCode(-1)` + `setResultData(report)`, printed by
 `am broadcast` as `data="…"` — because that is the one channel a script can read without `run-as`.
 The report is a **quote-free, space-free** `key=value;…` string (`status=ok;remaining=…;limit=…;
-reset_ms=…;checked_ms=…`, or `status=error;code=…` on failure) so it survives that channel intact,
-and the same report is written to **`quota.txt`** in the app's external cache dir
-(`getExternalCacheDir()`) as a second, permission-free way in. The check is a network call, so it
+reset_ms=…;checked_ms=…;device=…;tv=…;touch=…`, or `status=error;code=…` on failure) so it survives
+that channel intact, and the same report is written to **`quota.txt`** in the app's external cache
+dir (`getExternalCacheDir()`) as a second, permission-free way in. The check is a network call, so it
 runs off the main thread through `goAsync()`; `finish()` always runs, even on failure, or the
 broadcast would hang until the system times it out.
 
-The flow harness uses exactly this path: `run.py` fires the broadcast before the flows and prints
-the result ([test/README](../test/README.md)).
+The trailing `device=…;tv=…;touch=…` is `Device.report()` — the [device
+classification](#device-detection-fire-tv--android-tv--touch) riding along on the check that was
+already happening, because it is otherwise invisible from the outside. It is read on the main thread
+(cheap) so both the success and the failure branch carry it, and it is appended to the string
+*before* it is written to `quota.txt`, so the two channels cannot drift apart.
+
+The flow harness uses exactly this path: `run.py` fires the broadcast before the flows, prints the
+quota, and **asserts** the device fields against `test/config.json`'s `expected_device`
+([test/README](../test/README.md)). A missing report or a mismatched value fails the run.
 
 ## Settings
 
@@ -407,6 +414,80 @@ instead of the old ARM-only wording.
 > exercises the 64-bit branch — and the `err_no_native_libs` branch stays logic-only. The
 > `armeabi-v7a` path is exercised on every install and flow run.
 
+## Device detection (Fire TV / Android TV / touch)
+
+The app used to assume "a TV with a D-pad" everywhere. It now answers *what am I running on?* in one
+place, so a caller can adapt instead of re-deriving it from a pile of feature flags.
+
+Two classes, split so the decision can be tested without a device:
+
+- **`DeviceKind`** — the decision, as a pure enum (`FIRE_TV`, `ANDROID_TV`, `TOUCH`, `OTHER`) with
+  **no `android.*` import at all**. It takes a plain `Signals` bundle and returns one value, so
+  `test/jvm/DeviceKindTest.java` can exercise every branch on the JVM
+  ([JVM tests](#jvm-tests-devicekind)).
+- **`Device`** — the Android side. Reads `Build.MANUFACTURER` / `MODEL`, three `PackageManager`
+  features, the `Configuration` and `UiModeManager` once, hands them to `DeviceKind.classify`, and
+  exposes `kind()`, `isFireTv()`, `isAndroidTv()`, `isTv()`, `isTouch()`, `report()`.
+
+The signals are a **ladder with a fixed precedence — Fire TV > Android TV > touch > other** — not
+independent flags, so a device that reports several signals (an Android TV with a touchscreen) is
+still exactly one kind, with the more specific one winning:
+
+| Signal | Fire TV stick here | Fire tablet | Android TV box | Phone |
+|---|---|---|---|---|
+| `MANUFACTURER` / `MODEL` | `Amazon` / `AFTMM` | `Amazon` / `KFTRWI` | `Google` / `sabrina` | `samsung` / `SM-…` |
+| `amazon.hardware.fire_tv` | ✔ | ✘ | ✘ | ✘ |
+| `android.software.leanback` | ✔ | ✘ | ✔ | ✘ |
+| `android.hardware.type.television` | ✔ | ✘ | ✔ | ✘ |
+| `UiModeManager` = `TELEVISION` | ✔ | ✘ | ✔ | ✘ |
+| `Configuration.touchscreen` = `FINGER` | ✘ | ✔ | ✘ | ✔ |
+| → `DeviceKind` | **`FIRE_TV`** | `TOUCH` | `ANDROID_TV` | `TOUCH` |
+
+Three decisions in there are worth stating, because each was a wrong answer first:
+
+- **`isTouch()` is the touchscreen *resource qualifier*, not the `android.hardware.touchscreen`
+  feature flag.** It is literally `Configuration.touchscreen == TOUCHSCREEN_FINGER` — the same field
+  Android matches `res/values-finger/` on ([Device-aware wording](#device-aware-wording)).
+  The feature flag is tempting (it is *absent* on this stick, so it "works") but it is true on
+  devices where the resource system would not pick `-finger`, which is exactly the drift this
+  avoids. Two answers, one signal.
+- **`UI_MODE_TYPE_TELEVISION` is checked as well as the two features.** Some AOSP boxes carry
+  neither `leanback` nor `type.television` but do set the TV UI mode; without it they fall to
+  `OTHER`.
+- **The `AFT…` model prefix is the fallback for Fire TV, and it is null-guarded.** It catches a box
+  that does not advertise `amazon.hardware.fire_tv`. A Fire **tablet** is also Amazon but a `KF…`
+  model, so it correctly lands on `TOUCH` rather than `FIRE_TV`.
+
+Nothing is cached: the signals are three feature lookups, one system-service call and one config
+read, and a cache would have to be invalidated on a configuration change.
+
+**The first caller is the diagnostics report** — `device=fire_tv;tv=1;touch=0` rides along on the
+A3 broadcast ([Diagnostics](#diagnostics-and-the-remote-quota-check-a3)), because the classification
+is otherwise invisible from outside the app. That is also what the flow harness asserts, so a
+regression here fails a run rather than going unnoticed:
+
+```
+data="status=ok;remaining=53;limit=60;reset_ms=…;checked_ms=…;device=fire_tv;tv=1;touch=0"
+```
+
+**What it unlocks.** The notification wording (below), a touch-friendly layout factor, and possibly
+a different default interval (a phone is on more often than a TV). The layout half is
+[roadmap item 3](11-roadmap.md#3-android-tv--phone-compatibility) and is not done.
+
+### JVM tests (`DeviceKind`)
+
+Because `DeviceKind` touches no Android API, it is compiled against the plain JDK and tested
+directly — 25 cases covering the Fire TV / Android TV / touch / other branches, the precedence
+between them, null safety and the report slugs:
+
+```bash
+test/jvm/run.sh     # javac DeviceKind.java + DeviceKindTest.java, then java … DeviceKindTest
+```
+
+That is the point of the split: the Android TV and phone branches **cannot be produced on this
+stick**, so without this they would be untested logic. `Device` only reads the platform; the
+decision is tested. Exit code is 0/1, so it can be a CI step.
+
 ## Language
 
 The app follows the Fire TV's language by default and can be overridden per app. The choice lives
@@ -457,6 +538,46 @@ with `-R`:
 `-R` marks the archive as an *overlay*, and aapt2 then rejects `values-de|fr|es` with
 *"resource … does not override an existing resource"* — it expects an overlay to replace, not a
 locale variant to merge. Positionally, the per-locale configs merge with `values/` as intended.
+
+### Device-aware wording
+
+Two strings were TV-only and are now picked by the device — **without a line of Java**, because the
+touchscreen is a resource qualifier:
+
+| String | `values/` (no touch) | `values-finger/` (touch) |
+|---|---|---|
+| `notif_available_text` | `Press OK to open` | `Tap to open` |
+| `set_test_notification_msg` | `Test notification — press OK to open` | `Test notification — tap to open` |
+| `picker_hint` | `…press OK to install the highlighted version.` | `…tap to install the highlighted version.` |
+
+Android picks `values-finger/` when `Configuration.touchscreen == TOUCHSCREEN_FINGER`, which is the
+*same* field `Device.isTouch()` reads — so the wording and the detection cannot disagree. Per-locale
+variants repeat the locale (`values-de-finger/`, `values-fr-finger/`, `values-es-finger/`), because
+the locale qualifier outranks the touchscreen one; each is a pure **delta** over its locale file.
+
+Three strings named the device where a generic word reads fine everywhere, so they were reworded
+rather than duplicated four ways: `set_notification_desc` ("Fire TV notification center" →
+"notification area"), `err_not_enough_space` ("on the Fire TV" → "on the device") and
+`set_delete_desc` ("save space on the stick" → "save space"; the other locales never had the noun).
+The notification text also said *"Press OK to **install**"* — but the notification **opens the
+updater**, it does not install — so it now says *"Press OK to **open**"*.
+
+Strings that describe *behaviour* rather than input — "runs while the TV is on", "after the TV
+boots", "confirm the install on the TV" — are deliberately left TV-first: the **layout** is still
+TV-first ([roadmap item 3](11-roadmap.md#3-android-tv--phone-compatibility)), and rewording those for
+a phone whose screens are still 48 dp of padding would be the dishonest half of the job.
+
+`test/check_strings.py` guards all of it, with no device:
+
+```bash
+python3 test/check_strings.py
+```
+
+It fails when a locale is missing a key that `values/` has (bar the handful that are deliberately
+identical in every language), when a `-finger` file *invents* a key instead of overriding one, when
+a translation drops or renumbers a `%1$s` placeholder, or when the `test/strings/app.<lang>.json`
+harness labels disagree on their keys. It also runs as the pre-flight step of `test/run.py`, before
+any adb traffic.
 
 ## Changelog
 
@@ -623,7 +744,12 @@ python3 test/run.py install --app-lang de       # against a German build
 ```
 
 `all` runs them in that order and ends back on "latest installed". Every run also fires the
-diagnostics broadcast first, so the quota check (A3) is exercised on each invocation.
+diagnostics broadcast first, so the quota check (A3) is exercised on each invocation — and its
+report is now **asserted** for the device classification
+([Device detection](#device-detection-fire-tv--android-tv--touch)). A **static string-parity check**
+(`test/check_strings.py`) runs before any adb traffic, so a locale that drifted from `values/` cannot
+make a flow look for a label that is gone. Both are device-free; the `DeviceKind` decision has its
+own JVM tests ([above](#jvm-tests-devicekind)).
 
 **No label is hard-coded.** The app's own strings come from `test/strings/app.<lang>.json` (selected
 with `--app-lang`) and the stock installer/uninstaller strings from `test/strings/system.<lang>.json`
@@ -735,13 +861,33 @@ Round-1 features (A1–A7, B2), same stick (2026-11-16), updater `0.2.0` / `vers
 | `upgrade` flow (A2) | `python3 test/run.py all --yes` → **5/5 PASS**; `upgrade` proved an in-place replace (`firstInstallTime 2026-11-16 12:32:49` unchanged, `lastUpdateTime 12:32:49 → 12:33:28`) |
 | All four languages | English `all` **5/5**, German `all` **5/5**, French `install` **1/1**, Spanish `install` **1/1** |
 
+Device detection + device-aware wording, same stick (2026-11-17), updater `0.4.0` / `versionCode 4`
+(the release APK, `sha256 10c334d1…`):
+
+| Step | Result |
+|---|---|
+| English `all` (final APK) | **5/5 PASS** — install 52s, downgrade 69s, upgrade 32s, uninstall 72s, clean-install 44s |
+| In-place upgrade | `firstInstallTime 2026-11-17 14:00:47` **unchanged**, `lastUpdateTime 14:01:27` moved — the 2.25.0 → 2.26.0 replace did not reinstall |
+| Device report over the broadcast | `data="status=ok;remaining=51;limit=60;reset_ms=…;checked_ms=…;device=fire_tv;tv=1;touch=0"`; `quota.txt` carries the identical suffix |
+| Device assertion in the harness | `✓ device: fire_tv (tv=1, touch=0)`; a missing report or a mismatch now **fails** the run (`config.json` → `expected_device`) |
+| String parity | `test/check_strings.py` → `values/: 181   values-de/fr/es: 175   +finger: 3 keys per locale`; also the `run.py` pre-flight |
+| `DeviceKind` JVM tests | `test/jvm/run.sh` → 25/25 pass (Fire TV / Android TV / touch / other, the precedence, null safety, the slugs) |
+| Resource variants packaged | `aapt2 dump resources` lists `(finger)` / `(de-finger)` / `(fr-finger)` / `(es-finger)` for `notif_available_text`, `set_test_notification_msg`, `picker_hint`; the stick itself resolves `values/` (`am get-config` → `touchscreen=notouch`) |
+| German / French / Spanish smokes | `install --app-lang de|fr|es` → **1/1 each** (51/52/54s), then English restored — 1/1 |
+| German TV notification wording | posted the test notification from Settings → **Benachrichtigung testen**; `dumpsys notification --noredact` → `android.text=String (Test-Benachrichtigung — OK zum Öffnen drücken)` — the corrected *open*, not *install*, on the stick |
+
 ## Known limitations
 
 - One remote confirmation per install (silent install is impossible; [06](06-own-updater-feasibility.md)).
 - A downgrade costs two confirmations and **erases Plezy's data**; the app warns before starting
   ([Downgrade](#downgrade)).
-- Self-update is not implemented yet: a new updater build is installed with `adb install -r`. This
-  is the first item on the [roadmap](11-roadmap.md).
+- **Device detection and the touch wording are logic-verified, not hardware-verified, beyond
+  `FIRE_TV`.** This stick only produces the `FIRE_TV` / no-touch case; the Android TV, touch and
+  `values-finger` branches are covered by `test/jvm/run.sh` (25 cases) and `test/check_strings.py`,
+  never against a real Android TV or phone. The **touch layout** is not adapted at all — the app is
+  TV-first (32–48 dp padding, ≥ 50 dp rows, D-pad focus, two-pane pickers that move left/right) — so
+  a phone would get TV-sized UI. See
+  [roadmap item 3](11-roadmap.md#3-android-tv--phone-compatibility).
 - The `arm64-v8a` / `x86_64` **installs** are unverified on hardware (this stick is 32-bit): both
   tarballs' signer hashes match the pinned value off-device and they carry the expected native libs,
   but only a 64-bit device can exercise the branch end to end. The `err_no_native_libs` branch stays

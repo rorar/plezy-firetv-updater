@@ -144,11 +144,24 @@ python3 -u test/run.py install --app-lang de
 Run it from `test/` if you want to import `harness` / `flows` in an ad-hoc snippet. It drives
 Settings → Language, dismisses the "Open Plezy?" prompt, clicks `INSTALLIEREN`, and proves the
 upgrade was an in-place replace (`firstInstallTime` unchanged, `lastUpdateTime` moved). Every run
-also fires the quota diagnostics broadcast. Details in [`test/README.md`](test/README.md).
+also fires the quota diagnostics broadcast and **asserts** the `device=…;tv=…;touch=…` fields it now
+carries against `test/config.json`'s `expected_device` (`fire_tv` / `1` / `0` on this stick); a
+missing report fails the run. Details in [`test/README.md`](test/README.md).
+
+Two checks need **no device** and are worth running after any string or device-logic change:
+
+```bash
+python3 test/check_strings.py    # locale/-finger/placeholder parity (also a run.py pre-flight)
+test/jvm/run.sh                  # DeviceKind tests on the plain JVM (25 cases)
+```
+
+`DeviceKind` has no `android.*` import on purpose, so `test/jvm/run.sh` can cover the Android TV and
+touch branches this stick cannot produce. Keep it that way: decision logic that touches no platform
+API belongs in `DeviceKind`, not `Device`.
 
 To trigger a quota check by hand:
 
 ```bash
 adb shell am broadcast --include-stopped-packages -a dev.rorar.plezyupdater.action.DIAGNOSTICS
-# → Broadcast completed: result=-1, data="status=ok;remaining=…;limit=60;reset_ms=…;checked_ms=…"
+# → Broadcast completed: result=-1, data="status=ok;remaining=…;limit=60;reset_ms=…;checked_ms=…;device=fire_tv;tv=1;touch=0"
 ```

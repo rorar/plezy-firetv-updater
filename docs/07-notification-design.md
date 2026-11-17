@@ -64,7 +64,7 @@ BOOT_COMPLETED re-arm                  ──┤
                      versionName newer than installed?
                                          │ yes
                                          ▼
-                  Notification "Plezy 2.27.0 available — press OK to install"
+                  Notification "Plezy 2.27.0 available — press OK to open"
                   legacy Notification builder (API 25 has no channels)
                   contentIntent → UpdaterActivity        ← verified to work
                                          │
@@ -88,7 +88,10 @@ every 12 hours just to say that something is available.
 - **No `POST_NOTIFICATIONS` runtime permission.** Introduced in API 33.
 - **Content intent is the whole UX.** Verified: selecting the card and pressing OK opens the
   target activity directly. It must land on "Install 2.27.0", not on a generic home screen.
-- **Keep the text short.** Title `Plezy 2.27.0 available`, text `Press OK to install`.
+- **Keep the text short.** Title `Plezy 2.27.0 available`, text `Press OK to open` (the
+  notification *opens* the updater; it does not install). The wording is device-aware: on a touch
+  device Android picks `res/values-finger/` and it reads `Tap to open`
+  ([08](08-app-implementation.md#device-aware-wording)).
 - **Don't auto-cancel** (unlike the probe), so the entry survives an accidental dismissal.
 - **Failure must not spam.** Back off after N consecutive network failures instead of posting an
   error notification every 12 h.

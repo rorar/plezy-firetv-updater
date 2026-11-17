@@ -1,6 +1,7 @@
 # 11 — Roadmap
 
-Where the updater goes after Round 1 (the A1–A7 + B2 set, updater `0.2.0`). Each item says what it
+Where the updater goes after Round 1 (the A1–A7 + B2 set, updater `0.2.0`; self-update in `0.3.0`;
+device detection and device-aware wording in `0.4.0`). Each item says what it
 is, what it would take, what can go wrong, and **how it would be verified on the stick** — including
 the honest cases where this hardware cannot verify it. Order is a suggestion, not a commitment.
 
@@ -63,9 +64,13 @@ The relaunched build's About row reads `Plezy Updater 0.3.0 (build 3)`, and a se
 
 ## 2. Device detection (Fire TV vs Android TV vs phone)
 
-Today the app assumes "a TV with a D-pad". That assumption leaks into the notification wording
-("press OK on the remote") and into the check cadence. A small `Device` helper would answer the
-question once and let each caller adapt.
+**Done** (2026-11-17, updater `0.4.0`). See
+[08 — Device detection](08-app-implementation.md#device-detection-fire-tv--android-tv--touch).
+
+Two classes, split so the decision is testable without hardware: **`DeviceKind`** is the decision as
+a pure enum with **no `android.*` import at all** (it takes a plain `Signals` bundle), and
+**`Device`** is the thin Android wrapper that reads the signals once and hands them over. One value,
+fixed precedence **Fire TV > Android TV > touch > other**.
 
 **Signals measured on this stick** (2026-11-16):
 
@@ -78,30 +83,79 @@ question once and let each caller adapt.
 | `hasSystemFeature("android.hardware.type.television")` | true |
 | `hasSystemFeature("amazon.hardware.fire_tv")` | true |
 | `hasSystemFeature("android.hardware.touchscreen")` | **absent** |
+| `Configuration.touchscreen` (`am get-config`) | `notouch` |
 
-So a workable ladder:
+The ladder, as built — three corrections to the sketch this section first carried:
 
 ```
-isFireTv()    = MANUFACTURER == "Amazon" && MODEL starts with "AFT"
-                (or hasSystemFeature("amazon.hardware.fire_tv"))
+isFireTv()    = MANUFACTURER == "Amazon" && MODEL starts with "AFT"    (null-guarded)
+                || hasSystemFeature("amazon.hardware.fire_tv")
 isAndroidTv() = hasSystemFeature("android.software.leanback")
                 || hasSystemFeature("android.hardware.type.television")
-isTv()        = isFireTv() || isAndroidTv()
-isTouch()     = hasSystemFeature("android.hardware.touchscreen")
+                || UiModeManager.getCurrentModeType() == UI_MODE_TYPE_TELEVISION
+isTv()        = kind is FIRE_TV or ANDROID_TV
+isTouch()     = Configuration.touchscreen == TOUCHSCREEN_FINGER       ← NOT the feature flag
 ```
 
+- **`isTouch` is the touchscreen *resource qualifier*, not `android.hardware.touchscreen`.** It is
+  the same field Android matches `res/values-finger/` on, so the wording (item 3) and the detection
+  share one signal. The feature flag is tempting — it is absent on this stick, so it "works" — but it
+  is true on devices where the resource system would not pick `-finger`, which is the drift this
+  avoids.
+- **`UI_MODE_TYPE_TELEVISION` is checked too**, for AOSP boxes that carry neither TV feature.
+- **A Fire tablet (`KF…`, touch) classifies `TOUCH`, not `FIRE_TV`** — Amazon, but not a TV.
+
 The manifest already declares `android.software.leanback` and `android.hardware.touchscreen` as
-`required="false"`, so the same APK installs on all three. `Device` is a pure function of the
-`PackageManager` and `Build`, so it is testable by feeding it a fake feature set.
+`required="false"`, so the same APK installs on all three.
 
 **What it unlocks:** the notification wording (item 3), a touch-friendly layout factor, and possibly
 a different default interval (a phone is on more often than a TV).
 
-**Verify on the stick.** `Device.isFireTv()` must be true and `isTouch()` false — both readable from
-`pm list features` / `getprop` exactly as in the table above. The Android TV and phone branches
-cannot be verified here; they need an emulator or another device (item 3).
+**Verified on the stick.** The classification rides along on the A3 diagnostics broadcast as
+`device=…;tv=…;touch=…`, and the flow harness asserts it against `config.json`:
+
+```
+data="status=ok;remaining=53;limit=60;reset_ms=…;checked_ms=…;device=fire_tv;tv=1;touch=0"
+```
+
+The Android TV and phone branches cannot be produced on this stick, so they are covered by
+`test/jvm/run.sh` — 25 cases against `DeviceKind` on the plain JVM, including the precedence between
+the branches and null safety. They stay *logic*-verified, not hardware-verified (item 3).
 
 ## 3. Android TV / phone compatibility
+
+**Wording: done** (2026-11-17, `0.4.0`). **Layout: not started** — and the layout is the one thing
+that cannot be verified on this stick.
+
+### Device-aware wording — done
+
+The app used to ship one TV-flavoured sentence. It now picks it by device **without a line of Java**,
+using Android's own touchscreen resource qualifier: `values-finger/` (and `values-de|fr|es-finger/`)
+override three strings — `notif_available_text`, `set_test_notification_msg`, `picker_hint` — with
+"tap" instead of "press OK". Because the qualifier *is* `Configuration.touchscreen ==
+TOUCHSCREEN_FINGER`, the same field `Device.isTouch()` reads (item 2), the wording and the detection
+cannot disagree. Two strings that named the device where the generic word reads fine everywhere were
+reworded instead of duplicated four ways (`set_notification_desc` "Fire TV notification center" →
+"notification area"; `err_not_enough_space` "on the Fire TV" → "on the device"; `set_delete_desc`
+"save space on the stick" → "save space"). Strings that describe *behaviour* — "runs while the TV is
+on", "after the TV boots" — stay TV-first, because the layout still is. See
+[08 — Device-aware wording](08-app-implementation.md#device-aware-wording).
+
+The sketch this section first carried invented three notification rows; there is really only **one**
+notification (the update-available one), and its text said *install* although it **opens** the
+updater:
+
+| | TV (`values/`) | Touch (`values-finger/`) |
+|---|---|---|
+| Update available | `Plezy 2.27.0 available` · `Press OK to open` | `Plezy 2.27.0 available` · `Tap to open` |
+| Test notification | `Test notification — press OK to open` | `Test notification — tap to open` |
+| Picker hint | `…press OK to install the highlighted version.` | `…tap to install the highlighted version.` |
+
+`test/check_strings.py` keeps the four `-finger` files honest: they may only *override* keys that
+exist in the matching base file, placeholders must survive translation, and no locale may fall behind
+`values/`. It runs as the pre-flight step of `test/run.py`, so a wording drift fails a run.
+
+### Layout — not started
 
 The UI is TV-first by design: 32–48 dp screen padding, 17 sp body text, ≥ 50 dp rows, and a focus
 model built for a D-pad ([10](10-tv-ui-design.md)). On a phone that reads as oversized, and the
@@ -119,21 +173,12 @@ left/right.
 - **Keep the D-pad path intact.** The focus model must not regress on the TV; the touch behaviour is
   additive.
 
-**Notification wording, device-aware.** `Notifier` picks the string by device instead of shipping
-one TV-flavoured sentence:
-
-| | TV | Phone |
-|---|---|---|
-| Update available | "Plezy 2.27.0 available — press OK to install" | "Plezy 2.27.0 available — tap to install" |
-| Installed | "Plezy updated to 2.27.0" | same |
-| Not installed | "Plezy is not installed — press OK to install" | "… — tap to install" |
-
-This is the part the user specifically called out; it is small and it depends only on item 2.
-
-**Verify.** No Android TV or phone is available, so this is the item that **cannot be verified on
-this hardware**. Options, in order of cost: an API 25 TV emulator (verifies the leanback branch and
-the touch absence), then any real Android TV / phone (verifies the touch layout). Until then it
-stays a documented, unverified branch — the same honesty the B2 note uses.
+**Verify.** No Android TV or phone is available, so the layout half **cannot be verified on this
+hardware** — and the wording half, although statically checked and tied to the JVM-tested
+`Device.isTouch()`, has never been seen on a real touch device either. Options, in order of cost: an
+API 25 TV emulator (verifies the leanback branch and the touch absence), then any real Android TV /
+phone (verifies the touch layout). Until then it stays a documented, unverified branch — the same
+honesty the B2 note uses.
 
 ## 4. 64-bit / `arm64-v8a`
 
@@ -188,8 +233,10 @@ actually changed.
    signer. Only the on-device 64-bit install remains, and it needs hardware.
 2. ~~**Self-update** (item 1)~~ — **done** 2026-11-17, `0.3.0`; verified in place on the stick. It
    makes every later change shippable without `adb`.
-3. **Device detection + notification wording** (items 2–3, wording half) — small, and the part the
-   user called out.
+3. ~~**Device detection + notification wording** (items 2–3, wording half)~~ — **done** 2026-11-17,
+   `0.4.0`; the classification is asserted over the diagnostics broadcast and the wording rides the
+   `-finger` qualifier, so no Java decides it. The branches this stick cannot produce are covered by
+   `test/jvm/run.sh`.
 4. **`targetSdk` bump** (item 5) — only if newer Android matters; the biggest single change.
 5. **Touch UI** (item 3, layout half) — last, because it is the one that cannot be verified here.
 
@@ -200,5 +247,13 @@ actually changed.
 - **One build, one key.** The APK stays ABI-free, and everything is signed with the same key, so any
   build can replace any other ([Build and install](08-app-implementation.md#build-and-install)).
 - **Say what was not verified.** The arm64/x86_64 *signers* are now checked off-device, but their
-  *installs* and the `err_no_native_libs` path stay unverified on this 32-bit stick; device detection
-  and touch support would join that list until a second device exists.
+  *installs* and the `err_no_native_libs` path stay unverified on this 32-bit stick; the Android TV
+  and touch branches of device detection and the `-finger` wording are **logic**-verified (JVM tests,
+  string-parity check) but never seen on a real Android TV or phone, and the touch *layout* is not
+  done at all. They join the list until a second device exists.
+- **Testable decisions live outside `android.*`.** `DeviceKind` takes a plain `Signals` bundle and has
+  no platform import, which is what lets `test/jvm/run.sh` cover the branches this stick cannot
+  produce. Keep new decision logic on that side of the line.
+- **One signal, one place.** The touch wording and `Device.isTouch()` both read
+  `Configuration.touchscreen`; do not let a second, "close enough" signal (like the
+  `android.hardware.touchscreen` feature flag) creep in beside it.

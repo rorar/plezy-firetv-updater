@@ -66,7 +66,7 @@
     <string name="set_interval_now">Now %1$s.</string>
     <string name="set_interval_runs">Runs %1$s and after the TV boots.</string>
     <string name="set_delete_label">Delete APK after installing</string>
-    <string name="set_delete_desc">Remove the downloaded file once Plezy is installed, to save space on the stick.</string>
+    <string name="set_delete_desc">Remove the downloaded file once Plezy is installed, to save space.</string>
     <string name="set_allow_older_label">Allow older versions</string>
     <string name="set_allow_older_desc">Developer option: pick any release, not only newer ones.</string>
     <string name="set_uninstall_label">Uninstall Plezy…</string>

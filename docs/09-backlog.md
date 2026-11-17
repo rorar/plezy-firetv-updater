@@ -7,13 +7,32 @@ parking lot. Status is checked against the code in `app/`.
 
 The forward-looking items now live in the [roadmap](11-roadmap.md), so this stays a short pointer:
 
-- **Device detection** (Fire TV vs Android TV vs phone) with the notification wording adapted.
-- **Android TV / phone compatibility** (the layout is TV-first today).
+- **Android TV / phone compatibility — the layout half.** The wording half landed in `0.4.0`
+  ([roadmap item 3](11-roadmap.md#3-android-tv--phone-compatibility)); the TV-first sizing and the
+  two-pane pickers still assume a D-pad, and no touch device is available to verify them on.
 - **`targetSdk` bump matrix** (25 → 26 → 28 → … ) and what each step breaks.
 
 Nothing here is a commitment; the roadmap explains the order and the reasoning.
 
 ## Already implemented
+
+- **Device detection (roadmap item 2).** Landed 2026-11-17 (`0.4.0`): `DeviceKind` (the decision, a
+  pure enum with no `android.*` import) and `Device` (the Android wrapper) answer *what is this
+  running on?* once, with the precedence Fire TV > Android TV > touch > other. `isTouch()` is the
+  touchscreen *resource qualifier*, not the `android.hardware.touchscreen` feature flag. The result
+  rides along on the A3 diagnostics broadcast (`device=fire_tv;tv=1;touch=0`) and the flow harness
+  asserts it; the branches this stick cannot produce are covered by `test/jvm/run.sh` (25 cases). See
+  [11 § 2](11-roadmap.md#2-device-detection-fire-tv-vs-android-tv-vs-phone) and
+  [08](08-app-implementation.md#device-detection-fire-tv--android-tv--touch).
+
+- **Device-aware wording (roadmap item 3, wording half).** Landed 2026-11-17 (`0.4.0`): Android's own
+  touchscreen resource qualifier picks the sentence — `res/values-finger/` and its per-locale siblings
+  override `notif_available_text`, `set_test_notification_msg` and `picker_hint` with "tap" instead of
+  "press OK", so no Java decides it and the wording cannot disagree with `Device.isTouch()`. The
+  notification text was corrected from "install" to "open" (it opens the updater), and three strings
+  that named the device were reworded. `test/check_strings.py` keeps the locale files in parity. See
+  [11 § 3](11-roadmap.md#3-android-tv--phone-compatibility) and
+  [08](08-app-implementation.md#device-aware-wording).
 
 - **Self-update of the updater (roadmap item 1).** Landed 2026-11-17 (`0.3.0`): **Settings → About →
   "Update Plezy Updater…"** checks this repo's own GitHub releases and installs a newer
@@ -59,7 +78,8 @@ Nothing here is a commitment; the roadmap explains the order and the reasoning.
   `attachBaseContext`; `""` means "follow the system". The picker lists **System default** plus each
   language by its own name with a bundled flag (no network — the flags ship in the APK). Units are
   `<plurals>`, and even the low-level download/verify errors are localised. See
-  [08](08-app-implementation.md#language) and [10](10-tv-ui-design.md#language).
+  [08](08-app-implementation.md#language) and
+  [10](10-tv-ui-design.md#language--one-row-per-shipped-language).
 
 - **Staying under GitHub's 60-requests/hour API limit.** The updater no longer depends on the
   metered API: the latest check reads the unmetered `releases/latest` `302` and `releases.atom`,
@@ -162,3 +182,10 @@ Nothing here is a commitment; the roadmap explains the order and the reasoning.
   Settings alignment/globe/wording fixes, and the `upgrade` flow. All five flows pass in English and
   German; French and Spanish pass the non-destructive `install`. That left the backlog empty again —
   the four forward-looking items now live in the [roadmap](11-roadmap.md).
+- **Self-update** landed on 2026-11-17 (updater `0.3.0`): **Settings → About → "Update Plezy
+  Updater…"** checks this repo's own releases and installs a newer build in place, signer-checked.
+- **Device detection + device-aware wording** (roadmap items 2–3, wording half) landed on 2026-11-17
+  (updater `0.4.0`). The classification is asserted over the diagnostics broadcast and the wording
+  rides the `-finger` resource qualifier; the parts this stick cannot produce are covered by
+  `test/jvm/run.sh` and `test/check_strings.py`, both device-free. What is left is the touch
+  **layout** and the `targetSdk` bump.

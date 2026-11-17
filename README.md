@@ -66,15 +66,16 @@ Verified on **2026-11-13/17** with Plezy `2.26.0`, ADB `1.0.41` (platform-tools 
 | Launcher | 24 `LEANBACK_LAUNCHER` entries, app appears in the Fire TV home row |
 | APK used | `derFrisson/plezy-apks` `2.26.0` → `plezy-android-armeabi-v7a.apk` (90,748,577 bytes) |
 | Installed size | ~87 MB in `/data/app/com.edde746.plezy-1` |
-| Updater | `dev.rorar.plezyupdater` `0.3.0` (`versionCode 3`) — see [docs/08](docs/08-app-implementation.md) |
+| Updater | `dev.rorar.plezyupdater` `0.4.0` (`versionCode 4`) — see [docs/08](docs/08-app-implementation.md) |
 
 ## The updater app
 
-`app/` builds to a ~276 KB APK (the launcher icon, TV banner and the language flags at every density
+`app/` builds to a ~304 KB APK (the launcher icon, TV banner and the language flags at every density
 are the bulk of it; the code and vectors are small). It polls the upstream GitHub release on a
 user-set interval (default twice a day) and after boot, posts a notification when something newer
-exists, and installs it with one confirmation on the stock Fire OS installer screen. Settings are
-grouped into User / Advanced / Developer sections:
+exists, and installs it with one confirmation on the stock Fire OS installer screen. It detects what
+it is running on — Fire TV, another Android TV, or a touch device — and picks its wording to match
+("press OK" vs "tap"). Settings are grouped into User / Advanced / Developer sections:
 
 - **Toast notifications** and **Notifications** — each output can be turned off independently.
 - **Prompt to open Plezy** — on by default: after a successful install, offer to start Plezy.
