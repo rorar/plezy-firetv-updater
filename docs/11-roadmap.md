@@ -62,6 +62,11 @@ lastUpdateTime=2026-11-17 13:13:46 → 13:21:42
 The relaunched build's About row reads `Plezy Updater 0.3.0 (build 3)`, and a second check reports
 `Up to date — 0.3.0 (build 3).`
 
+**It then carried the next release too** (2026-11-17, `0.4.0`). The stick was reset to `v0.3.0`
+(an in-place downgrade of a release build is refused on API 25 — [Finding 2](08-app-implementation.md#finding-2--android-71-refuses-downgrades-of-release-builds)), then the same row brought it
+to `0.4.0`: `versionCode 3 → 4` with `firstInstallTime` unchanged and `lastUpdateTime` moved. So the
+`adb install -r` in the chicken-and-egg bullet is now genuinely a one-time step.
+
 ## 2. Device detection (Fire TV vs Android TV vs phone)
 
 **Done** (2026-11-17, updater `0.4.0`). See

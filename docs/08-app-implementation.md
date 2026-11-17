@@ -875,6 +875,7 @@ Device detection + device-aware wording, same stick (2026-11-17), updater `0.4.0
 | Resource variants packaged | `aapt2 dump resources` lists `(finger)` / `(de-finger)` / `(fr-finger)` / `(es-finger)` for `notif_available_text`, `set_test_notification_msg`, `picker_hint`; the stick itself resolves `values/` (`am get-config` → `touchscreen=notouch`) |
 | German / French / Spanish smokes | `install --app-lang de|fr|es` → **1/1 each** (51/52/54s), then English restored — 1/1 |
 | German TV notification wording | posted the test notification from Settings → **Benachrichtigung testen**; `dumpsys notification --noredact` → `android.text=String (Test-Benachrichtigung — OK zum Öffnen drücken)` — the corrected *open*, not *install*, on the stick |
+| Self-update `0.3.0` → `0.4.0` | the stick was reset to `v0.3.0` (API 25 refuses an in-place downgrade of a release build — [Finding 2](#finding-2--android-71-refuses-downgrades-of-release-builds)), then **Settings → About → "Plezy Updater aktualisieren…"** with the D-pad: the check found `0.4.0`, downloaded and verified it, and the stock installer showed an **update** dialog ("Bestehende Daten gehen nicht verloren"). After **INSTALLIEREN**: `versionCode 3 → 4`, `firstInstallTime 2026-11-17 14:15:33` **unchanged**, `lastUpdateTime 14:19:29`; the relaunched About row reads `Plezy Updater 0.4.0 (Build 4)` |
 
 ## Known limitations
 
