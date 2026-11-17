@@ -40,6 +40,8 @@ public class SettingsActivity extends Activity {
     private TextView languageSummary;
     private Button quotaButton;
     private TextView quotaSummary;
+    private Button selfUpdateButton;
+    private TextView selfUpdateSummary;
     private BroadcastReceiver packageRemovedReceiver;
 
     @Override
@@ -104,6 +106,7 @@ public class SettingsActivity extends Activity {
         content.addView(testNotification, buttonParams(12));
 
         addSection(getString(R.string.section_about));
+        addSelfUpdate();
         Button about = Ui.actionButton(this, getString(R.string.about_label));
         about.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -160,6 +163,12 @@ public class SettingsActivity extends Activity {
         refreshUninstallRow();
         refreshLanguageRow();
         refreshQuotaRow();
+        // A self-update flow that opened the installer and was then cancelled comes back here with
+        // the row still busy; release it so the check can be run again.
+        if (selfUpdateButton != null && !selfUpdateButton.isEnabled()) {
+            selfUpdateButton.setEnabled(true);
+            selfUpdateSummary.setText(getString(R.string.self_hint));
+        }
     }
 
     @Override
@@ -345,6 +354,86 @@ public class SettingsActivity extends Activity {
                 });
             }
         }, "quota-check").start();
+    }
+
+    /**
+     * The self-update row: check this project's own GitHub releases and install a newer build of the
+     * updater. Manual on purpose — replacing the running app is not something to do behind the
+     * user's back, and the last step is always the system installer's own confirmation.
+     */
+    private void addSelfUpdate() {
+        selfUpdateButton = Ui.actionButton(this, getString(R.string.self_label));
+        selfUpdateButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                runSelfUpdate();
+            }
+        });
+        content.addView(selfUpdateButton, buttonParams(8));
+
+        selfUpdateSummary = summary();
+        selfUpdateSummary.setText(getString(R.string.self_hint));
+        content.addView(selfUpdateSummary);
+    }
+
+    private void runSelfUpdate() {
+        if (selfUpdateButton == null || !selfUpdateButton.isEnabled()) {
+            return;
+        }
+        selfUpdateButton.setEnabled(false);
+        selfUpdateSummary.setText(getString(R.string.self_checking));
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                final Context c = SettingsActivity.this;
+                String text;
+                boolean busy = false;
+                try {
+                    SelfUpdate.Available available = SelfUpdate.check(c);
+                    if (available == null) {
+                        text = getString(R.string.self_up_to_date,
+                                SelfUpdate.installedVersionName(c),
+                                SelfUpdate.installedVersionCode(c));
+                    } else {
+                        // Download + verify + open the installer; the dialog takes over from here,
+                        // and the row stays disabled until onResume releases it.
+                        SelfUpdate.downloadAndInstall(c, available, new SelfUpdate.Progress() {
+                            @Override
+                            public void onText(final String progress) {
+                                runOnUiThread(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        if (!isFinishing()) {
+                                            selfUpdateSummary.setText(progress);
+                                        }
+                                    }
+                                });
+                            }
+                        });
+                        text = getString(R.string.progress_confirm);
+                        busy = true;
+                    }
+                } catch (Throwable t) {
+                    String m = t.getMessage();
+                    text = getString(R.string.self_failed,
+                            m == null ? t.getClass().getSimpleName() : m);
+                }
+                final String result = text;
+                final boolean stillBusy = busy;
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (isFinishing()) {
+                            return;
+                        }
+                        if (!stillBusy) {
+                            selfUpdateButton.setEnabled(true);
+                        }
+                        selfUpdateSummary.setText(result);
+                    }
+                });
+            }
+        }, "self-update").start();
     }
 
     private void addSection(String name) {

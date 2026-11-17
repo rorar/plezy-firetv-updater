@@ -165,6 +165,23 @@ public final class PlezyRepo {
                 core.getLong("reset") * 1000L);
     }
 
+    /**
+     * The newest release tag of any GitHub repo, via the unmetered {@code releases/latest} redirect
+     * (no API quota). Used for the updater's own releases ({@link SelfUpdate}); the Plezy check has
+     * its own richer path because it also wants the release notes.
+     */
+    public static String latestTagFor(Context c, String ownerRepo) throws Exception {
+        Resp r = request(c, "https://github.com/" + ownerRepo + "/releases/latest", null, false);
+        if (r.code != 301 && r.code != 302) {
+            throw new IllegalStateException(c.getString(R.string.err_repo_http, r.code));
+        }
+        String tag = tagFromLocation(r.location);
+        if (tag == null) {
+            throw new IllegalStateException(c.getString(R.string.err_repo_http, r.code));
+        }
+        return tag;
+    }
+
     /** Version name of the installed Plezy, or null when it is not installed. */
     public static String installedVersion(Context c) {
         try {

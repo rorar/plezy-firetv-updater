@@ -92,6 +92,16 @@
     <string name="about_thanks_heading">Dank</string>
     <string name="about_thanks_text">Plezy Updater ist ein kleines Sideload-Hilfsprogramm, das com.edde746.plezy auf diesem Fernseher aktuell hält. Dank an das Plezy-Projekt für die App, die es aktualisiert, und an GitHub für das Hosten der Releases.</string>
 
+    <string name="self_label">Plezy Updater aktualisieren…</string>
+    <string name="self_hint">Prüft die GitHub-Releases dieses Projekts auf einen neueren Build.</string>
+    <string name="self_checking">Wird geprüft…</string>
+    <string name="self_up_to_date">Aktuell — %1$s (Build %2$d).</string>
+    <string name="self_failed">Update fehlgeschlagen: %1$s</string>
+    <string name="toast_self_installed">Plezy Updater %1$s installiert</string>
+    <string name="toast_self_failed">Updater-Installation fehlgeschlagen: %1$s</string>
+    <string name="err_self_wrong_package">Heruntergeladene Datei ist nicht Plezy Updater (%1$s)</string>
+    <string name="err_self_older">Heruntergeladener Build %1$d ist nicht neuer als der installierte %2$d</string>
+
     <string name="language_label">Sprache</string>
     <string name="language_title">Sprache</string>
     <string name="language_system">Systemstandard</string>

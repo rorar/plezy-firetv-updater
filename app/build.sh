@@ -26,9 +26,9 @@ TARGET_SDK=25
 
 # The app version, stamped into the manifest at link time (--replace-version), so the number in
 # the APK always comes from here and the About screen reads the same value back from PackageManager.
-# Override for a one-off build: VERSION_CODE=3 VERSION_NAME=0.3.0 ./build.sh
-VERSION_CODE="${VERSION_CODE:-2}"
-VERSION_NAME="${VERSION_NAME:-0.2.0}"
+# Override for a one-off build: VERSION_CODE=4 VERSION_NAME=0.4.0 ./build.sh
+VERSION_CODE="${VERSION_CODE:-3}"
+VERSION_NAME="${VERSION_NAME:-0.3.0}"
 
 cd "$(dirname "$0")"
 

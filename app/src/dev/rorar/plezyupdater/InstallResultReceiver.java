@@ -18,6 +18,9 @@ public class InstallResultReceiver extends BroadcastReceiver {
 
     private static final String TAG = "PlezyUpdater";
 
+    /** Set on the session's result intent when the APK is the updater's own build. */
+    public static final String EXTRA_SELF_UPDATE = "self_update";
+
     @Override
     public void onReceive(Context c, Intent i) {
         // A receiver has no activity to wrap; build a context that resolves strings in the picked
@@ -40,6 +43,22 @@ public class InstallResultReceiver extends BroadcastReceiver {
             } catch (Throwable t) {
                 Log.e(TAG, "could not launch confirmation intent", t);
                 Notifier.toast(c, ctx.getString(R.string.toast_install_unconfirmed));
+            }
+            return;
+        }
+
+        // The updater replacing itself: word the outcome for the updater, and never treat it as a
+        // Plezy install (no Plezy re-check, no "Open Plezy?" prompt). The running process may be
+        // killed by the swap, so the toast is best-effort.
+        if (i.getBooleanExtra(EXTRA_SELF_UPDATE, false)) {
+            SelfUpdate.cleanup(c);
+            if (status == PackageInstaller.STATUS_SUCCESS) {
+                Notifier.cancelNotification(c);
+                Notifier.toast(c, ctx.getString(R.string.toast_self_installed,
+                        SelfUpdate.installedVersionName(c)));
+            } else {
+                Notifier.toast(c, ctx.getString(R.string.toast_self_failed,
+                        describe(ctx, status, message)));
             }
             return;
         }

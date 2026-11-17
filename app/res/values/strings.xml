@@ -101,6 +101,17 @@
     <string name="about_thanks_heading">Thanks</string>
     <string name="about_thanks_text">Plezy Updater is a small sideload helper that keeps com.edde746.plezy current on this TV. Thanks to the Plezy project for the app it updates, and to GitHub for hosting the releases.</string>
 
+    <!-- self-update -->
+    <string name="self_label">Update Plezy Updater…</string>
+    <string name="self_hint">Checks this project\'s GitHub releases for a newer build.</string>
+    <string name="self_checking">Checking…</string>
+    <string name="self_up_to_date">Up to date — %1$s (build %2$d).</string>
+    <string name="self_failed">Update failed: %1$s</string>
+    <string name="toast_self_installed">Plezy Updater %1$s installed</string>
+    <string name="toast_self_failed">Updater install failed: %1$s</string>
+    <string name="err_self_wrong_package">Downloaded file is not Plezy Updater (%1$s)</string>
+    <string name="err_self_older">Downloaded build %1$d is not newer than the installed %2$d</string>
+
     <!-- language -->
     <string name="language_label">Language</string>
     <string name="language_title">Language</string>

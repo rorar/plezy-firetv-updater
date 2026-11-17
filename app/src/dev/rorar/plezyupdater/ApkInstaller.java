@@ -263,8 +263,71 @@ public final class ApkInstaller {
         return new Verified(candidate.versionName, candidate.versionCode);
     }
 
-    /** Commits a PackageInstaller session; the system dialog takes over from here. */
+    /**
+     * The gate for the updater's <em>own</em> update ({@link SelfUpdate}): right package, installable
+     * here, strictly newer than the running build, and signed with the <em>same certificate</em> as
+     * the running app. The last check is the one that matters — it is what lets a new build replace
+     * the running one at all, and it fails with a readable message instead of letting the platform
+     * raise {@code INSTALL_FAILED_UPDATE_INCOMPATIBLE}.
+     */
+    public static Verified verifySelfUpdate(Context c, File apk) throws IOException {
+        PackageManager pm = c.getPackageManager();
+
+        PackageInfo candidate = pm.getPackageArchiveInfo(apk.getAbsolutePath(),
+                PackageManager.GET_SIGNATURES);
+        if (candidate == null) {
+            throw new IOException(c.getString(R.string.err_invalid_apk));
+        }
+        if (!c.getPackageName().equals(candidate.packageName)) {
+            throw new IOException(c.getString(R.string.err_self_wrong_package, candidate.packageName));
+        }
+
+        PackageInfo installed;
+        try {
+            installed = pm.getPackageInfo(c.getPackageName(), PackageManager.GET_SIGNATURES);
+        } catch (PackageManager.NameNotFoundException e) {
+            throw new IOException(c.getString(R.string.err_missing_signature), e);
+        }
+
+        if (candidate.versionCode <= installed.versionCode) {
+            throw new IOException(c.getString(R.string.err_self_older,
+                    candidate.versionCode, installed.versionCode));
+        }
+
+        if (candidate.applicationInfo != null
+                && candidate.applicationInfo.minSdkVersion > android.os.Build.VERSION.SDK_INT) {
+            throw new IOException(c.getString(R.string.err_needs_api,
+                    candidate.applicationInfo.minSdkVersion, android.os.Build.VERSION.SDK_INT));
+        }
+
+        if (candidate.signatures == null || candidate.signatures.length == 0
+                || installed.signatures == null || installed.signatures.length == 0) {
+            throw new IOException(c.getString(R.string.err_missing_signature));
+        }
+        byte[] expected = digest(c, installed.signatures[0]);
+        byte[] actual = digest(c, candidate.signatures[0]);
+        if (!MessageDigest.isEqual(expected, actual)) {
+            throw new IOException(c.getString(R.string.err_signer_mismatch));
+        }
+
+        Log.i(TAG, "verified self-update " + candidate.versionName + " ("
+                + candidate.versionCode + ") signer " + hex(actual));
+        return new Verified(candidate.versionName, candidate.versionCode);
+    }
+
+    /** Commits a PackageInstaller session for a Plezy APK; the system dialog takes over. */
     public static void install(Context c, File apk, boolean allowDowngrade) throws IOException {
+        install(c, apk, allowDowngrade, false);
+    }
+
+    /**
+     * Commits a PackageInstaller session; the system dialog takes over from here.
+     *
+     * @param selfUpdate the APK is the updater's own build, so the result must not be worded as a
+     *                   Plezy install (see {@link InstallResultReceiver})
+     */
+    public static void install(Context c, File apk, boolean allowDowngrade, boolean selfUpdate)
+            throws IOException {
         // The system copies the APK into its own staging area, so there has to be room for a
         // second copy on top of the one already in the cache.
         requireSpace(c, c.getCacheDir(), apk.length() + 50 * MB);
@@ -297,6 +360,9 @@ public final class ApkInstaller {
             }
 
             Intent result = new Intent(c, InstallResultReceiver.class);
+            if (selfUpdate) {
+                result.putExtra(InstallResultReceiver.EXTRA_SELF_UPDATE, true);
+            }
             PendingIntent pi = PendingIntent.getBroadcast(c, sessionId, result,
                     PendingIntent.FLAG_UPDATE_CURRENT);
             session.commit(pi.getIntentSender());
