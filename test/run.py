@@ -20,6 +20,7 @@ import sys
 import time
 
 import harness
+import check_strings
 from harness import Device, HarnessError, load_config, load_strings
 from flows import Flows
 
@@ -66,6 +67,14 @@ def main(argv=None):
     ap.add_argument("--yes", action="store_true", help="confirm the destructive flows up front")
     ap.add_argument("-v", "--verbose", action="store_true", help="echo every adb command")
     args = ap.parse_args(argv)
+
+    # Static parity first: it needs no device, and a drifted locale would make the flows look
+    # for a label that is no longer there. Same check as `python3 test/check_strings.py`.
+    print("=== strings ===")
+    if check_strings.main() != 0:
+        print("\nerror: fix the string parity problems above before running the flows.",
+              file=sys.stderr)
+        return 1
 
     device = Device(serial=args.serial, adb=args.adb, verbose=args.verbose)
     try:

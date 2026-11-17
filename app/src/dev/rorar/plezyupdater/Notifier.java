@@ -41,7 +41,7 @@ public final class Notifier {
         });
     }
 
-    /** Posts a notification that opens the updater when confirmed with the remote. */
+    /** Posts a notification that opens the updater when the user activates it. */
     public static void notification(Context c, String title, String text) {
         if (!Prefs.notificationEnabled(c)) {
             Log.i(TAG, "notification suppressed by settings: " + title);

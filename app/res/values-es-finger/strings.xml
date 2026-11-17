@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Spanish touch wording; see values-finger/strings.xml for why this directory exists. -->
+<resources>
+    <string name="notif_available_text">Pulsa para abrir</string>
+    <string name="set_test_notification_msg">Notificación de prueba — pulsa para abrir</string>
+    <string name="picker_hint">Más reciente primero. Instalado: %1$s   —   pulsa para instalar la versión resaltada.</string>
+</resources>

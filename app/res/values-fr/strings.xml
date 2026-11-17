@@ -50,7 +50,7 @@
     <string name="set_toast_label">Notifications toast</string>
     <string name="set_toast_desc">Court message en bas de l\'écran.</string>
     <string name="set_notification_label">Notifications</string>
-    <string name="set_notification_desc">Entrée dans le centre de notifications du Fire TV.</string>
+    <string name="set_notification_desc">Entrée dans la zone de notifications.</string>
     <string name="set_open_prompt_label">Proposer d\'ouvrir Plezy</string>
     <string name="set_open_prompt_desc">Après une installation, proposer de lancer Plezy.</string>
     <string name="set_auto_label">Vérifier automatiquement</string>
@@ -175,7 +175,7 @@
     <string name="open_prompt_failed">Impossible d\'ouvrir Plezy</string>
 
     <string name="notif_available_title">Plezy %1$s disponible</string>
-    <string name="notif_available_text">Appuyez sur OK pour installer</string>
+    <string name="notif_available_text">Appuyez sur OK pour ouvrir</string>
 
     <string name="err_repo_no_asset">La version %1$s n\'a pas de %2$s</string>
     <string name="err_repo_http">L\'API GitHub a renvoyé HTTP %1$d</string>
@@ -184,7 +184,7 @@
 
     <string name="err_download_http">Échec du téléchargement : HTTP %1$d</string>
     <string name="err_download_truncated">Téléchargement incomplet : %1$d/%2$d octets</string>
-    <string name="err_not_enough_space">Espace libre insuffisant : %1$s libres, environ %2$s requis. Libérez de l\'espace sur le Fire TV et réessayez</string>
+    <string name="err_not_enough_space">Espace libre insuffisant : %1$s libres, environ %2$s requis. Libérez de l\'espace sur l\'appareil et réessayez</string>
     <string name="err_archive_no_apk">L\'archive ne contient aucune entrée .apk</string>
     <string name="err_invalid_apk">Le fichier téléchargé n\'est pas un APK valide</string>
     <string name="err_wrong_package">Mauvais paquet : %1$s</string>

@@ -57,7 +57,7 @@
     <string name="set_toast_label">Toast notifications</string>
     <string name="set_toast_desc">Short message at the bottom of the screen.</string>
     <string name="set_notification_label">Notifications</string>
-    <string name="set_notification_desc">Entry in the Fire TV notification center.</string>
+    <string name="set_notification_desc">Entry in the notification area.</string>
     <string name="set_open_prompt_label">Prompt to open Plezy</string>
     <string name="set_open_prompt_desc">After an install, offer to start Plezy.</string>
     <string name="set_auto_label">Check automatically</string>
@@ -198,7 +198,7 @@
 
     <!-- update notification -->
     <string name="notif_available_title">Plezy %1$s available</string>
-    <string name="notif_available_text">Press OK to install</string>
+    <string name="notif_available_text">Press OK to open</string>
 
     <!-- network / release feed errors -->
     <string name="err_repo_no_asset">Release %1$s has no %2$s</string>
@@ -209,7 +209,7 @@
     <!-- download / verify errors -->
     <string name="err_download_http">Download failed: HTTP %1$d</string>
     <string name="err_download_truncated">Download truncated: %1$d/%2$d bytes</string>
-    <string name="err_not_enough_space">Not enough free space: %1$s free, need about %2$s. Free up space on the Fire TV and try again</string>
+    <string name="err_not_enough_space">Not enough free space: %1$s free, need about %2$s. Free up space on the device and try again</string>
     <string name="err_archive_no_apk">Archive contains no .apk entry</string>
     <string name="err_invalid_apk">Downloaded file is not a valid APK</string>
     <string name="err_wrong_package">Wrong package: %1$s</string>

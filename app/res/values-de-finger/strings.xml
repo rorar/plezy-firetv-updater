@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- German touch wording; see values-finger/strings.xml for why this directory exists. -->
+<resources>
+    <string name="notif_available_text">Zum Öffnen tippen</string>
+    <string name="set_test_notification_msg">Test-Benachrichtigung — zum Öffnen tippen</string>
+    <string name="picker_hint">Neueste zuerst. Installiert: %1$s   —   tippen, um die markierte Version zu installieren.</string>
+</resources>

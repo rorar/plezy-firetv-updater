@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Touch wording.
+
+  The "finger" here is the touchscreen resource qualifier (values-finger), not a hardware
+  feature flag: Android picks this file when Configuration.touchscreen is TOUCHSCREEN_FINGER,
+  which is exactly the same signal Device.isTouch() reads. So the wording and the detection
+  can never disagree — a device that gets "tap" here is a device that reports TOUCH there.
+
+  Only the strings that talk about *how* the user acts are overridden. Everything else keeps
+  the default values/ wording, which is the no-touch (TV / remote) variant.
+-->
+<resources>
+    <string name="notif_available_text">Tap to open</string>
+    <string name="set_test_notification_msg">Test notification — tap to open</string>
+    <string name="picker_hint">Newest first. Installed: %1$s   —   tap to install the highlighted version.</string>
+</resources>

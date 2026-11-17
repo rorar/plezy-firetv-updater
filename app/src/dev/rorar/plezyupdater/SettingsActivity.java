@@ -20,7 +20,7 @@ import android.widget.TextView;
 
 /**
  * The notification channels are switchable, because on a TV both can be annoying: a toast
- * interrupts the bottom of the screen, a notification lives in the Fire TV center. Turning a
+ * interrupts the bottom of the screen, a notification lives in the notification area. Turning a
  * channel off suppresses it everywhere — every message goes through {@link Notifier}, which reads
  * these switches.
  *
