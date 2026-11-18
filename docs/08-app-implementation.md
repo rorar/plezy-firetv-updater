@@ -1,7 +1,7 @@
 # 08 — The updater app, as built
 
-`app/` is the working updater: `dev.rorar.plezyupdater` **0.7.0** (`versionCode 7`),
-minSdk **25** / targetSdk **33**, plain Java, programmatic UI, **no Gradle and no AndroidX**. It is
+`app/` is the working updater: `dev.rorar.plezyupdater` **0.8.0** (`versionCode 8`),
+minSdk **25** / targetSdk **34**, plain Java, programmatic UI, **no Gradle and no AndroidX**. It is
 verified end-to-end on the API 25 stick (AFTMM, Fire OS 6.7.1.1 / API 25) and, on 2026-11-18, on the
 emulator lane (Android TV API 25/30, phone API 34) **and on a real arm64 phone** (LineageOS 22.1 =
 Android 15 = API 35). All five flows pass 5/5 in English and German, with French and Spanish
@@ -186,6 +186,28 @@ The re-check is cancelled the moment either signal settles the downgrade (`insta
 screen. Verified on the phone: logcat `downgrade: Plezy still reads as 2.26.0 — re-checking before
 deciding it was cancelled`, then `downgrade: Plezy is gone — installing` as the broadcast arrived,
 then the cached APK's installer appeared. Both signals remain, so either order works.
+
+## Finding 6 — API 34 requires `ACCESS_NETWORK_STATE` for a network-constrained job
+
+`targetSdk` 34 turned a silent job into a **crash on launch**. Both jobs the app schedules declare a
+network constraint — the periodic check (`UpdateJob.schedule`, job 2001) and the "check soon" one-off
+(`UpdateJob.runNow`, job 2002) both call `setRequiredNetworkType` — and on Android 14
+`JobScheduler.schedule` refuses such a job unless the app holds `ACCESS_NETWORK_STATE`:
+
+```
+E AndroidRuntime: java.lang.SecurityException: android.permission.ACCESS_NETWORK_STATE required for
+                  jobs with a connectivity constraint
+E AndroidRuntime:   at dev.rorar.plezyupdater.UpdateJob.schedule(UpdateJob.java:47)
+E AndroidRuntime:   at dev.rorar.plezyupdater.MainActivity.onCreate(MainActivity.java:132)
+```
+
+`MainActivity.onCreate` arms the job, so the app died the instant it opened — on API 34 and API 35
+alike. At `targetSdk` 33 the rule did not apply, which is why `0.7.0` ran on the API 34 emulator
+without it. The fix is one line in the manifest: declare `android.permission.ACCESS_NETWORK_STATE`
+(install-time, auto-granted, and inert on the API 25 stick, which never enforced the rule). The
+emulator lane is what caught it — the flow's first step (`open the updater`) timed out with the
+launcher still focused, and logcat named the exception; the fix was confirmed by relaunching on both
+API 34+ devices before re-running the flows.
 
 ## Install routine (shared)
 
@@ -947,6 +969,58 @@ The request dialog is the one thing the harness deliberately does **not** drive:
 nondeterministic (the platform shows it at most twice, and a prior denial changes the outcome), so
 `run.py` grants the permission up front and the dialog itself is verified by hand, above.
 
+### `targetSdk` 34: receiver flags + `ACCESS_NETWORK_STATE` (`0.8.0`), 2026-11-18
+
+The next roadmap step: raise `targetSdk` 33 → 34. Two platform rules turn on at API 34, and both sit
+behind a `VERSION.SDK_INT` guard so the API 25 stick is unchanged:
+
+- **Runtime-registered receivers must declare an export flag.** A target-34 app that calls
+  `Context.registerReceiver` without one is refused at runtime. All four sites now go through the new
+  `Receivers.register(Context, BroadcastReceiver, IntentFilter)`, which passes
+  `Context.RECEIVER_NOT_EXPORTED` when `SDK_INT >= TIRAMISU` (the flag and the three-argument overload
+  are API 33+) and the plain two-argument call below it: the custom `ACTION_INSTALL_FINISHED`
+  receivers in `MainActivity` and `VersionListActivity`, and the `ACTION_PACKAGE_REMOVED` ones in
+  `SettingsActivity` and `InstallFlow`. Every one listens only to an in-app broadcast or a protected
+  system broadcast, so *not exported* is the correct answer.
+- **`ACCESS_NETWORK_STATE` is required for a job with a network constraint.** Both jobs
+  (`UpdateJob.schedule` periodic 2001 and `UpdateJob.runNow` one-off 2002) call
+  `setRequiredNetworkType`, and on API 34+ `JobScheduler.schedule` throws
+  `SecurityException: android.permission.ACCESS_NETWORK_STATE required for jobs with a connectivity
+  constraint` ([Finding 6](#finding-6--api-34-requires-access_network_state-for-a-network-constrained-job)).
+  That was a **hard crash on launch** — `MainActivity.onCreate` arms the job — so the permission is
+  now declared (install-time, auto-granted, inert on API 25).
+
+There is nothing else to change: no foreground service, and no implicit internal intents. The
+`REQUEST_DELETE_PACKAGES` permission was re-checked by building a variant without it and running a
+downgrade on API 34: the stock uninstaller opens and immediately refuses
+(`UninstallerActivity: Uid … does not have android.permission.REQUEST_DELETE_PACKAGES or
+android.permission.DELETE_PACKAGES`), so the downgrade can never start and the permission **stays**.
+
+Stick (API 25), updater `0.8.0` / `versionCode 8` (APK 315 114 B, `sha256 daa5e3fb…`):
+
+| Step | Result |
+|---|---|
+| Build identity | `dumpsys package dev.rorar.plezyupdater` → `versionCode=8 minSdk=25 targetSdk=34`, `versionName=0.8.0`; `aapt2 dump badging` → `targetSdkVersion:'34'`, `ACCESS_NETWORK_STATE` among the permissions |
+| API 25 regression | the permission and the receiver flag are inert below their API levels; every flow runs as in `0.7.0`, and no `SecurityException`/`IllegalArgumentException` from `registerReceiver` or `JobScheduler` appears in logcat |
+| English `all` | **5/5 PASS** — install 132s, downgrade 67s, upgrade 41s, uninstall 71s, clean-install 52s |
+| German `all` | **5/5 PASS** — install 52s, downgrade 65s, upgrade 42s, uninstall 72s, clean-install 53s |
+
+`phone34` (Google APIs phone, API 34) and the real `phone35` (API 35), updater `0.8.0` / `versionCode 8`:
+
+| Step | Result |
+|---|---|
+| Build identity | both → `versionCode=8 minSdk=25 targetSdk=34`, `versionName=0.8.0` |
+| **The crash (before the fix)** | both lanes: the flow's first step (`open the updater`) timed out with the launcher (phone34) / notification shade (phone35) still focused; logcat → `SecurityException: android.permission.ACCESS_NETWORK_STATE required for jobs with a connectivity constraint` at `UpdateJob.schedule(UpdateJob.java:47)` ← `MainActivity.onCreate(MainActivity.java:132)` |
+| After the fix | relaunching both showed `MainActivity` focused/resumed with no `AndroidRuntime` entry, and the receiver registration every flow's first screen performs raised no `SecurityException`/`IllegalArgumentException` |
+| **`REQUEST_DELETE_PACKAGES` removal (phone34)** | a variant built without it passed diagnostics and reached the picker, but **`Uninstall & install` never opened the uninstaller** — `UninstallerActivity: Uid 10194 does not have android.permission.REQUEST_DELETE_PACKAGES or android.permission.DELETE_PACKAGES` — so the downgrade failed; the permission is required and kept |
+| `phone34` English `all` | **5/5 PASS** — install 36s, downgrade 41s, upgrade 21s, uninstall 86s, clean-install 29s |
+| `phone34` German `all` | **5/5 PASS** — install 35s, downgrade 41s, upgrade 18s, uninstall 83s, clean-install 25s |
+| `phone35` English `all` | **5/5 PASS** — install 50s, downgrade 52s, upgrade 22s, uninstall 64s, clean-install 42s |
+| `phone35` German `all` | **5/5 PASS** — install 43s, downgrade 52s, upgrade 24s, uninstall 92s, clean-install 33s |
+| French / Spanish smokes | `install --app-lang fr\|es` on `phone34` → **1/1 each** (33s / 35s) |
+
+### Round-1 verification phases (2026-11-14/15)
+
 | Step | Result |
 |---|---|
 | GitHub check | `Installed: 2.26.0 / Latest upstream: 2.26.0 (up to date)` |
@@ -1188,6 +1262,14 @@ screen, up to three dialogs, so a two-dialog platform needs no special case.
   report carries `notif=allowed|blocked`. Verified on the API 34 emulator and the API 35 phone
   ([above](#targetsdk-33--post_notifications-070-2026-11-18)); the API 25 stick never sees the
   permission. See [roadmap item 5](11-roadmap.md#5-targetsdk-bump-matrix).
+- **The API 34 rules are handled from `0.8.0` on.** A target-34 app must pass an export flag to every
+  `registerReceiver` (all four sites go through `Receivers.register`, `RECEIVER_NOT_EXPORTED` from
+  API 33) and must hold `ACCESS_NETWORK_STATE` for a network-constrained job — without it
+  `MainActivity.onCreate` crashed on launch on API 34+
+  ([Finding 6](#finding-6--api-34-requires-access_network_state-for-a-network-constrained-job)). Both
+  are inert on the API 25 stick. Verified on the API 34 emulator and the API 35 phone
+  ([above](#targetsdk-34-receiver-flags--access_network_state-080-2026-11-18)). See
+  [roadmap item 5](11-roadmap.md#5-targetsdk-bump-matrix).
 - **A job does not wake a sleeping TV.** The old `RTC_WAKEUP` alarm could; `JobScheduler` runs the
   check while the TV is on, which the UI already promises ("Runs while the TV is on"). Also, a newly
   scheduled periodic job runs once almost immediately on this build before settling into its

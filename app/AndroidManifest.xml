@@ -1,21 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="dev.rorar.plezyupdater"
-    android:versionCode="7"
-    android:versionName="0.7.0">
+    android:versionCode="8"
+    android:versionName="0.8.0">
 
-    <uses-sdk android:minSdkVersion="25" android:targetSdkVersion="33" />
+    <uses-sdk android:minSdkVersion="25" android:targetSdkVersion="34" />
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Android 14 (API 34) refuses JobScheduler.schedule() with a SecurityException when a job
+         declares a network constraint but the app does not hold ACCESS_NETWORK_STATE. Both jobs
+         here (the periodic check and the one-off "check soon") require network, so this is one of
+         the two things the targetSdk 34 bump turned on — and it is a hard crash on launch on API 34+
+         without it. A normal install-time permission: inert on the API 25 stick, which never
+         enforced the rule. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <!-- Runtime permission from API 33 (Android 13) on: without it the platform drops every
          notification this app posts. It does not exist on API 25..32, so it is requested only
          when Build.VERSION.SDK_INT >= TIRAMISU (see Notifier) and the manifest entry is inert
-         below 33. targetSdk 33 is what makes the request necessary in the first place. -->
+         below 33. targetSdk 33 or higher is what makes the request necessary in the first place. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Needed from API 26 on to send ACTION_DELETE / ACTION_UNINSTALL_PACKAGE (the stock
-         uninstaller behind "Uninstall Plezy…"). Auto-granted, and ignored on API 25. -->
+         uninstaller behind "Uninstall Plezy…"). Auto-granted, and ignored on API 25. Required, not
+         cosmetic: with it removed on API 34 the stock uninstaller opens and immediately refuses —
+         `UninstallerActivity: Uid … does not have android.permission.REQUEST_DELETE_PACKAGES or
+         android.permission.DELETE_PACKAGES` — so a downgrade can never start (verified 2026-11-18). -->
     <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
 
     <uses-feature android:name="android.software.leanback" android:required="false" />

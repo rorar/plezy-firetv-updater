@@ -103,7 +103,7 @@ public class VersionListActivity extends Activity {
                         PackageInstaller.STATUS_FAILURE));
             }
         };
-        registerReceiver(installFinishedReceiver,
+        Receivers.register(this, installFinishedReceiver,
                 new IntentFilter(MainActivity.ACTION_INSTALL_FINISHED));
 
         loadReleases();

@@ -83,7 +83,7 @@ public final class InstallFlow {
         };
         IntentFilter removed = new IntentFilter(Intent.ACTION_PACKAGE_REMOVED);
         removed.addDataScheme("package");
-        activity.registerReceiver(packageRemovedReceiver, removed);
+        Receivers.register(activity, packageRemovedReceiver, removed);
     }
 
     /** Unregister the receiver; call from the screen's {@code onDestroy()}. */

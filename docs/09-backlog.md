@@ -23,7 +23,7 @@ The forward-looking items now live in the [roadmap](11-roadmap.md), so this stay
   TV-first because the layout is too ([08](08-app-implementation.md#device-aware-wording)); this
   request is to carry it the rest of the way.
 - **`targetSdk` bump, further steps** — 25 → 26 landed in `0.5.0`, 26 → 31 in `0.6.0`, 31 → 33 in
-  `0.7.0`; 34 → … remain, one step per release
+  `0.7.0`, 33 → 34 in `0.8.0`; 35 → … remains, one step per release
   ([roadmap item 5](11-roadmap.md#5-targetsdk-bump-matrix)).
 
 Nothing here is a commitment; the roadmap explains the order and the reasoning.
@@ -59,6 +59,18 @@ Nothing here is a commitment; the roadmap explains the order and the reasoning.
   flows re-run unchanged on the stick. See
   [11 § 5](11-roadmap.md#5-targetsdk-bump-matrix) and
   [08](08-app-implementation.md#targetsdk-33--post_notifications-070-2026-11-18).
+
+- **`targetSdk` 33 → 34 (roadmap item 5, fourth step): receiver export flags + the job network
+  permission.** Landed 2026-11-18 (`0.8.0`): all four runtime receiver registrations go through the
+  new `Receivers.register`, which passes `Context.RECEIVER_NOT_EXPORTED` from API 33
+  (`SDK_INT >= TIRAMISU`) and the plain two-argument call below it, and the manifest declares
+  `ACCESS_NETWORK_STATE` — without it API 34 refuses the network-constrained jobs with a
+  `SecurityException` in `MainActivity.onCreate`, a hard crash on launch. Verified on `phone34`
+  (API 34) and the real `phone35` (API 35) — the crash reproduced first, then the fix — with the API
+  25 flows re-run unchanged on the stick. A variant built without `REQUEST_DELETE_PACKAGES` proved
+  that permission is still required on API 34 (the stock uninstaller refuses). See
+  [11 § 5](11-roadmap.md#5-targetsdk-bump-matrix) and
+  [08](08-app-implementation.md#targetsdk-34-receiver-flags--access_network_state-080-2026-11-18).
 
 - **Device detection (roadmap item 2).** Landed 2026-11-17 (`0.4.0`): `DeviceKind` (the decision, a
   pure enum with no `android.*` import) and `Device` (the Android wrapper) answer *what is this

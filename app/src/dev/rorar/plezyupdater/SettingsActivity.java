@@ -160,7 +160,7 @@ public class SettingsActivity extends Activity {
         };
         IntentFilter filter = new IntentFilter(Intent.ACTION_PACKAGE_REMOVED);
         filter.addDataScheme("package");
-        registerReceiver(packageRemovedReceiver, filter);
+        Receivers.register(this, packageRemovedReceiver, filter);
     }
 
     @Override

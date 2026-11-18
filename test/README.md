@@ -70,7 +70,7 @@ live in `config.json` → `profiles`, and `--profile <name>` selects one (defaul
 Five profiles ship: `stick` (the Fire TV, the regression target), `tv25` and `tv30` (Android TV
 emulators), `phone34` (an Android 14 phone emulator), and `phone35` (a **real** Android 15 / API 35
 arm64 phone). The emulators are why this exists: the stick is API 25, so the notification-channel,
-background-limit, and `targetSdk` 31 branches cannot be reached on it at all; the real phone adds
+background-limit, and `targetSdk` 31/34 branches cannot be reached on it at all; the real phone adds
 arm64 and API 35.
 
 A profile may name the environment variable that holds its address (`serial_env`), so
@@ -109,13 +109,14 @@ What each lane is for:
 |---|---|---|---|
 | `tv25` | 25 | x86 | updater-side checks (device classification, diagnostics, jobs) |
 | `tv30` | 30 | x86 | the API 26+ channel / background-limit / implicit-broadcast behaviour |
-| `phone34` | 34 | x86_64 | the **full Plezy flows**, and the only *emulator* here that enforces the `targetSdk` 31 rules |
+| `phone34` | 34 | x86_64 | the **full Plezy flows**, and the only *emulator* here that enforces the `targetSdk` 31/34 rules |
 | `phone35` | 35 | arm64-v8a | a **real phone** (not an emulator): the full flows over touch on the newest platform here, and the only arm64 device |
 
 Plezy itself ships `arm64-v8a` / `armeabi-v7a` / `x86_64` only, so the 32-bit x86 TV images cannot
 install it — they exercise the updater, not a Plezy install. `phone34` (x86_64) is the emulator that
-runs everything end to end, and it is also the lane that proves the `targetSdk` 31 work (mutable vs
-immutable `PendingIntent`s, the notification trampoline rule). `phone35` repeats that on real
+runs everything end to end, and it is also the lane that proves the `targetSdk` 31/34 work (mutable vs
+immutable `PendingIntent`s, the notification trampoline rule, the receiver-export flag and the
+`ACCESS_NETWORK_STATE` job permission). `phone35` repeats that on real
 hardware and closes the arm64 gap. The emulators boot headless; `phone35` is the user's own phone,
 reachable over wireless adb (`PHONE_SERIAL` in `local.env`).
 

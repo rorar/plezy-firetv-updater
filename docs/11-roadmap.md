@@ -3,7 +3,8 @@
 Where the updater goes after Round 1 (the A1–A7 + B2 set, updater `0.2.0`; self-update in `0.3.0`;
 device detection and device-aware wording in `0.4.0`; `targetSdk` 25 → 26 in `0.5.0`; the emulator
 lane, a real-phone lane and `targetSdk` 26 → 31 in `0.6.0`; `targetSdk` 31 → 33 with
-`POST_NOTIFICATIONS` in `0.7.0`). Each item says what it
+`POST_NOTIFICATIONS` in `0.7.0`; `targetSdk` 33 → 34 with the runtime-receiver export flags and the
+`ACCESS_NETWORK_STATE` job permission in `0.8.0`). Each item says what it
 is, what it would take, what can go wrong, and **how it would be verified on the stick** — including
 the honest cases where this hardware cannot verify it (the emulator lane now covers some of those).
 Order is a suggestion, not a commitment.
@@ -219,7 +220,8 @@ branch, which stays logic-only.
 
 ## 5. `targetSdk` bump matrix
 
-The app targets **31** today (25 through `0.4.0`, 26 in `0.5.0`, 31 in `0.6.0`); raising it is only
+The app targets **34** today (25 through `0.4.0`, 26 in `0.5.0`, 31 in `0.6.0`, 33 in `0.7.0`, 34 in
+`0.8.0`); raising it is only
 worth doing if the updater must also run well on newer Android (which items 2–3 imply). Each step is a
 known set of changes; all of them can be guarded by `Build.VERSION.SDK_INT` so the API 25 behaviour is
 unchanged.
@@ -233,11 +235,12 @@ unchanged.
 | 30 | 11.0 | **Package visibility** — `<queries>` for `com.edde746.plezy` is already declared. `ACTION_DELETE` still launches the stock uninstaller; installing still needs `REQUEST_INSTALL_PACKAGES` (declared). |
 | 31 ✅ | 12.0 | **Done in `0.6.0`.** **`PendingIntent` mutability** — `ApkInstaller`'s session-result `PendingIntent` is `FLAG_UPDATE_CURRENT \| FLAG_MUTABLE` (the platform writes the session status into it, and on API 25 the confirmation intent too); `Notifier`'s notification `PendingIntent` is `FLAG_IMMUTABLE` (it only opens `MainActivity`). Both add the flag only when `SDK_INT >= S`, so the API 25–30 flags stay `0`; `FLAG_MUTABLE`/`FLAG_IMMUTABLE` are compile-time constants, so naming them is safe and dex inlines them. **Notification trampolines** — the notification's `contentIntent` is already an activity, started directly, not a receiver that starts one: verified on `tv30`, nothing to change. **`REQUEST_DELETE_PACKAGES`** — declared; the platform's package-visibility rules make it necessary to send `ACTION_DELETE` on newer Android (declared, but *not* empirically tested by removing it). **Also fixed here** — the downgrade handshake raced the platform ([08](08-app-implementation.md#finding-5--the-uninstall-handshake-raced-the-platform-on-android-12)). Verified end to end on the `phone34` emulator (API 34) **and on the real `phone35` (API 35)**. |
 | 33 ✅ | 13.0 | **Done in `0.7.0`.** **`POST_NOTIFICATIONS` is a runtime permission** — a `targetSdk 33` app's notifications are dropped until it is granted. `Notifier` gained `systemAllows` / `needsPermission` / `requestPermission` (all guarded by `SDK_INT >= TIRAMISU`, so the API 25 stick is untouched), `MainActivity` asks once on the first resume while the *Notifications* switch is on (persisted `notif_asked`), and the Settings row asks again on toggle-on and shows a **Blocked by Android…** hint plus an **Open notification settings** action while the notification is blocked. The diagnostics report gained `notif=allowed\|blocked`, asserted by the harness. Verified on `phone34` (API 34) and the real `phone35` (API 35) — request dialog, grant, and a posted notification — and the API 25 flows are unchanged ([08](08-app-implementation.md#targetsdk-33--post_notifications-070-2026-11-18)). |
-| 34 | 14.0 | Foreground-service types and further implicit-intent restrictions; check the notification and alarm paths. |
+| 34 ✅ | 14.0 | **Done in `0.8.0`.** **Runtime-registered receivers must declare an export flag** — a target-34 app that calls `Context.registerReceiver` without one is refused. All four sites (the custom `ACTION_INSTALL_FINISHED` receivers in `MainActivity` / `VersionListActivity`, the `ACTION_PACKAGE_REMOVED` ones in `SettingsActivity` / `InstallFlow`) now go through `Receivers.register`, which passes `Context.RECEIVER_NOT_EXPORTED` when `SDK_INT >= TIRAMISU` (the flag and the three-argument overload are API 33+) and the plain two-argument call below it, so the API 25 stick is unchanged. **`ACCESS_NETWORK_STATE` is required for a job with a network constraint** — this one is a *hard crash on launch* on API 34+: `UpdateJob.schedule` throws `SecurityException: android.permission.ACCESS_NETWORK_STATE required for jobs with a connectivity constraint`; both jobs require network, so the permission is now declared (inert on API 25). **Foreground-service types / implicit internal intents**: no foreground service and no implicit internal intents, so nothing else to change. Verified on `phone34` (API 34) and `phone35` (API 35) — the crash reproduced first, then the fix — with the API 25 flows re-run ([08](08-app-implementation.md#targetsdk-34-receiver-flags--access_network_state-080-2026-11-18)). |
 | 35 | 15.0 | Nothing new beyond 33/34 seen on the `phone35` run (LineageOS 22.1): the five flows pass on it, which is the point — the newest platform here is exercised end to end. |
 
 The order of the real work inside a bump is: notification channel (26) → job scheduling (26) →
-`PendingIntent` flags (31) → notification permission (33). Each is hand-written against the platform
+`PendingIntent` flags (31) → notification permission (33) → receiver export flags and the job
+network permission (34). Each is hand-written against the platform
 API and each keeps an API 25 fallback.
 
 **Verify.** A bump must not change behaviour on the stick: re-run the five flows and the quota
@@ -252,7 +255,10 @@ whole Plezy flow, `tv25` repeats the API 25 platform without the stick, and `pho
 flow on a **real** API 35 arm64 phone. The 31 step was verified on `phone34` and `phone35` end to
 end, and the 26 step's API 26+ branches are now exercised on `tv30`. The 33 step was verified the same
 way, with the `POST_NOTIFICATIONS` request dialog driven by hand on both API 33+ devices (the harness
-grants the permission up front so a flow is not at the mercy of the one-time dialog).
+grants the permission up front so a flow is not at the mercy of the one-time dialog). The 34 step was
+verified on the same two lanes, where the lane earned its keep: the `ACCESS_NETWORK_STATE` job
+requirement reproduced as a **crash on launch** on API 34+ before the fix, and the runtime-receiver
+export flag is exercised by every flow (both activities register a receiver on start).
 
 ## Suggested order
 
@@ -276,12 +282,19 @@ grants the permission up front so a flow is not at the mercy of the one-time dia
 6. ~~**`targetSdk` bump, step 33**~~ — **done** 2026-11-18, `0.7.0`; `POST_NOTIFICATIONS` is requested
    (auto once + on toggle), the Settings row warns when Android blocks the notification, and the
    diagnostics report carries `notif=`. Verified on `phone34` (API 34) and `phone35` (API 35), with
-   the API 25 flows re-run on the stick. The **next** real step is `targetSdk` 34 (foreground-service
-   types and the further implicit-intent / receiver-export rules — the custom
-   `ACTION_INSTALL_FINISHED` receiver is the thing to check there); each step keeps the API 25 flows
-   as the regression test and the lane for the new branch.
-7. **Touch UI** (item 3, layout half) — last: `phone34` can *drive* a touch device now, but an
-   emulator is not a real phone, so the layout half stays the least-verifiable item.
+   the API 25 flows re-run on the stick.
+7. ~~**`targetSdk` bump, step 34**~~ — **done** 2026-11-18, `0.8.0`; the runtime-receiver export flag
+   (`Receivers.register` → `RECEIVER_NOT_EXPORTED` from API 33) and the `ACCESS_NETWORK_STATE` job
+   permission that API 34 turns into a hard crash on launch. Verified on `phone34` (API 34) and
+   `phone35` (API 35) — the crash reproduced first, then the fix — with the API 25 flows re-run on the
+   stick. Each step keeps the API 25 flows as the regression test and the lane for the new branch.
+8. **Touch UI** (item 3, layout half) — **next** (`0.9.0`): `phone34` can *drive* a touch device now,
+   but an emulator is not a real phone, so the layout half stays the least-verifiable item. This is
+   the single-pane touch Choose-Version with the right-side changelog fly-in (see
+   [09](09-backlog.md#requested--not-started)).
+9. **`targetSdk` bump, step 35** — after the touch UI, deliberately: API 35 enforces edge-to-edge
+   (window insets; `setStatusBarColor` deprecated), and the changelog fly-in's insets depend on the
+   touch layout existing first.
 
 ## Guardrails
 

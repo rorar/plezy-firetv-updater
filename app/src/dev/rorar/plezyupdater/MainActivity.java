@@ -117,7 +117,7 @@ public class MainActivity extends Activity {
                         PackageInstaller.STATUS_FAILURE));
             }
         };
-        registerReceiver(installFinishedReceiver, new IntentFilter(ACTION_INSTALL_FINISHED));
+        Receivers.register(this, installFinishedReceiver, new IntentFilter(ACTION_INSTALL_FINISHED));
 
         // The download/verify/install pipeline; it also owns the downgrade uninstall handshake.
         installFlow = new InstallFlow(this, installCallback);
