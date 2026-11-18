@@ -925,6 +925,7 @@ Stick (API 25), updater `0.7.0` / `versionCode 7` (APK 315 114 B, `sha256 8bb22b
 | English `all` | **5/5 PASS** — install 116s, downgrade 65s, upgrade 34s, uninstall 70s, clean-install 58s |
 | German `all` | **5/5 PASS** — install 52s, downgrade 67s, upgrade 36s, uninstall 70s, clean-install 53s |
 | API 25 regression | no `POST_NOTIFICATIONS` dialog, no permission code path runs, every flow byte-for-byte as `0.6.0` |
+| Self-update `0.6.0` → `0.7.0` | the stick was reset to `v0.6.0` (a fresh install — API 25 refuses the in-place downgrade of the updater, [Finding 2](#finding-2--android-71-refuses-downgrades-of-release-builds)), then **Settings → About → "Plezy Updater aktualisieren…"** on the D-pad: the check found `0.7.0`, downloaded and verified it, and the stock installer showed an **update** dialog ("Möchtest du ein Update für diese App installieren?"); after **INSTALLIEREN** → `versionCode 6 → 7`, `firstInstallTime 2026-11-18 18:00:37` **unchanged**, `lastUpdateTime 18:01:43` |
 
 `phone34` (Google APIs phone, API 34) and the real `phone35` (API 35), updater `0.7.0` / `versionCode 7`:
 
