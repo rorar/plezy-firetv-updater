@@ -8,6 +8,8 @@
   (`FIRE_TV_SERIAL`); `source local.env` then `adb connect "$FIRE_TV_SERIAL"` (accept the RSA
   dialog once). The `192.168.1.50:5555` in the docs is a placeholder. Screen `1920x1080`,
   density `320` (2.0× → 960x540 dp).
+- A real **phone** is also on the lane (`phone35`, see [below](#the-emulator-lane-testemulatorsh-and-the-real-phone-phone35)):
+  its address is `PHONE_SERIAL` in the same gitignored `local.env`.
 - **The TV sleeps.** Before any `screencap`/`uiautomator dump`, wake it:
   `adb shell input keyevent KEYCODE_WAKEUP` then `KEYCODE_HOME`. A sleeping screen gives an
   all-black screenshot and `uiautomator dump` fails with
@@ -139,7 +141,8 @@ python3 -u test/run.py upgrade --yes
 python3 -u test/run.py install --app-lang de
 ```
 
-`--serial` defaults to `$FIRE_TV_SERIAL`; pass `--serial <ip>:5555` to override.
+`--serial` defaults to the profile's `serial_env` variable, then `$FIRE_TV_SERIAL`; pass
+`--serial <ip>:5555` to override.
 
 Run it from `test/` if you want to import `harness` / `flows` in an ad-hoc snippet. It drives
 Settings → Language, dismisses the "Open Plezy?" prompt, clicks `INSTALLIEREN`, and proves the
@@ -147,6 +150,21 @@ upgrade was an in-place replace (`firstInstallTime` unchanged, `lastUpdateTime` 
 also fires the quota diagnostics broadcast and **asserts** the `device=…;tv=…;touch=…` fields it now
 carries against `test/config.json`'s `expected_device` (`fire_tv` / `1` / `0` on this stick); a
 missing report fails the run. Details in [`test/README.md`](test/README.md).
+
+Two things it does before/inside a run that are easy to get wrong by hand:
+
+- **It clears a stray system window first.** If a previous run left the stock installer/uninstaller
+  in front, `open_updater()` BACK-cancels it and fails loudly if it will not go away. Leftover
+  dialogs otherwise make a run drive the wrong window and look like an app bug.
+- **`clean-install` presses "Open" and asserts Plezy launches** (`assert_open_prompt_opens_plezy`),
+  not just "Not now". The other flows only dismiss the prompt, so the positive button is covered
+  here.
+
+A downgrade on **Android 12+** races the platform: `onResume` can run *before* the
+`ACTION_PACKAGE_REMOVED` broadcast, so a successful uninstall still reads as installed for ~137 ms.
+`InstallFlow` handles it with a bounded re-check (750 ms × 5) and finishes on the broadcast — do not
+"fix" a phone-only downgrade failure by trusting a version read (see
+[`docs/08`](docs/08-app-implementation.md#finding-5--the-uninstall-handshake-raced-the-platform-on-android-12)).
 
 Two checks need **no device** and are worth running after any string or device-logic change:
 
@@ -185,6 +203,34 @@ adb shell logcat -d -s PlezyUpdater                                 # "backgroun
   fresh process (verified), which then logs `background check starting (manual=true)`.
 - With `Check automatically` off, job 2001 is gone from `dumpsys jobscheduler`; the one-off 2002
   still runs when armed with `manual=true`.
-- The updater targets **API 26** now. The channel path (`Notifier.ensureChannel`) and the
-  background-execution-limit behaviour are **not** reachable on this API 25 stick — they are
-  logic-verified only, and there is no emulator here.
+- The updater targets **API 31** now. The channel path (`Notifier.ensureChannel`) and the
+  background-execution-limit behaviour are **not** reachable on this API 25 stick — use the
+  emulator lane (`tv30` / `phone34`, below) for those branches.
+
+## The emulator lane (`test/emulator.sh`) and the real phone (`phone35`)
+
+A second platform to test the branches the API 25 stick cannot produce. `test/emulator.sh
+create|start|provision|stop|list <profile>` boots an AVD headless and `run.py --profile <name>
+--serial emulator-5554` runs the flows on it. Profiles (`test/config.json`): `tv25` / `tv30` are
+x86 Android TV images (updater-side checks only — Plezy has no 32-bit x86 build, so the full flows
+cannot run there), `phone34` is x86_64 API 34 and runs the whole Plezy flow **and** enforces the
+`targetSdk` 31 rules. Only one emulator runs at a time — `start` refuses if one is already up — so
+the lanes are sequential. Needs `$ANDROID_HOME` (default `~/Android/Sdk`). See
+[`test/README.md`](test/README.md#emulator-lane).
+
+`phone35` is **not** an emulator: a real arm64 phone (LineageOS 22.1 = Android 15 = API 35,
+touchscreen, `de-DE`) over wireless adb. It is the only arm64 device here (so it is the only one that
+exercises Plezy's `arm64-v8a` install) and the only real touch device. Its address lives only in the
+gitignored `local.env` as `PHONE_SERIAL`; the profile names that variable (`serial_env`), so:
+
+```bash
+cd ~/Code/plezy-firetv-updater
+source local.env                        # sets FIRE_TV_SERIAL and PHONE_SERIAL
+python3 -u test/run.py all --yes --profile phone35    # no --serial needed
+```
+
+Its stock installer is the AOSP one on Android 15, in German: **`Installieren`** (fresh) /
+**`Aktualisieren`** (update) / **`Trotzdem aktualisieren`** (update from a different installer, a
+*second* dialog) / **`Abbrechen`** — recorded in `strings/system.de.api34.json`, which the profile
+points at with `system_strings`. Wireless-debugging adbd **changes its port** whenever it restarts
+(`adb root` / `unroot`, reboot); re-discover it with `adb mdns services` (`_adb-tls-connect._tcp`).

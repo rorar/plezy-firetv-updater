@@ -98,13 +98,79 @@ class Flows:
     # screens
     # ------------------------------------------------------------------ #
 
+    #: Focus substrings that mean a stock installer/uninstaller is (still) in front.
+    _SYSTEM_DIALOGS = ("packageinstaller", "InstallAppProgress",
+                       "UninstallerActivity", "UninstallAppProgress")
+
+    def _system_dialog_focus(self):
+        """The focused window when a stock installer/uninstaller is in front, else ''."""
+        focus = self.d.current_focus()
+        return focus if any(t in focus for t in self._SYSTEM_DIALOGS) else ""
+
+    def _clear_stray_system_window(self, tries=2):
+        """Cancel a stock installer/uninstaller window left over from an earlier run.
+
+        Every flow starts from the updater's Main View. If a *system* dialog is in front instead,
+        the device is dirty — a previous run (or a hand test) left the stock installer up and its
+        window sits in the activity stack. Proceeding would drive the wrong window: the incident
+        this guards against was a stale updater-confirmation dialog that made a whole 0.6.0 stick
+        run look like an app regression. BACK cancels the stock installer/uninstaller, so clear it
+        here — loudly — and fail if it will not go away, rather than corrupt the run silently.
+        """
+        for _ in range(tries):
+            focus = self._system_dialog_focus()
+            if not focus:
+                return
+            self.log(f"    ! stray system dialog in front ({focus!r}) — cancelling it with BACK")
+            self.d.key("KEYCODE_BACK")
+            time.sleep(1.5)
+        focus = self._system_dialog_focus()
+        if focus:
+            raise HarnessError(
+                f"a stock installer/uninstaller window is stuck in front ({focus!r}); "
+                "dismiss it on the device and re-run")
+
     def open_updater(self):
         self.log("  open the updater")
         self.d.wake()
+        self._clear_stray_system_window()
         self.d.shell(f"am force-stop {self.c['updater_package']}", check=False)
         self.d.shell(f"am start -n {self.c['main_activity']}", check=False)
+        self._dismiss_deprecation_warning()
         self.d.wait_focus("MainActivity", timeout=30)
         time.sleep(2)  # let the update check fill in the buttons
+
+    def _dismiss_deprecation_warning(self, timeout=15):
+        """Clear Android's "built for an older version of Android" warning, if it shows.
+
+        From API 34 the platform raises ``DeprecatedTargetSdkVersionDialog`` when an app targets
+        below ``Build.VERSION.MIN_SUPPORTED_TARGET_SDK_INT`` (28 on API 34) — a *system* window,
+        so it hides the updater and ``wait_focus("MainActivity")`` would otherwise time out.
+
+        Press **OK**, not BACK: OK is what makes ``AppWarnings`` record the per-package
+        ``FLAG_HIDE_DEPRECATED_SDK`` (persisted in ``/data/system/appwarnings.xml``), so the
+        warning is not raised again on the next activity start — BACK only closes it once, and it
+        pops up again on every activity the app opens. The dialog's positive button is the
+        platform's "OK" in every locale. Once the updater targets 31+ (roadmap item 5) the dialog
+        stops appearing and this returns False as soon as the Main View is in front.
+        """
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            focus = self.d.current_focus()
+            if "DeprecatedTargetSdkVersionDialog" in focus:
+                self.log('    dismiss the "built for an older version of Android" warning (OK)')
+                screen = self.d.dump()
+                node = screen.find(exact="OK") or screen.find(exact="Ok")
+                if node is not None:
+                    self._tap(node, "OK")
+                else:
+                    self.d.key("KEYCODE_DPAD_CENTER")
+                time.sleep(1.5)
+                return True
+            if "MainActivity" in focus:
+                return False
+            time.sleep(0.5)
+        return False
 
     def open_picker(self):
         label = self.s.app("main.choose_version")
@@ -163,9 +229,9 @@ class Flows:
         screen tells us the current language — no stored state or per-run flag needed.
         """
         screen = self.d.dump()
-        labels = set(screen.labels())
+        labels = {label.casefold() for label in screen.labels()}
         for code in harness.APP_LANGS:
-            if harness.load_app_strings(code)["main"]["settings"] in labels:
+            if harness.load_app_strings(code)["main"]["settings"].casefold() in labels:
                 return code
         raise HarnessError(
             f"could not tell the app's language from the main screen:\n{screen.pretty()}")
@@ -215,9 +281,14 @@ class Flows:
         return target
 
     def _select_language_row(self, target, order, native):
-        """Step the open language picker to ``target`` and press OK."""
+        """Step the open language picker to ``target`` and press OK.
+
+        A TV list has a row focused the moment it opens; a *touch* device (the phone lane) often
+        has no focus at all until a D-pad event arrives, so nudge it once with DOWN to establish
+        focus rather than giving up.
+        """
         target_index = order.index(target)
-        for _ in range(len(order) + 2):
+        for _ in range(len(order) + 3):
             screen = self.d.dump()
             current = self._focused_language_row(screen, order, native)
             if current == target_index:
@@ -225,8 +296,9 @@ class Flows:
                 time.sleep(2.5)
                 return
             if current is None:
-                raise HarnessError(
-                    f"no language-picker row is focused:\n{screen.pretty()}")
+                self.d.key("KEYCODE_DPAD_DOWN")  # establish focus on a touch device
+                time.sleep(0.5)
+                continue
             self.d.key("KEYCODE_DPAD_DOWN" if target_index > current else "KEYCODE_DPAD_UP")
             time.sleep(0.5)
         raise HarnessError(f"could not move the language picker to {target!r}")
@@ -265,12 +337,39 @@ class Flows:
         raise HarnessError("no install dialog appeared (download still running?)")
 
     def _confirm_system_install(self, timeout=90):
+        """Tap the stock installer's positive button, once or twice as the platform needs.
+
+        The label depends on the platform *and* on the situation: the AOSP installer (API 25) says
+        "INSTALL" ("INSTALLIEREN") for both a first install and an update; the Material installer
+        (API 31+) says "Install" for a first install but "Update" when replacing; and the AOSP
+        installer on API 31+ adds a *second* confirmation — "Update anyway" ("Trotzdem
+        aktualisieren") — when the app was installed by a different installer than this one (the
+        state a sideloaded Plezy is in). ``installer.confirm`` and ``installer.update_confirm`` may
+        each be one label or a list of alternatives; the loop taps whichever is on screen and stops
+        once the installer window is gone, so a two-dialog platform needs no special case.
+        """
         self.d.wait_focus("PackageInstallerActivity", timeout=timeout)
         time.sleep(1)
-        label = self.s.sys("installer.confirm")
-        screen = self.d.dump()
-        node = self._require(screen, f"installer button {label!r}", exact=label)
-        self._tap(node, label)
+        candidates = (self.s.sys_candidates("installer.confirm")
+                      + self.s.sys_candidates_optional("installer.update_confirm"))
+        tapped = False
+        for _ in range(3):
+            if "PackageInstallerActivity" not in self.d.current_focus():
+                break
+            screen = self.d.dump()
+            node = None
+            for label in candidates:
+                node = screen.find(exact=label)
+                if node is not None:
+                    break
+            if node is None:
+                break
+            self._tap(node, node.label)
+            tapped = True
+            time.sleep(2)
+        if not tapped:
+            raise HarnessError(
+                f"installer confirm button not found (tried {candidates}):\n{self.d.dump().pretty()}")
 
     def _confirm_system_uninstall(self, timeout=90):
         self.d.wait_focus("UninstallerActivity", timeout=timeout)
@@ -314,6 +413,33 @@ class Flows:
             time.sleep(1)
         return False
 
+    def assert_open_prompt_opens_plezy(self, timeout=25):
+        """Tap **Open** on the "Open Plezy?" prompt and prove it starts Plezy (roadmap item 6).
+
+        Every install flow *dismisses* the prompt (``_dismiss_open_prompt`` taps "Not now"), so
+        only the negative path was covered — the dialog merely appearing proved nothing about its
+        **Open** button, which had never been pressed by the harness. This presses it and asserts
+        Plezy's MainActivity comes to the front, then leaves the updater in front again so the run
+        ends on a known screen.
+        """
+        title = self.s.app("open_prompt.title")
+        open_label = self.s.app("open_prompt.open")
+        pkg = self.c["plezy_package"]
+        screen, _ = self._wait_for(title, what=f"{title!r} prompt", timeout=timeout)
+        node = self._require(screen, f"prompt button {open_label!r}", exact=open_label)
+        self._tap(node, open_label)
+        deadline = time.time() + timeout
+        last = ""
+        while time.time() < deadline:
+            last = self.d.current_focus()
+            if pkg in last:
+                self.log(f"    ✓ Open launched Plezy ({last})")
+                self.d.shell(f"am force-stop {pkg}", check=False)
+                self.open_updater()
+                return
+            time.sleep(1)
+        raise HarnessError(f"tapping {open_label!r} did not launch Plezy (focus: {last!r})")
+
     def _back_to_main(self, timeout=25):
         """Walk back to the updater's Main View with BACK — never force-stops or relaunches.
 
@@ -344,7 +470,13 @@ class Flows:
         dict, or None when the receiver did not answer.
         """
         action = self.c["diagnostics_action"]
-        out = self.d.shell(f"am broadcast --include-stopped-packages -a {action}", check=False)
+        # -p <package> makes the broadcast explicit. Since targetSdk 26 the platform refuses to
+        # deliver an *implicit* broadcast to a manifest receiver ("Background execution not
+        # allowed" in logcat), so the bare action works on the API 25 stick but is dropped on
+        # API 26+. Naming the package is what the docs and the shell example must show too.
+        out = self.d.shell(
+            f"am broadcast -p {self.c['updater_package']} --include-stopped-packages -a {action}",
+            check=False)
         last = out.strip().splitlines()[-1] if out.strip() else "(no output)"
         self.log(f"    quota broadcast: {last}")
         m = re.search(r'result=(-?\d+)(?:,\s*data="(.*)")?', out)
@@ -522,7 +654,9 @@ class Flows:
         self._tap(node, node.label)
         self._confirm_system_install(timeout=180)
         self.assert_installed(version)
-        self._dismiss_open_prompt()
+        # Prove the "Open Plezy?" prompt's positive button really launches Plezy (item 6), then
+        # leave the updater in front. The other flows only ever dismiss this prompt.
+        self.assert_open_prompt_opens_plezy()
         self.log(self._space_note(before))
         return version
 

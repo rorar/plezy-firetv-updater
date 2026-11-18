@@ -1,0 +1,19 @@
+{
+  "language": "English",
+  "locale": "en-US",
+  "_comment": "The stock installer's labels on the Material installer used from Android 12 (API 31) on. The buttons are the same sentence case as the older Google installer, but an update reads 'Update' instead of 'Install', and the prompts are shorter ('Do you want to install this app?' / 'Do you want to update this app?'). The uninstaller still says 'OK'. A profile points here with 'system_strings'; without it a run uses system.<lang>.json.",
+
+  "installer": {
+    "confirm": "Install",
+    "update_confirm": ["Update", "Update anyway"],
+    "cancel": "Cancel",
+    "fresh_prompt_contains": "Do you want to install this app?",
+    "update_prompt_contains": "Do you want to update this app?"
+  },
+
+  "uninstaller": {
+    "confirm": "OK",
+    "cancel": "Cancel",
+    "prompt_contains": "Do you want to uninstall this app?"
+  }
+}

@@ -15,7 +15,9 @@ follows from it.
 
 Releases (the APK is attached to each): **<https://github.com/rorar/plezy-firetv-updater/releases>**.
 
-Verified on **2026-11-13/17** with Plezy `2.26.0`, ADB `1.0.41` (platform-tools `37.0.0`).
+Verified on **2026-11-13/18** with Plezy `2.26.0`, ADB `1.0.41` (platform-tools `37.0.0`) — on the
+stick (API 25) end to end, on the emulator lane (Android TV API 25/30, phone API 34), and on a real
+arm64 phone (API 35) for `0.6.0`.
 
 ---
 
@@ -66,7 +68,7 @@ Verified on **2026-11-13/17** with Plezy `2.26.0`, ADB `1.0.41` (platform-tools 
 | Launcher | 24 `LEANBACK_LAUNCHER` entries, app appears in the Fire TV home row |
 | APK used | `derFrisson/plezy-apks` `2.26.0` → `plezy-android-armeabi-v7a.apk` (90,748,577 bytes) |
 | Installed size | ~87 MB in `/data/app/com.edde746.plezy-1` |
-| Updater | `dev.rorar.plezyupdater` `0.5.0` (`versionCode 5`, minSdk 25 / targetSdk 26) — see [docs/08](docs/08-app-implementation.md) |
+| Updater | `dev.rorar.plezyupdater` `0.6.0` (`versionCode 6`, minSdk 25 / targetSdk 31) — see [docs/08](docs/08-app-implementation.md) |
 
 ## The updater app
 
@@ -75,7 +77,7 @@ are the bulk of it; the code and vectors are small). It polls the upstream GitHu
 user-set interval (default twice a day) and after boot, posts a notification when something newer
 exists, and installs it with one confirmation on the stock Fire OS installer screen. It detects what
 it is running on — Fire TV, another Android TV, or a touch device — and picks its wording to match
-("press OK" vs "tap"). It is minSdk 25 / **targetSdk 26**, so the periodic check is a `JobScheduler`
+("press OK" vs "tap"). It is minSdk 25 / **targetSdk 31**, so the periodic check is a `JobScheduler`
 job and the notification uses a platform channel on Android 8+ while the API 25 stick keeps the
 legacy path — one code path, no AndroidX. Settings are grouped into User / Advanced / Developer
 sections:
@@ -160,8 +162,12 @@ python3 test/run.py install --app-lang de   # set the app to German, then run
 The updater is runtime-switchable, so `--app-lang` sets the app's language (via Settings →
 Language) before the flows run — one build is exercised in every language. Every label the flows
 look for lives in per-language JSON (`test/strings/app.<lang>.json` for the app,
-`test/strings/system.<lang>.json` for the stock Fire OS dialogs), so no label is hard-coded and the
-same flows run against any app language and any device locale.
+`test/strings/system.<lang>.json` for the stock installer dialogs), so no label is hard-coded and
+the same flows run against any app language and any device locale. The same harness also runs on
+**emulators** (`test/emulator.sh` + `--profile`, see [`test/README.md`](test/README.md#emulator-lane)):
+an Android TV image (API 25/30) for the branches the API 25 stick cannot reach, an API 34 phone that
+runs the whole flow and enforces the `targetSdk` 31 rules, and a **real** API 35 arm64 phone
+(`--profile phone35`) that closes the arm64 gap.
 
 ## Quick start (reproduce the install)
 

@@ -60,7 +60,14 @@ public final class Notifier {
             Context app = c.getApplicationContext();
             Intent open = new Intent(app, MainActivity.class);
             open.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-            PendingIntent pi = PendingIntent.getActivity(app, 0, open, 0);
+            // API 31 (Android 12) makes the mutability flag mandatory for an app targeting 31+.
+            // Nothing fills extras into this one — it just opens MainActivity — so IMMUTABLE is
+            // correct (and is what the notification-trampoline rule wants: an activity, started
+            // directly, not a receiver that starts one). On API 25..30 the flags stay 0, exactly
+            // as before; FLAG_IMMUTABLE is a compile-time constant, so naming it is safe.
+            int piFlags = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+                    ? PendingIntent.FLAG_IMMUTABLE : 0;
+            PendingIntent pi = PendingIntent.getActivity(app, 0, open, piFlags);
 
             Notification.Builder builder;
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {

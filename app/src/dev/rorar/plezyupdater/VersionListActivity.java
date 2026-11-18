@@ -114,13 +114,18 @@ public class VersionListActivity extends Activity {
         super.onResume();
         // An install (from here or elsewhere) may have finished while this screen was paused.
         // A *null* read right around a PackageInstaller session is a transient — PackageManager
-        // briefly hides the package being replaced — so never downgrade a known version to null
-        // here. A real uninstall arrives through InstallFlow.onPlezyRemoved().
+        // briefly hides the package being replaced — so the screen keeps showing the last known
+        // version rather than flickering to "not installed".
         String current = PlezyRepo.installedVersion(this);
         if (current != null) {
             installedVersion = current;
         }
-        installFlow.onResume(installedVersion);
+        // The flow gets the *fresh* read, not the sticky field above: only a fresh read says
+        // whether a pending downgrade's uninstall really happened (null → install the APK we
+        // already downloaded) or was cancelled (non-null → say so). On Android 12+ this resume
+        // can run *before* the ACTION_PACKAGE_REMOVED broadcast, so passing the sticky field
+        // would be read as a cancellation and the downgrade would never install.
+        installFlow.onResume(current);
         refreshList();
         // An install may have finished while this screen was paused behind the installer.
         OpenPrompt.maybeShow(this);

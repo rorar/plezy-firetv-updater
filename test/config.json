@@ -5,16 +5,70 @@
   "main_activity": "dev.rorar.plezyupdater/.MainActivity",
   "plezy_package": "com.edde746.plezy",
 
-  "installer_activity": "com.android.packageinstaller/.PackageInstallerActivity",
-  "uninstaller_activity": "com.android.packageinstaller/.UninstallerActivity",
-
   "diagnostics_action": "dev.rorar.plezyupdater.action.DIAGNOSTICS",
 
-  "expected_device": {
-    "_comment": "What Device.kind()/isTv()/isTouch() must report for THIS stick, asserted against the device=…;tv=…;touch=… fields the diagnostics broadcast now carries. The stick is an Amazon Fire TV (AFTMM, amazon.hardware.fire_tv) with no touchscreen.",
-    "kind": "fire_tv",
-    "tv": "1",
-    "touch": "0"
+  "default_profile": "stick",
+
+  "profiles": {
+    "_comment": "Which device the run expects. --profile picks one; run.py copies its fields onto the top level (installer_activity, uninstaller_activity, expected_device) and uses system_lang when --system-lang is left at 'auto'. The emulator profiles also name the AVD/image so a run can say what it booted. A profile may name the environment variable that holds the device's address (serial_env) so `--profile phone35` needs no --serial; the real address stays in the gitignored local.env. 'navigation' is how the app's own screens are driven: 'dpad' (TV) or 'touch' (phone) — both are still driven with `input` (D-pad + tap), a dedicated touch flow is roadmap item 3.",
+
+    "stick": {
+      "description": "Fire TV Stick 4K (AFTMM), Fire OS 6.7.1.1 = Android 7.1.2 = API 25. The primary target; the API 25 regression test runs here.",
+      "installer_activity": "com.android.packageinstaller/.PackageInstallerActivity",
+      "uninstaller_activity": "com.android.packageinstaller/.UninstallerActivity",
+      "expected_device": {"kind": "fire_tv", "tv": "1", "touch": "0"},
+      "system_lang": "de",
+      "navigation": "dpad"
+    },
+
+    "tv25": {
+      "description": "AOSP Android TV emulator, API 25 (system-images;android-25;android-tv;x86). The same platform as the stick but a plain Android TV, so the kind must be android_tv, not fire_tv.",
+      "avd": "plezy-tv25",
+      "image": "system-images;android-25;android-tv;x86",
+      "_installer_note": "Like tv30, this image ships the Google installer package wrapping the AOSP activity classes. It has no touchscreen (-notouch), so touch=0.",
+      "installer_activity": "com.google.android.packageinstaller/com.android.packageinstaller.PackageInstallerActivity",
+      "uninstaller_activity": "com.google.android.packageinstaller/com.android.packageinstaller.UninstallerActivity",
+      "expected_device": {"kind": "android_tv", "tv": "1", "touch": "0"},
+      "system_lang": "en",
+      "navigation": "dpad"
+    },
+
+    "tv30": {
+      "description": "AOSP Android TV emulator, API 30 (system-images;android-30;android-tv;x86). First platform where the API 26+ notification channel and the background-execution limits are real.",
+      "avd": "plezy-tv30",
+      "image": "system-images;android-30;android-tv;x86",
+      "_installer_note": "This image ships the Google installer package (com.google.android.packageinstaller) wrapping the AOSP activity classes, and it reports a touchscreen (-finger), so touch=1.",
+      "installer_activity": "com.google.android.packageinstaller/com.android.packageinstaller.PackageInstallerActivity",
+      "uninstaller_activity": "com.google.android.packageinstaller/com.android.packageinstaller.UninstallerActivity",
+      "expected_device": {"kind": "android_tv", "tv": "1", "touch": "1"},
+      "system_lang": "en",
+      "navigation": "dpad"
+    },
+
+    "phone34": {
+      "description": "Google APIs phone emulator, API 34 (system-images;android-34;google_apis;x86_64). The only image here that runs Android 12+, so it is what enforces the targetSdk 31 rules (PendingIntent mutability, notification trampolines).",
+      "avd": "plezy-phone34",
+      "image": "system-images;android-34;google_apis;x86_64",
+      "_installer_note": "The Material installer on API 31+ says 'Install' / 'Cancel' (sentence case); the older AOSP installer says 'INSTALL' / 'CANCEL'. The uninstaller still says 'OK'. That is what system_strings points at.",
+      "installer_activity": "com.google.android.packageinstaller/.PackageInstallerActivity",
+      "uninstaller_activity": "com.google.android.packageinstaller/.UninstallerActivity",
+      "expected_device": {"kind": "touch", "tv": "0", "touch": "1"},
+      "system_lang": "en",
+      "system_strings": "system.en.api34.json",
+      "navigation": "touch"
+    },
+
+    "phone35": {
+      "description": "A real arm64 phone running an Android 15 (API 35) LineageOS GSI with a touchscreen and a de-DE locale. Closes the arm64 asset gap — Plezy publishes arm64-v8a / armeabi-v7a / x86_64 only, so the 32-bit x86 TV images cannot install it — and adds API 35 on top of phone34's API 34. Runs the full flows over touch.",
+      "serial_env": "PHONE_SERIAL",
+      "_installer_note": "The AOSP PackageInstaller on Android 15 uses sentence-case buttons in German: 'Installieren' for a first install, 'Aktualisieren' when replacing, 'Abbrechen', and the uninstaller still 'OK'. That 'Aktualisieren' is the one difference from the old AOSP installer, so this profile points at system.de.api34.json. The real address is NOT in this file — set PHONE_SERIAL in the gitignored local.env (see local.env.example).",
+      "installer_activity": "com.android.packageinstaller/.PackageInstallerActivity",
+      "uninstaller_activity": "com.android.packageinstaller/.UninstallerActivity",
+      "expected_device": {"kind": "touch", "tv": "0", "touch": "1"},
+      "system_lang": "de",
+      "system_strings": "system.de.api34.json",
+      "navigation": "touch"
+    }
   },
 
   "language_rows": {

@@ -1,18 +1,19 @@
 {
   "language": "English",
   "locale": "en-US",
-  "_comment": "The stock installer / uninstaller labels on an English-locale device. Kept for completeness; this stick is de-DE.",
+  "_comment": "The stock installer / uninstaller labels on an English-locale device. Measured on the AOSP Android TV images (tv25 API 25, tv30 API 30), whose Google PackageInstaller uses one 'Install' label for a first install *and* an update. The harness matches labels case-insensitively, so the platform's upper-casing (Theme.Material on API 31+) does not matter. The stick is de-DE and uses system.de.json.",
 
   "installer": {
-    "confirm": "INSTALL",
-    "cancel": "CANCEL",
-    "fresh_prompt_contains": "Do you want to install this app?",
-    "update_prompt_contains": "Do you want to update this app?"
+    "confirm": "Install",
+    "update_confirm": "Install",
+    "cancel": "Cancel",
+    "fresh_prompt_contains": "Do you want to install this application?",
+    "update_prompt_contains": "Do you want to install an update to this existing application?"
   },
 
   "uninstaller": {
     "confirm": "OK",
-    "cancel": "CANCEL",
+    "cancel": "Cancel",
     "prompt_contains": "Do you want to uninstall this app?"
   }
 }

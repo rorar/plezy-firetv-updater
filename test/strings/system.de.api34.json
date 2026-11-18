@@ -1,0 +1,19 @@
+{
+  "language": "German",
+  "locale": "de-DE",
+  "_comment": "The stock installer's labels on the AOSP PackageInstaller shipped with Android 12+ (API 31+), German locale. Measured on the API 35 LineageOS GSI (profile phone35): the buttons are sentence case ('Installieren' / 'Abbrechen'), a same-source update reads 'Aktualisieren', and an update whose app was installed by a *different* installer first asks 'Soll diese App von … aktualisiert werden?' with the button 'Trotzdem aktualisieren' — hence the two candidates. The harness matches case-insensitively. A profile points here with 'system_strings'; without it a run uses system.<lang>.json.",
+
+  "installer": {
+    "confirm": "Installieren",
+    "update_confirm": ["Aktualisieren", "Trotzdem aktualisieren"],
+    "cancel": "Abbrechen",
+    "fresh_prompt_contains": "Möchtest du diese App installieren?",
+    "update_prompt_contains": "Möchtest du diese App aktualisieren?"
+  },
+
+  "uninstaller": {
+    "confirm": "OK",
+    "cancel": "Abbrechen",
+    "prompt_contains": "Möchtest du diese App deinstallieren?"
+  }
+}

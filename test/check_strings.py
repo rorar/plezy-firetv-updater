@@ -110,6 +110,39 @@ def check_resources(problems):
     return base
 
 
+def check_system_variants(problems):
+    """A ``system.<lang>.<variant>.json`` must carry exactly the keys of its base file.
+
+    The stock installer's *wording* changes with the platform (the Material installer's
+    sentence-case buttons, say), but the set of labels the harness reads is fixed. A variant that
+    drops or invents a key would make a flow look for a label that is no longer there.
+    """
+    def leaves(node, prefix=""):
+        if not isinstance(node, dict):
+            return {prefix}
+        out = set()
+        for key, value in node.items():
+            if key.startswith("_"):
+                continue
+            out |= leaves(value, f"{prefix}.{key}" if prefix else key)
+        return out
+
+    for name in sorted(os.listdir(LABELS)):
+        if not re.match(r"^system\.[a-z]{2}\..+\.json$", name):
+            continue
+        base_name = ".".join(name.split(".")[:2]) + ".json"
+        base_path = os.path.join(LABELS, base_name)
+        if not os.path.exists(base_path):
+            problems.append(f"{name}: no base {base_name}")
+            continue
+        base = leaves(json.load(open(base_path)))
+        variant = leaves(json.load(open(os.path.join(LABELS, name))))
+        for key in sorted(base - variant):
+            problems.append(f"{name}: missing {key!r} (present in {base_name})")
+        for key in sorted(variant - base):
+            problems.append(f"{name}: extra {key!r}")
+
+
 def check_labels(problems):
     def leaves(node, prefix=""):
         if not isinstance(node, dict):
@@ -138,6 +171,7 @@ def main():
     problems = []
     base = check_resources(problems)
     check_labels(problems)
+    check_system_variants(problems)
 
     counts = "   ".join(
         f"values-{lang}: {len(read_strings(resource(lang)))}" for lang in LANGS)

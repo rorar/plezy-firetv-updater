@@ -1,8 +1,11 @@
 # 08 — The updater app, as built
 
-`app/` is the working updater: `dev.rorar.plezyupdater` **0.5.0** (`versionCode 5`),
-minSdk **25** / targetSdk **26**, plain Java, programmatic UI, **no Gradle and no AndroidX**. It was
-verified end-to-end on the stick (AFTMM, Fire OS 6.7.1.1 / API 25) on 2026-11-13/17.
+`app/` is the working updater: `dev.rorar.plezyupdater` **0.6.0** (`versionCode 6`),
+minSdk **25** / targetSdk **31**, plain Java, programmatic UI, **no Gradle and no AndroidX**. It is
+verified end-to-end on the API 25 stick (AFTMM, Fire OS 6.7.1.1 / API 25) and, on 2026-11-18, on the
+emulator lane (Android TV API 25/30, phone API 34) **and on a real arm64 phone** (LineageOS 22.1 =
+Android 15 = API 35). All five flows pass 5/5 in English and German, with French and Spanish
+`install` smokes, on both the stick and the phone.
 
 ## What it does
 
@@ -126,6 +129,62 @@ if (intent.getBooleanExtra(Intent.EXTRA_REPLACING, false)) {
 `EXTRA_REPLACING` is exactly the platform's signal for "this removal is part of a replace", so the
 handshake now only fires for a real uninstall. (Confirmed on the stick: `pm path` reported Plezy
 installed and unchanged throughout the session, so the null was purely a UI-state artefact.)
+
+## Finding 5 — the uninstall handshake raced the platform on Android 12+
+
+The downgrade handshake finishes on whichever of two signals arrives first: the
+`ACTION_PACKAGE_REMOVED` broadcast ([Finding 4](#finding-4--replacing-a-package-also-broadcasts-action_package_removed))
+or the activity's `onResume`, which runs when the stock uninstaller closes
+([Downgrade](#downgrade)). The activity kept the last known version in a field and passed *that*
+to the flow, trusting the broadcast to have already blanked it. On the Fire TV (API 25) it had — the
+resume saw `null` and installed the cached APK, which is why every stick run passed.
+
+On Android 12+ the order is the other way round: `onResume` runs *before* the removal broadcast. The
+field was still `2.26.0`, so the flow read a non-null version as *"the user cancelled the
+uninstall"*: it cleared the pending downgrade and showed the **"Downgrade cancelled"** toast — while
+Plezy was in fact already gone and the picker already said *Installed: none*. The downgrade never
+installed and the progress line stuck on "Uninstalling Plezy…".
+
+**First fix (the emulator lane, `phone34` / API 34).** Hand the flow the **fresh** read instead of
+the sticky field, so the flow decides install-vs-cancel on what is true *now*:
+
+```java
+String current = PlezyRepo.installedVersion(this);
+if (current != null) {
+    installedVersion = current;   // the screen keeps the last known version for its own UI
+}
+installFlow.onResume(current);    // the flow decides install-vs-cancel on what is true *now*
+```
+
+The sticky field still guards the *UI* against the transient `null` PackageManager reports while it
+swaps a package; the flow only consults the argument when a downgrade is actually pending, where a
+`null` unambiguously means the uninstall we asked for happened.
+
+**That was not enough (the real phone, `phone35` / API 35).** A *fresh* read is still not a truth
+signal: on the phone the uninstall had not yet propagated to PackageManager, so `current` was still
+`2.26.0` for ~137 ms after a **successful** uninstall. The fresh read was therefore read as a
+cancellation too, and the downgrade failed again — this time with the APK already downloaded and
+Plezy gone. Measured on-device: the stock uninstaller closed at `16:25:24.4`, `onResume` read the
+version at `16:25:24.6`, and the `ACTION_PACKAGE_REMOVED` broadcast landed at `16:25:24.8`.
+
+So `InstallFlow` no longer *decides* on that read at all. A non-null read schedules a **bounded
+re-check** (750 ms × 5) and waits for the authoritative `ACTION_PACKAGE_REMOVED` broadcast; the
+broadcast (or the first re-check that sees Plezy gone) installs the cached APK, and only a version
+that is *still* there after all five checks is a real cancellation:
+
+```java
+public void onResume(String installedVersion) {
+    if (pendingDowngradeApk == null || busy) return;
+    if (installedVersion == null) { installPendingDowngrade(); return; }  // gone → install now
+    scheduleUninstallRecheck();     // maybe gone → let the broadcast decide, don't cancel yet
+}
+```
+
+The re-check is cancelled the moment either signal settles the downgrade (`installPendingDowngrade`
+/ `clearPendingDowngrade` / `dispose`), so neither path installs twice and no callback outlives the
+screen. Verified on the phone: logcat `downgrade: Plezy still reads as 2.26.0 — re-checking before
+deciding it was cancelled`, then `downgrade: Plezy is gone — installing` as the broadcast arrived,
+then the cached APK's installer appeared. Both signals remain, so either order works.
 
 ## Install routine (shared)
 
@@ -383,7 +442,15 @@ Two behaviour differences worth knowing:
   while the TV is on; the UI wording ("Runs while the TV is on", "Checks every 12 hours while the
   TV is on") already says so.
 
+**Verified on a newer platform.** The API 26+ branches this stick cannot reach are exercised on the
+emulator lane ([`test/README.md`](../test/README.md#emulator-lane)): on `tv30` (Android TV, API 30)
+and `phone34` (API 34) the channel is created (`dumpsys notification` shows the `updates` channel
+and the notification on it), `Notifier.ensureChannel` is a no-op-safe call on every post, and the
+`JobScheduler` job runs under the background-execution limits the `targetSdk` 26 bump was about.
+`phone34` additionally runs the whole Plezy flow, which is where the Android 12+ downgrade race
+([Finding 5](#finding-5--the-uninstall-handshake-raced-the-platform-on-android-12)) was found.
 
+## Staying under GitHub's rate limit
 
 GitHub's REST API is **metered**: 60 requests per hour for an unauthenticated client, per IP. The
 updater spends one on every screen and every boot, so a burst of checks (and the flow tests, which
@@ -445,10 +512,12 @@ instead of the old ARM-only wording.
 
 > The `arm64-v8a` and `x86_64` **signer hashes are verified** off-device (2026-11-16): both tarballs
 > extract to an APK signed with the same certificate as the 32-bit one
-> (`903b862c…316e72`, `CN=Edvard Wikhall, O=edde746`) and carry `lib/arm64-v8a` / `lib/x86_64`. What
-> is still unverified on this hardware is the **install** itself — the stick is 32-bit, so it never
-> exercises the 64-bit branch — and the `err_no_native_libs` branch stays logic-only. The
-> `armeabi-v7a` path is exercised on every install and flow run.
+> (`903b862c…316e72`, `CN=Edvard Wikhall, O=edde746`) and carry `lib/arm64-v8a` / `lib/x86_64`. All
+> three installs are now exercised end to end: `armeabi-v7a` on every stick install, `x86_64` on the
+> `phone34` emulator (abilist `x86_64,arm64-v8a` → `plezy-android-x86_64.tar.gz`), and **`arm64-v8a`
+> on the real arm64 phone** (`phone35`, abilist `arm64-v8a,…` → `plezy-android-arm64-v8a.tar.gz`,
+> `dumpsys package com.edde746.plezy` afterwards reports `primaryCpuAbi=arm64-v8a`). Only the
+> `err_no_native_libs` branch stays logic-only.
 
 ## Device detection (Fire TV / Android TV / touch)
 
@@ -710,7 +779,9 @@ instead of a stale "up to date".
 
 Selecting an older version while **Allow older versions** is on would normally die at
 `INSTALL_FAILED_VERSION_DOWNGRADE` ([Finding 2](#finding-2--android-71-refuses-downgrades-of-release-builds)).
-Instead the app takes the only route Android 7.1 allows — uninstall, then install:
+Instead the app takes the uninstall-then-install route — the only one Android 7.1 allows, and the
+one it uses on every API level so there is a single code path ([Finding
+5](#finding-5--the-uninstall-handshake-raced-the-platform-on-android-12)):
 
 1. **Download and verify first**, while Plezy is still installed, so a failed download never
    leaves the user with no Plezy. The verified APK is cached.
@@ -718,9 +789,12 @@ Instead the app takes the only route Android 7.1 allows — uninstall, then inst
    (servers, settings, downloads) is erased — and then 2.25.0 installed").
 3. **Uninstall** via `ACTION_DELETE`.
 4. On `ACTION_PACKAGE_REMOVED` (or `onResume`, whichever comes first), **install** the cached APK
-   through the normal `PackageInstaller` session → the usual install dialog. The removal must be a
-   real uninstall — a replace also broadcasts `REMOVED`, so `InstallFlow` ignores anything flagged
-   with `EXTRA_REPLACING` ([Finding 4](#finding-4--replacing-a-package-also-broadcasts-action_package_removed)).
+   through the normal `PackageInstaller` session → the usual install dialog. Which of the two wins
+   is platform-dependent — on Android 12+ `onResume` runs first ([Finding
+   5](#finding-5--the-uninstall-handshake-raced-the-platform-on-android-12)), so the flow is given
+   the fresh installed-version read rather than a cached one. The removal must be a real uninstall —
+   a replace also broadcasts `REMOVED`, so `InstallFlow` ignores anything flagged with
+   `EXTRA_REPLACING` ([Finding 4](#finding-4--replacing-a-package-also-broadcasts-action_package_removed)).
    All of this lives in `InstallFlow`, so the picker can start a downgrade too.
 5. `InstallResultReceiver` re-checks as always, so the screen shows the new version (and, since
    the latest release is now newer again, offers the upgrade back).
@@ -792,7 +866,18 @@ with `--app-lang`) and the stock installer/uninstaller strings from `test/string
 (selected from the device locale with `--system-lang`, auto-detected). All four app languages
 (`en`/`de`/`fr`/`es`) ship as complete files, mirroring the `res/values*/strings.xml` they stand for;
 the same flows therefore run against any app language and any device locale, and adding a language
-is a matter of copying a pair of JSON files.
+is a matter of copying a pair of JSON files. A platform whose installer is worded differently points
+at a `system.<lang>.<variant>.json` from its profile (`phone34` → `system.en.api34.json`, for the
+Material installer's `Update` button); the variant must carry exactly the base file's keys, which
+`check_strings.py` enforces. Labels are matched **case-insensitively**, because `Theme.Material`
+upper-cases dialog buttons on API 31+ while Fire OS renders them as written.
+
+**Emulator lane.** The same harness runs on emulators, not just the stick:
+[`test/emulator.sh`](../test/README.md#emulator-lane) boots the AVDs headless and `run.py --profile
+<name>` selects one from `test/config.json`. `phone34` (x86_64, API 34) runs the whole flow and
+enforces the `targetSdk` 31 rules; `tv25` / `tv30` (x86, Android TV) cover the device-detection and
+API 26+ branches but only updater-side, because Plezy has no 32-bit `x86` build. Only one emulator
+runs at a time.
 
 The **`upgrade` flow (A2)** is the one the user asked for after the downgrade work: it proves the
 **Main View** path, not the picker. It goes back with the remote's BACK key — deliberately not a
@@ -802,7 +887,7 @@ dashboard and proves a *replace* from the package identity: `firstInstallTime` m
 `lastUpdateTime` must, because a fresh install would move both. If Plezy is not already on the older
 release the flow downgrades first, so `upgrade` also runs on its own.
 
-## Verified on hardware (2026-11-14/16)
+## Verified on hardware (2026-11-14/18)
 
 | Step | Result |
 |---|---|
@@ -929,33 +1014,127 @@ Device detection + device-aware wording, same stick (2026-11-17), updater `0.4.0
 | Quota / device report | every flow run asserts `data="status=ok;…;device=fire_tv;tv=1;touch=0"` — unchanged |
 | English `all` | **5/5 PASS** — install 58s, downgrade 66s, upgrade 34s, uninstall 72s, clean-install 43s |
 | German / French / Spanish smokes | `install --app-lang de\|fr\|es` → **1/1 each** (61/54/74s), then English restored |
-| **Not verifiable here** | the API 26+ branches: `NotificationChannel` creation and the background-execution-limit avoidance a job buys. No API 26+ device or emulator exists in this environment, so both are **logic**-verified only |
+| **Not verifiable on the stick** | the API 26+ branches: `NotificationChannel` creation and the background-execution-limit avoidance a job buys. These are now covered by the emulator lane below |
+
+`targetSdk` 31 (`0.6.0`), same stick (2026-11-18), updater `0.6.0` / `versionCode 6`
+(APK 311 018 B, `sha256 8f718827…`):
+
+| Step | Result |
+|---|---|
+| Build identity | `dumpsys package dev.rorar.plezyupdater` → `versionCode=6 minSdk=25 targetSdk=31`, `versionName=0.6.0` |
+| Quota / device report | `data="status=ok;…;device=fire_tv;tv=1;touch=0"` — unchanged on API 25 |
+| English `all` | **5/5 PASS** — install 55s, downgrade 69s, upgrade 34s, uninstall 71s, clean-install 54s |
+| In-place upgrade | `firstInstallTime 2026-11-18 16:50:50` **unchanged**, `lastUpdateTime 16:51:27` moved — the 2.25.0 → 2.26.0 replace did not reinstall |
+| Downgrade on API 25 | the removal broadcast still arrives *before* `onResume` here, so the new re-check is never even scheduled: **OK** → **INSTALLIEREN** immediately, Plezy `2.25.0` — the API 25 behaviour is byte-for-byte unchanged ([Finding 5](#finding-5--the-uninstall-handshake-raced-the-platform-on-android-12)) |
+| "Open Plezy?" **Open** | the `clean-install` flow now presses **Open** (not just **Not now**) and asserts Plezy's `MainActivity` comes to the front: `✓ Open launched Plezy (Window{… com.edde746.plezy/.MainActivity})` |
+
+### Emulator lane (2026-11-18), updater `0.6.0` / `versionCode 6`
+
+A second and third platform, for the branches the API 25 stick cannot produce. `test/emulator.sh`
+boots the AVDs headless and `run.py --profile` drives them
+([`test/README.md`](../test/README.md#emulator-lane)); the real phone needs only `--profile phone35`.
+The lane earned its keep immediately — it found the Android 12+ downgrade race
+([Finding 5](#finding-5--the-uninstall-handshake-raced-the-platform-on-android-12)), then found it
+*again* on the real phone where the emulator had passed, and caught the case-sensitivity the harness
+had assumed away.
+
+`phone34` (Google APIs phone, API 34 — the image that enforces the `targetSdk` 31 rules), full flow:
+
+| Step | Result |
+|---|---|
+| Build identity | `dumpsys package dev.rorar.plezyupdater` → `versionCode=6 minSdk=25 targetSdk=31`, `versionName=0.6.0` |
+| Device report | `data="…;device=touch;tv=0;touch=1"` — asserted against `config.json` |
+| English `all` | **5/5 PASS** — install / downgrade / upgrade / uninstall / clean-install |
+| In-place upgrade | `firstInstallTime` unchanged, `lastUpdateTime` moved — the replace did not reinstall |
+| Downgrade (Android 12+) | this is where the Android 12+ ordering first bit: `onResume` ran **before** `ACTION_PACKAGE_REMOVED`, so a successful uninstall looked cancelled. The fix is [Finding 5](#finding-5--the-uninstall-handshake-raced-the-platform-on-android-12); the flow passes now |
+| Installer labels | the Material installer's `install`/`update`/`cancel` strings pulled from its APK match `strings/system.en.api34.json` (`Install` / `Update` / `Cancel`) |
+
+`tv30` (AOSP Android TV, API 30 — the first image here where the API 26+ branches are real):
+
+| Step | Result |
+|---|---|
+| Device report | `data="…;device=android_tv;tv=1;touch=1"` — the `android_tv` kind the stick cannot produce, and a TV that *does* report a touchscreen |
+| Channel created | `dumpsys notification --noredact` → `NotificationChannel{mId='updates', mName=Update notifications, mImportance=3}` |
+| Notification on the channel | `NotificationRecord(pkg=dev.rorar.plezyupdater id=1001 … channel=updates)` |
+| No trampoline | its `contentIntent` is `PendingIntentRecord{… startActivity …}` — an activity started directly, the shape Android 12 requires |
+| Periodic job under the limits | `JOB #…/2001 … PERIODIC interval=+12h`, `Network type: INTERNET`, satisfied constraints include `BACKGROUND_NOT_RESTRICTED` / `WITHIN_QUOTA` — the background-execution machinery the `targetSdk` 26 bump is about |
+| The job actually checks | `cmd jobscheduler run -f … 2001` → logcat `background check starting (manual=false)`, then `notification posted: Plezy 2.26.0 available` |
+
+`tv25` (AOSP Android TV, API 25 — the stick's platform without Fire OS):
+
+| Step | Result |
+|---|---|
+| Device report | `data="…;device=android_tv;tv=1;touch=0"` — classified `android_tv`, not `fire_tv`, on the same API level as the stick |
+| Job armed | `JOB #…/2001 … PERIODIC interval=+12h0m0s0ms` |
+| Installer labels | the Google installer's `install`/`cancel`/`ok` strings match `strings/system.en.json` (`Install` / `Cancel` / `OK`) |
+
+The `tv25`/`tv30` profiles run **updater-side checks only**: Plezy ships no 32-bit `x86` build, so
+the full Plezy flows cannot install on those images. `phone34` (x86_64) is the one that runs them.
+
+### Real phone (2026-11-18), updater `0.6.0` / `versionCode 6`
+
+The emulator lane proved the API 31 rules, but an emulator is not real hardware — and the biggest
+remaining gap was **arm64**. A real phone closes both: an arm64 phone running a LineageOS 22.1
+(Android 15 = **API 35**) build, touchscreen, `de-DE`. Its address and identity are not in the repo —
+the profile names an environment variable (`PHONE_SERIAL`, see
+[`test/README.md`](../test/README.md#device-profiles)) that lives only in the gitignored
+`local.env`. It is driven as `--profile phone35`.
+
+| Step | Result |
+|---|---|
+| Build identity | `dumpsys package dev.rorar.plezyupdater` → `versionCode=6 minSdk=25 targetSdk=31`, `versionName=0.6.0`; the phone reports `POST_NOTIFICATIONS` **not granted** (the API 33 item, below) |
+| Device report | `data="…;device=touch;tv=0;touch=1"` — a real touch phone, asserted against `config.json` |
+| **arm64 install** | abilist `arm64-v8a,…` → `assetName()` picks `plezy-android-arm64-v8a.tar.gz`; `dumpsys package com.edde746.plezy` afterwards → `primaryCpuAbi=arm64-v8a` — the 64-bit install branch, now verified on real hardware (B2) |
+| English `all` | **5/5 PASS** — install 42s, downgrade 51s, upgrade 23s, uninstall 63s, clean-install 37s |
+| German `all` | **5/5 PASS** — install 44s, downgrade 59s, upgrade 23s, uninstall 96s, clean-install 35s |
+| French / Spanish smokes | `install --app-lang fr\|es` → **1/1 each** (40/41s) |
+| In-place upgrade | `firstInstallTime 2026-11-18 16:38:45` **unchanged**, `lastUpdateTime 16:39:11` moved |
+| **Downgrade (the real catch)** | the *first* fix was not enough here: a **fresh** `installedVersion` read was still `2.26.0` ~137 ms after a successful uninstall, so the downgrade was cancelled and no installer appeared. The bounded re-check fixed it — logcat `downgrade: Plezy still reads as 2.26.0 — re-checking…`, then `downgrade: Plezy is gone — installing`. This is [Finding 5](#finding-5--the-uninstall-handshake-raced-the-platform-on-android-12) |
+| "Open Plezy?" **Open** | `clean-install` pressed **Open** and asserted Plezy's `MainActivity` came to the front (`✓ Open launched Plezy (…com.edde746.plezy/.MainActivity)`) |
+| Installer labels | the AOSP PackageInstaller on Android 15 is German: **`Installieren`** (fresh) / **`Aktualisieren`** (update) / **`Trotzdem aktualisieren`** (update from a different installer) / **`Abbrechen`** — pulled from its APK and recorded in `strings/system.de.api34.json` |
+| Destructive, and expected | the downgrade / uninstall / clean-install flows **erased Plezy's data** on the phone (the user accepted this); it was left back on `2.26.0` |
+
+The `Trotzdem aktualisieren` button is a real finding: a sideloaded Plezy was installed by an earlier
+installer, so an update from *this* one first asks "Soll diese App von … aktualisiert werden?" — a
+**second** confirmation dialog the harness had never seen. `installer.confirm` / `installer.update_confirm`
+may now each be a *list* of candidate labels, and `_confirm_system_install` taps whichever is on
+screen, up to three dialogs, so a two-dialog platform needs no special case.
 
 ## Known limitations
+
 - One remote confirmation per install (silent install is impossible; [06](06-own-updater-feasibility.md)).
 - A downgrade costs two confirmations and **erases Plezy's data**; the app warns before starting
   ([Downgrade](#downgrade)).
-- **Device detection and the touch wording are logic-verified, not hardware-verified, beyond
-  `FIRE_TV`.** This stick only produces the `FIRE_TV` / no-touch case; the Android TV, touch and
-  `values-finger` branches are covered by `test/jvm/run.sh` (25 cases) and `test/check_strings.py`,
-  never against a real Android TV or phone. The **touch layout** is not adapted at all — the app is
-  TV-first (32–48 dp padding, ≥ 50 dp rows, D-pad focus, two-pane pickers that move left/right) — so
-  a phone would get TV-sized UI. See
+- **Device detection and the touch wording are verified on real hardware now.** This stick produces
+  the `FIRE_TV` / no-touch case; the Android TV branch (`tv25`/`tv30`) and the touch branch
+  (`phone34`) are **device**-verified on the emulator lane, and the touch branch is also verified on
+  a **real** touch phone (`phone35`, API 35) — see
+  [above](#emulator-lane-2026-11-18-updater-060--versioncode-6). `test/jvm/run.sh` (25 cases) and
+  `test/check_strings.py` still cover the decision logic and the `values-finger` wording off-device,
+  and no real Android TV (only emulators) has been seen. The **touch layout** is still not adapted at
+  all — the app is TV-first (32–48 dp padding, ≥ 50 dp rows, D-pad focus, two-pane pickers that move
+  left/right) — so a phone gets TV-sized UI; `phone34`/`phone35` *drive* the flows over touch but that
+  is not the same as a tuned touch layout. See
   [roadmap item 3](11-roadmap.md#3-android-tv--phone-compatibility).
-- **The API 26+ notification-channel and job-scheduling branches are logic-verified only.** The
+- **The API 26+ notification-channel and job-scheduling branches are now device-verified.** The
   stick is API 25, so `Notifier.ensureChannel` and `new Notification.Builder(app, CHANNEL_ID)` never
-  run here, and the API 25 job is exercised on a platform whose `JobScheduler` predates the
-  background-execution limits the bump is about. The API 25 path is what the flows cover; a second
-  device at API 26+ is needed to see the other one. See
-  [Background checks](#background-checks-jobscheduler-targetsdk-26).
+  run there; `tv30` (API 30) shows the `updates` channel and the notification on it, and its job runs
+  under the background-execution limits the bump is about
+  ([above](#emulator-lane-2026-11-18-updater-060--versioncode-6)). The API 25 path is what the stick
+  flows cover. See [Background checks](#background-checks-jobscheduler-targetsdk-26).
+- **`POST_NOTIFICATIONS` is not granted on the API 35 phone.** The manifest declares it, but the
+  updater targets 31, so the runtime permission is not requested and the platform denies it by
+  default (`appops get … POST_NOTIFICATION` → `ignore`) — the notification is posted but not shown.
+  That is the first item of the `targetSdk` 33 step, not a regression
+  ([roadmap item 5](11-roadmap.md#5-targetsdk-bump-matrix)).
 - **A job does not wake a sleeping TV.** The old `RTC_WAKEUP` alarm could; `JobScheduler` runs the
   check while the TV is on, which the UI already promises ("Runs while the TV is on"). Also, a newly
   scheduled periodic job runs once almost immediately on this build before settling into its
   interval, so a launch checks twice (foreground + background) — harmless, the check is unmetered.
-- The `arm64-v8a` / `x86_64` **installs** are unverified on hardware (this stick is 32-bit): both
-  tarballs' signer hashes match the pinned value off-device and they carry the expected native libs,
-  but only a 64-bit device can exercise the branch end to end. The `err_no_native_libs` branch stays
-  logic-only. See [Which build for this device](#which-build-for-this-device-b2).
+- All **three install branches are now verified end to end**: `armeabi-v7a` on the stick, `x86_64`
+  on the `phone34` emulator, and **`arm64-v8a` on the real `phone35`** (which then reports
+  `primaryCpuAbi=arm64-v8a`). Only the `err_no_native_libs` branch stays logic-only. See
+  [Which build for this device](#which-build-for-this-device-b2).
 - GitHub's unauthenticated limit is 60 req/h. The app no longer spends it: the latest check uses
   the unmetered web endpoints and a 15-minute TTL, the picker's API call is conditional
   (`304`s are free), and a spent quota falls back to the web feed and the last known version

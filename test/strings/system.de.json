@@ -5,6 +5,7 @@
 
   "installer": {
     "confirm": "INSTALLIEREN",
+    "update_confirm": "INSTALLIEREN",
     "cancel": "ABBRECHEN",
     "fresh_prompt_contains": "Möchtest du diese App installieren?",
     "update_prompt_contains": "Möchtest du ein Update für diese App installieren?"

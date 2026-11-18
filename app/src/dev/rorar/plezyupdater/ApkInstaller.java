@@ -363,8 +363,17 @@ public final class ApkInstaller {
             if (selfUpdate) {
                 result.putExtra(InstallResultReceiver.EXTRA_SELF_UPDATE, true);
             }
-            PendingIntent pi = PendingIntent.getBroadcast(c, sessionId, result,
-                    PendingIntent.FLAG_UPDATE_CURRENT);
+            // API 31 (Android 12) makes the mutability flag mandatory: a PendingIntent created by
+            // an app targeting 31+ must say whether its extras may be filled in by the receiver.
+            // The platform writes the session result into this one — status, message and, on
+            // API 25, the confirmation intent in EXTRA_INTENT — so it has to stay MUTABLE. Older
+            // platforms know neither flag; FLAG_MUTABLE is a compile-time constant, so it is
+            // inlined and safe to name here, and it is only *added* where the platform reads it.
+            int piFlags = PendingIntent.FLAG_UPDATE_CURRENT;
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                piFlags |= PendingIntent.FLAG_MUTABLE;
+            }
+            PendingIntent pi = PendingIntent.getBroadcast(c, sessionId, result, piFlags);
             session.commit(pi.getIntentSender());
             Log.i(TAG, "install session " + sessionId + " committed");
         } catch (RuntimeException e) {

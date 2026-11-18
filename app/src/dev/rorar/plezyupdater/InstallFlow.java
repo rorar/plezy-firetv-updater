@@ -29,6 +29,10 @@ public final class InstallFlow {
 
     private static final String TAG = "PlezyUpdater";
 
+    /** How long, and how often, to wait for a successful uninstall to become visible. */
+    private static final long UNINSTALL_RECHECK_MS = 750;
+    private static final int UNINSTALL_RECHECK_TRIES = 5;
+
     /** The screen that owns a flow: it shows progress and re-reads its state when told to. */
     public interface Callback {
         /** One line of progress, e.g. "Downloading… 42%". */
@@ -55,6 +59,9 @@ public final class InstallFlow {
     private boolean busy;
     /** A verified APK waiting for Plezy to be uninstalled before it can be installed. */
     private File pendingDowngradeApk;
+    /** A pending "did the uninstall really happen?" re-check, and how many checks are left. */
+    private Runnable recheck;
+    private int recheckTries;
 
     public InstallFlow(Activity activity, Callback callback) {
         this.activity = activity;
@@ -81,6 +88,7 @@ public final class InstallFlow {
 
     /** Unregister the receiver; call from the screen's {@code onDestroy()}. */
     public void dispose() {
+        cancelRecheck();
         try {
             activity.unregisterReceiver(packageRemovedReceiver);
         } catch (Throwable ignored) {
@@ -98,6 +106,71 @@ public final class InstallFlow {
     }
 
     /**
+     * Call from the screen's {@code onResume()}. Finishes a downgrade whose uninstall dialog just
+     * closed: installs the pending APK if Plezy is gone, otherwise reports the cancellation.
+     *
+     * <p>A non-null {@code installedVersion} here is <em>not</em> proof the user cancelled: on
+     * Android 12+ this resume can run <em>before</em> the uninstall has propagated to
+     * PackageManager, so Plezy still reads as installed for a moment after a successful uninstall.
+     * On a real API 35 phone that made a successful downgrade look cancelled and no installer ever
+     * appeared — the phone lane's first catch. So instead of cancelling on that stale read, give
+     * the {@code ACTION_PACKAGE_REMOVED} broadcast — the authoritative signal — a moment to arrive,
+     * and only cancel once Plezy is <em>still</em> there a few checks later.
+     */
+    public void onResume(String installedVersion) {
+        if (pendingDowngradeApk == null || busy) {
+            return;
+        }
+        if (installedVersion == null) {
+            Log.i(TAG, "downgrade: Plezy is gone after the uninstall dialog — installing");
+            installPendingDowngrade();
+            return;
+        }
+        Log.i(TAG, "downgrade: Plezy still reads as " + installedVersion
+                + " — re-checking before deciding it was cancelled");
+        if (recheck == null) {
+            recheckTries = UNINSTALL_RECHECK_TRIES;
+        }
+        postRecheck();
+    }
+
+    /** Poll for a few seconds; install the moment Plezy is really gone, else call it a cancel. */
+    private void postRecheck() {
+        if (recheck != null) {
+            return;
+        }
+        recheck = new Runnable() {
+            @Override
+            public void run() {
+                recheck = null;
+                if (pendingDowngradeApk == null || busy) {
+                    return;  // the broadcast (or a fresh resume) already settled it
+                }
+                if (PlezyRepo.installedVersion(activity) == null) {
+                    Log.i(TAG, "downgrade: Plezy is gone — installing");
+                    installPendingDowngrade();
+                    return;
+                }
+                if (--recheckTries > 0) {
+                    postRecheck();
+                    return;
+                }
+                Log.i(TAG, "downgrade: Plezy is still installed — cancelled");
+                clearPendingDowngrade();
+                Notifier.toast(activity, activity.getString(R.string.toast_downgrade_cancelled));
+            }
+        };
+        ui.postDelayed(recheck, UNINSTALL_RECHECK_MS);
+    }
+
+    private void cancelRecheck() {
+        if (recheck != null) {
+            ui.removeCallbacks(recheck);
+            recheck = null;
+        }
+    }
+
+    /**
      * Re-adopt a downgrade that process death interrupted: the verified APK is still in the cache
      * and the release tag is in the prefs. Call from the screen's {@code onCreate()}.
      */
@@ -111,22 +184,6 @@ public final class InstallFlow {
             pendingDowngradeApk = apk;
         } else {
             Prefs.setPendingDowngrade(activity, null);
-        }
-    }
-
-    /**
-     * Call from the screen's {@code onResume()}. Finishes a downgrade whose uninstall dialog just
-     * closed: installs the pending APK if Plezy is gone, otherwise reports the cancellation.
-     */
-    public void onResume(String installedVersion) {
-        if (pendingDowngradeApk == null || busy) {
-            return;
-        }
-        if (installedVersion == null) {
-            installPendingDowngrade();
-        } else {
-            clearPendingDowngrade();
-            Notifier.toast(activity, activity.getString(R.string.toast_downgrade_cancelled));
         }
     }
 
@@ -278,6 +335,7 @@ public final class InstallFlow {
     private void handlePlezyRemoved() {
         callback.onPlezyRemoved();
         if (pendingDowngradeApk != null) {
+            Log.i(TAG, "ACTION_PACKAGE_REMOVED: finishing the pending downgrade");
             installPendingDowngrade();
         }
     }
@@ -287,6 +345,7 @@ public final class InstallFlow {
         if (apk == null || busy) {
             return;
         }
+        cancelRecheck();
         pendingDowngradeApk = null;
         Prefs.setPendingDowngrade(activity, null);
         setBusy(true);
@@ -338,6 +397,7 @@ public final class InstallFlow {
     }
 
     private void clearPendingDowngrade() {
+        cancelRecheck();
         pendingDowngradeApk = null;
         Prefs.setPendingDowngrade(activity, null);
     }

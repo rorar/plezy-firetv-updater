@@ -140,16 +140,19 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         // A *null* read right around a PackageInstaller session is a transient — PackageManager
-        // briefly hides the package being replaced — so never downgrade a known version to null
-        // here; a real uninstall arrives through InstallFlow.onPlezyRemoved().
+        // briefly hides the package being replaced — so the screen keeps showing the last known
+        // version rather than flickering to "not installed".
         String current = PlezyRepo.installedVersion(this);
         if (current != null) {
             installedVersion = current;
         }
 
         // Downgrade flow: the uninstall dialog just closed. If Plezy is gone, install the APK we
-        // downloaded earlier; if it is still there, the user cancelled and the flow says so.
-        installFlow.onResume(installedVersion);
+        // downloaded earlier; if it is still there, the user cancelled and the flow says so. The
+        // flow gets the *fresh* read, not the sticky field above: on Android 12+ this resume can
+        // run before the ACTION_PACKAGE_REMOVED broadcast, and a stale non-null version would be
+        // read as a cancellation, so the downgrade would never install.
+        installFlow.onResume(current);
 
         if (installedAtInstallCommit != null && installedVersion != null
                 && !installedVersion.equals(installedAtInstallCommit)) {

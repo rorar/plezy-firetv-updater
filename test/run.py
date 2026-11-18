@@ -6,11 +6,16 @@
     python3 test/run.py upgrade --yes                         # downgrade → Main View → upgrade
     python3 test/run.py install --app-lang de           # set the app to German, then run
     python3 test/run.py all --yes --build               # build + install the updater first
+    python3 test/run.py all --yes --profile tv30        # against the API 30 Android TV emulator
 
 The updater is runtime-switchable, so --app-lang is the language to *set* before the
 flows run (via Settings → Language), not a build variant. Labels come from strings/:
---app-lang picks the app's language, --system-lang picks the Fire OS dialogs' language
+--app-lang picks the app's language, --system-lang picks the stock installer's language
 (auto-detected from the device by default).
+
+--profile picks which device the run expects (config.json → "profiles"): the expected
+device classification, the stock installer package, the device's locale, and how the app's
+screens are driven. It defaults to the config's default_profile, the Fire TV stick.
 """
 
 import argparse
@@ -28,7 +33,7 @@ FLOW_ORDER = ["install", "downgrade", "upgrade", "uninstall", "clean-install"]
 DESTRUCTIVE = {"downgrade", "upgrade", "uninstall", "clean-install", "all"}
 
 
-def build_and_install(device, args):
+def build_and_install(device, args, package):
     app_dir = os.path.join(harness.REPO, "app")
     env = dict(os.environ)
     env.setdefault("BT", "/tmp/opencode/sdk/android-15")
@@ -40,6 +45,11 @@ def build_and_install(device, args):
         raise HarnessError(f"build produced no APK at {apk}")
     print(f"  installing {apk} …")
     print("    " + device.sh("install", "-r", apk, timeout=180).strip())
+    # From API 26 the install itself needs the "install unknown apps" appop, which defaults to
+    # deny; grant it here so `--build` leaves the device able to install (see Device method).
+    granted = device.grant_install_permission(package)
+    if granted:
+        print(f"  install permission: {granted}")
 
 
 def main(argv=None):
@@ -56,10 +66,12 @@ def main(argv=None):
     ap.add_argument("--no-set-language", action="store_true",
                     help="skip the Settings → Language step (assume --app-lang is already set)")
     ap.add_argument("--system-lang", default="auto",
-                    help="language of the Fire OS dialogs (default: auto-detect)")
-    ap.add_argument("--serial", default=os.environ.get("FIRE_TV_SERIAL"),
-                    help="adb serial, e.g. 192.168.1.50:5555 "
-                         "(default: $FIRE_TV_SERIAL, see local.env.example)")
+                    help="language of the stock installer's dialogs (default: auto-detect)")
+    ap.add_argument("--profile", default=None,
+                    help="device profile from config.json (default: its default_profile)")
+    ap.add_argument("--serial", default=None,
+                    help="adb serial, e.g. 192.168.1.50:5555 (default: the profile's "
+                         "serial_env, then $FIRE_TV_SERIAL — see local.env.example)")
     ap.add_argument("--adb", default="adb", help="adb binary (default: adb)")
     ap.add_argument("--latest", default=None, help="override the 'latest' version")
     ap.add_argument("--older", default=None, help="override the 'older' version")
@@ -76,24 +88,40 @@ def main(argv=None):
               file=sys.stderr)
         return 1
 
-    device = Device(serial=args.serial, adb=args.adb, verbose=args.verbose)
+    config = load_config()
+    try:
+        profile = harness.apply_profile(config, args.profile)
+    except HarnessError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    if args.latest:
+        config["versions"]["latest"] = args.latest
+    if args.older:
+        config["versions"]["older"] = args.older
+
+    # Which device to talk to: an explicit --serial wins, then the profile's environment
+    # variable (so `source local.env; run.py --profile phone35` finds the phone without a flag),
+    # then the stick's historical default $FIRE_TV_SERIAL.
+    serial = (args.serial
+              or os.environ.get(profile.get("serial_env") or "", "")
+              or os.environ.get("FIRE_TV_SERIAL"))
+
+    device = Device(serial=serial, adb=args.adb, verbose=args.verbose)
     try:
         device.require_connected()
     except HarnessError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
 
-    config = load_config()
-    if args.latest:
-        config["versions"]["latest"] = args.latest
-    if args.older:
-        config["versions"]["older"] = args.older
-
     system_lang = args.system_lang
+    # A profile may name the stock installer's string file (e.g. the Material installer's
+    # sentence-case buttons on API 31+). An explicit --system-lang overrides that choice.
+    system_strings = None
     if system_lang == "auto":
-        system_lang = device.detect_system_lang()
+        system_lang = device.detect_system_lang() or profile.get("system_lang", "en")
+        system_strings = profile.get("system_strings")
     try:
-        strings = load_strings(args.app_lang, system_lang)
+        strings = load_strings(args.app_lang, system_lang, system_strings)
     except FileNotFoundError as exc:
         print(f"error: no such language file: {exc.filename}", file=sys.stderr)
         return 2
@@ -101,10 +129,14 @@ def main(argv=None):
     runs = FLOW_ORDER if "all" in args.flows else [f for f in FLOW_ORDER if f in args.flows]
 
     print("plezy-firetv-updater — on-device flow tests")
-    print(f"  device      : {args.serial or '(default)'}")
+    print(f"  device      : {serial or '(default)'}")
+    print(f"  profile     : {config['profile']} "
+          f"(expects {profile['expected_device']['kind']}, "
+          f"navigation {profile.get('navigation', 'dpad')})")
     print(f"  app language: {strings.app_language} ({args.app_lang})"
           + ("  [not set]" if args.no_set_language else ""))
-    print(f"  sys language: {strings.system_language} ({system_lang})")
+    print(f"  sys language: {strings.system_language} ({system_lang})"
+          + (f"  [{system_strings}]" if system_strings else ""))
     print(f"  latest/older: {config['versions']['latest']} / {config['versions']['older']}")
     print(f"  flows       : {', '.join(runs)}")
     print(f"  Plezy now   : {device.installed_version(config['plezy_package']) or 'not installed'}")
@@ -117,7 +149,7 @@ def main(argv=None):
         return 3
 
     if args.build:
-        build_and_install(device, args)
+        build_and_install(device, args, config["updater_package"])
 
     flows = Flows(device, strings, config)
 

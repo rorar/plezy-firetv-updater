@@ -60,15 +60,60 @@ class Strings:
         text = self._lookup(self._system, key)
         return text.format(**fmt) if fmt else text
 
+    def sys_optional(self, key, default=None):
+        """Like :meth:`sys`, but a key the system file does not define returns ``default``."""
+        try:
+            return self.sys(key)
+        except HarnessError:
+            return default
+
+    def _lookup_raw(self, tree, key):
+        cur = tree
+        for part in key.split("."):
+            if not isinstance(cur, dict) or part not in cur:
+                raise HarnessError(f"missing string key: {key}")
+            cur = cur[part]
+        return cur
+
+    def sys_candidates(self, key):
+        """A system label as a list: a string is one label, a list is alternative wordings.
+
+        The stock installer words one button differently by platform *and* by situation — on the
+        AOSP installer of API 31+ an update that comes from a *different* installer than the app's
+        original one first asks "Update anyway" ("Trotzdem aktualisieren") before the plain
+        "Update" ("Aktualisieren"). A label may therefore be a string or a list of strings.
+        """
+        value = self._lookup_raw(self._system, key)
+        if isinstance(value, str):
+            return [value]
+        if isinstance(value, list) and all(isinstance(x, str) for x in value):
+            return list(value)
+        raise HarnessError(f"string key {key} is neither a string nor a list of strings")
+
+    def sys_candidates_optional(self, key):
+        """Like :meth:`sys_candidates`, but a missing key yields ``[]``."""
+        try:
+            return self.sys_candidates(key)
+        except HarnessError:
+            return []
+
 
 def _load_json(path):
     with open(path, encoding="utf-8") as fh:
         return json.load(fh)
 
 
-def load_strings(app_lang, system_lang):
+def load_strings(app_lang, system_lang, system_strings=None):
+    """App labels for ``app_lang`` and stock-installer labels for ``system_lang``.
+
+    ``system_strings`` names the system file directly (e.g. ``system.en.api34.json``) for a
+    device whose stock installer is worded differently from the default — the Material installer
+    on Android 12+ says "Install" where the AOSP one says "INSTALL". A profile sets it; without
+    it the file is ``system.<system_lang>.json``.
+    """
     app = _load_json(os.path.join(HERE, "strings", f"app.{app_lang}.json"))
-    system = _load_json(os.path.join(HERE, "strings", f"system.{system_lang}.json"))
+    name = system_strings or f"system.{system_lang}.json"
+    system = _load_json(os.path.join(HERE, "strings", name))
     return Strings(app, system)
 
 
@@ -84,6 +129,32 @@ def load_app_strings(lang):
 
 def load_config():
     return _load_json(os.path.join(HERE, "config.json"))
+
+
+def profile_names(config):
+    """The device profiles declared in config.json, in file order, without the comment."""
+    return [k for k in config.get("profiles", {}) if not k.startswith("_")]
+
+
+def apply_profile(config, name=None):
+    """Flatten a device profile (config.json → "profiles") onto the config and return it.
+
+    The flows read ``installer_activity`` / ``uninstaller_activity`` / ``expected_device`` off
+    the top level, so the selected profile's fields are copied there. ``name=None`` picks the
+    config's ``default_profile`` (the stick), which keeps a run without ``--profile`` behaving
+    exactly as before. Raises :class:`HarnessError` for an unknown name.
+    """
+    profiles = config.get("profiles", {})
+    name = name or config.get("default_profile")
+    if name not in profiles or name.startswith("_"):
+        raise HarnessError(
+            f"unknown profile {name!r} (have: {', '.join(profile_names(config))})")
+    profile = profiles[name]
+    config["profile"] = name
+    for key, value in profile.items():
+        if not key.startswith("_"):
+            config[key] = value
+    return profile
 
 
 # --------------------------------------------------------------------------- #
@@ -134,17 +205,25 @@ class Screen:
 
     def find(self, exact=None, startswith=None, contains=None, regex=None,
              cls=None, enabled=None, x_max=None, x_min=None):
+        """Find the first node matching every given filter.
+
+        Text is compared **case-insensitively**. The same app string is rendered differently by
+        the platform theme: ``Theme.Material`` — which this app uses — sets ``textAllCaps`` on
+        ``AlertDialog`` buttons, so "Uninstall & install" shows up as "UNINSTALL & INSTALL" on
+        API 31+ (Android 12) while Fire OS 6 renders it as written. The label in the JSON is the
+        app's string; the platform's casing is presentation, not a translation.
+        """
         for n in self.nodes:
             label = n.label
             if not label:
                 continue
-            if exact is not None and n.text != exact:
+            if exact is not None and n.text.casefold() != exact.casefold():
                 continue
-            if startswith is not None and not label.startswith(startswith):
+            if startswith is not None and not label.casefold().startswith(startswith.casefold()):
                 continue
-            if contains is not None and contains not in label:
+            if contains is not None and contains.casefold() not in label.casefold():
                 continue
-            if regex is not None and not re.search(regex, label):
+            if regex is not None and not re.search(regex, label, re.IGNORECASE):
                 continue
             if cls is not None and cls not in n.cls:
                 continue
@@ -158,7 +237,8 @@ class Screen:
         return None
 
     def has(self, text):
-        return any(text in n.label for n in self.nodes)
+        """True when some node's label contains ``text`` (case-insensitive; see :meth:`find`)."""
+        return any(text.casefold() in n.label.casefold() for n in self.nodes)
 
     def labels(self):
         return [n.label for n in self.nodes if n.label]
@@ -249,11 +329,26 @@ class Device:
 
     # -- windows ----------------------------------------------------------
 
+    #: Which `dumpsys window …` variant prints mCurrentFocus, learned on first use.
+    _focus_cmd = None
+
     def current_focus(self):
-        out = self.shell("dumpsys window windows", check=False)
-        # mCurrentFocus=Window{abc123 u0 pkg/pkg.Activity} — the value contains spaces.
-        m = re.search(r"mCurrentFocus=(.*)", out)
-        return m.group(1).strip() if m else ""
+        """The focused window, e.g. ``Window{abc u0 pkg/pkg.Activity}`` (contains spaces).
+
+        The subcommand that carries ``mCurrentFocus`` moved: up to about API 30 it is
+        ``dumpsys window windows``, on API 34 that no longer prints it and ``dumpsys window
+        displays`` does. Both are small; try the one that worked last, then the other.
+        """
+        order = ["dumpsys window windows", "dumpsys window displays"]
+        if self._focus_cmd in order:
+            order.remove(self._focus_cmd)
+            order.insert(0, self._focus_cmd)
+        for cmd in order:
+            m = re.search(r"mCurrentFocus=(.*)", self.shell(cmd, check=False))
+            if m:
+                Device._focus_cmd = cmd
+                return m.group(1).strip()
+        return ""
 
     def wait_focus(self, needle, timeout=90, interval=2):
         deadline = time.time() + timeout
@@ -310,16 +405,40 @@ class Device:
     def is_installed(self, pkg):
         return "package:" in self.shell(f"pm path {pkg}", check=False)
 
+    def api_level(self):
+        return int(self.shell("getprop ro.build.version.sdk", check=False).strip() or 0)
+
+    def grant_install_permission(self, pkg):
+        """Grant "install unknown apps" for ``pkg``; no-op (returns None) below API 26.
+
+        On API 25 ``REQUEST_INSTALL_PACKAGES`` is an ordinary manifest permission the install just
+        uses. From API 26 it is a per-app *appop* whose default is **deny**, and the stock
+        installer then aborts the session with ``INSTALL_FAILED_ABORTED: User rejected
+        permissions``. A real user flips Settings → Apps → Special access; a test device (the
+        emulator lane) can grant it directly. Returns the resulting appops line for the log.
+        """
+        if self.api_level() < 26:
+            return None
+        self.shell(f"appops set {pkg} REQUEST_INSTALL_PACKAGES allow", check=False)
+        return self.shell(f"appops get {pkg} REQUEST_INSTALL_PACKAGES", check=False).strip()
+
     def free_data_kb(self):
+        """Free KB on the data partition, or None when ``df`` output cannot be parsed.
+
+        The mount point the shell sees for ``/data`` differs by platform — on the API 35 phone the
+        shell's ``/data`` shows as ``/storage/emulated/0/Android/obb`` — so match the
+        Available/Use% columns rather than the mount-point name.
+        """
         out = self.shell("df /data", check=False)
         for line in out.splitlines():
-            m = re.search(r"\s(\d+)\s+\d+%\s*/data\b", line)
+            m = re.search(r"\s(\d+)\s+\d+%\s+\S+", line)
             if m:
                 return int(m.group(1))
         return None
 
     def detect_system_lang(self):
+        """The device locale's language, e.g. 'de' for de-DE, or None when it cannot be read."""
         loc = self.shell("getprop persist.sys.locale", check=False).strip()
         if not loc:
             loc = self.shell("getprop ro.product.locale", check=False).strip()
-        return loc.split("-")[0].lower() if loc else "en"
+        return loc.split("-")[0].lower() if loc else None

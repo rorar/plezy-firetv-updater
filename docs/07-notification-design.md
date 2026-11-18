@@ -77,7 +77,8 @@ BOOT_COMPLETED → re-arm + job 2002      ──┤
 Why a job and not a foreground service: the check is a short, deferred network call, which is exactly
 what `JobScheduler` is for. On **API 25** it also happens to be the cheapest legal option (the
 background-execution limits do not exist yet), and from **API 26** — the app's `targetSdk` since
-`0.5.0` — a job is the *supported* way to run that call, where a background-started service is not.
+`0.5.0`, raised to **31** in `0.6.0` — a job is the *supported* way to run that call, where a
+background-started service is not.
 Using it on both keeps one code path ([08](08-app-implementation.md#background-checks-jobscheduler-targetsdk-26)).
 The notification is retained by the notification center without a service keeping it alive
 (verified above).
@@ -92,6 +93,10 @@ every 12 hours just to say that something is available.
   `new Notification.Builder(app, CHANNEL_ID)` when `SDK_INT >= O`, and uses the legacy
   `Notification.Builder` on API 25 (verified working via the builder on the stick). Creating an
   existing channel is a no-op, so it is safe to call on every post. Required from `targetSdk` 26.
+  **Verified on a real channel** on the `tv30` emulator (API 30) and on the real `phone35` (API 35):
+  `dumpsys notification --noredact` shows `NotificationChannel{mId='updates' …}` and the notification
+  posted on it — see
+  [08](08-app-implementation.md#emulator-lane-2026-11-18-updater-060--versioncode-6).
 - **No `POST_NOTIFICATIONS` runtime permission.** Introduced in API 33.
 - **Content intent is the whole UX.** Verified: selecting the card and pressing OK opens the
   target activity directly. It must land on "Install 2.27.0", not on a generic home screen.

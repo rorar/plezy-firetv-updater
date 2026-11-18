@@ -1,9 +1,11 @@
 # 11 — Roadmap
 
 Where the updater goes after Round 1 (the A1–A7 + B2 set, updater `0.2.0`; self-update in `0.3.0`;
-device detection and device-aware wording in `0.4.0`). Each item says what it
+device detection and device-aware wording in `0.4.0`; `targetSdk` 25 → 26 in `0.5.0`; the emulator
+lane, a real-phone lane and `targetSdk` 26 → 31 in `0.6.0`). Each item says what it
 is, what it would take, what can go wrong, and **how it would be verified on the stick** — including
-the honest cases where this hardware cannot verify it. Order is a suggestion, not a commitment.
+the honest cases where this hardware cannot verify it (the emulator lane now covers some of those).
+Order is a suggestion, not a commitment.
 
 The constraint behind all of it: **one APK must keep running on API 25** (the stick) while not being
 broken on newer Android. There is no AndroidX and no Gradle, so every newer platform API has to be
@@ -123,14 +125,18 @@ a different default interval (a phone is on more often than a TV).
 data="status=ok;remaining=53;limit=60;reset_ms=…;checked_ms=…;device=fire_tv;tv=1;touch=0"
 ```
 
-The Android TV and phone branches cannot be produced on this stick, so they are covered by
+The Android TV and phone branches cannot be produced on this stick. They are covered off-device by
 `test/jvm/run.sh` — 25 cases against `DeviceKind` on the plain JVM, including the precedence between
-the branches and null safety. They stay *logic*-verified, not hardware-verified (item 3).
+the branches and null safety — and, since the emulator lane, seen on a device too: `tv25`/`tv30`
+report `device=android_tv;tv=1;…`, `phone34` reports `device=touch;tv=0;touch=1`, and the **real**
+`phone35` (API 35) reports the same touch classification. So the touch branch is verified on real
+hardware; the Android TV branch only on emulators (no real Android TV here).
 
 ## 3. Android TV / phone compatibility
 
-**Wording: done** (2026-11-17, `0.4.0`). **Layout: not started** — and the layout is the one thing
-that cannot be verified on this stick.
+**Wording: done** (2026-11-17, `0.4.0`). **Layout: not started** — and it is the least-verifiable
+item: `phone34` (emulator) and `phone35` (a real phone) can *drive* a touch device now, but that is
+not a tuned touch layout.
 
 ### Device-aware wording — done
 
@@ -178,16 +184,16 @@ left/right.
 - **Keep the D-pad path intact.** The focus model must not regress on the TV; the touch behaviour is
   additive.
 
-**Verify.** No Android TV or phone is available, so the layout half **cannot be verified on this
-hardware** — and the wording half, although statically checked and tied to the JVM-tested
-`Device.isTouch()`, has never been seen on a real touch device either. Options, in order of cost: an
-API 25 TV emulator (verifies the leanback branch and the touch absence), then any real Android TV /
-phone (verifies the touch layout). Until then it stays a documented, unverified branch — the same
-honesty the B2 note uses.
+**Verify.** The emulator lane ([item 5](#5-targetsdk-bump-matrix)) provides an Android TV
+(`tv25`/`tv30`) and a touch device (`phone34`), and the real `phone35` is a touch phone too, so the
+*wording* half and the device classification are device-verified there, and `phone34`/`phone35` even
+drive the whole flow over touch. The **layout** half is still unbuilt, so there is nothing to verify
+yet: when it lands, `phone35` (a real phone) is the lane that can exercise it best. Until then it
+stays a documented, unverified branch — the same honesty the B2 note uses.
 
 ## 4. 64-bit / `arm64-v8a`
 
-**Done, except the on-device install.** B2 already picks Plezy's tarball per device from
+**Done, and now verified on hardware.** B2 already picks Plezy's tarball per device from
 `Build.SUPPORTED_ABIS` ([08](08-app-implementation.md#which-build-for-this-device-b2)), and the
 **updater's own APK carries no native code** — it is pure Java + resources, so it is ABI-independent
 and already "armv8a compatible". There is nothing to port.
@@ -203,38 +209,47 @@ apksigner verify --print-certs plezy.apk | grep SHA-256
 
 `arm64-v8a` and `x86_64` both extract to an APK signed with the pinned certificate
 (`CN=Edvard Wikhall, O=edde746`) and carrying `lib/arm64-v8a` / `lib/x86_64`, so the asset name and
-the signer assumption are correct for the 64-bit branch too. **Still open:** the actual *install* on
-a 64-bit device — this stick is 32-bit, so only real arm64 hardware (or an arm64 emulator) can
-exercise it end to end. That is a "when a device appears" item, not work to do now.
+the signer assumption are correct for the 64-bit branch too. **Both 64-bit installs are now verified
+end to end**: `x86_64` on the `phone34` emulator (abilist `x86_64,arm64-v8a` →
+`plezy-android-x86_64.tar.gz`), and **`arm64-v8a` on the real `phone35`** (abilist `arm64-v8a,…` →
+`plezy-android-arm64-v8a.tar.gz`; afterwards `dumpsys package com.edde746.plezy` reports
+`primaryCpuAbi=arm64-v8a`). Nothing on this item is left unverified except the `err_no_native_libs`
+branch, which stays logic-only.
 
 ## 5. `targetSdk` bump matrix
 
-The app targets **26** today (it was 25 through `0.4.0`); raising it is only worth doing if the
-updater must also run well on newer Android (which items 2–3 imply). Each step is a known set of
-changes; all of them can be guarded by `Build.VERSION.SDK_INT` so the API 25 behaviour is unchanged.
+The app targets **31** today (25 through `0.4.0`, 26 in `0.5.0`, 31 in `0.6.0`); raising it is only
+worth doing if the updater must also run well on newer Android (which items 2–3 imply). Each step is a
+known set of changes; all of them can be guarded by `Build.VERSION.SDK_INT` so the API 25 behaviour is
+unchanged.
 
 | `targetSdk` | Platform | What breaks / is required |
 |---|---|---|
 | 26 ✅ | Android 8.0 | **Done in `0.5.0`.** **Notification channels are mandatory** — `Notifier.ensureChannel` creates the `"updates"` channel and posts through `new Notification.Builder(app, CHANNEL_ID)` when `SDK_INT >= O`; on API 25 it keeps the legacy builder. **Background execution limits**: the `IntentService` started from an alarm (`UpdateCheckService` / `UpdateAlarm` / `CheckReceiver`) was replaced by a `JobScheduler` job (`UpdateJob` + `CheckJobService`, periodic id 2001, one-off id 2002) — no `WorkManager`, no AndroidX, and it exists on API 21 so there is no second code path. |
 | 27 | 8.1 | Minor; no change expected. |
 | 28 | 9.0 | **Cleartext HTTP is blocked** by default — all endpoints are already HTTPS, so fine. `Build.SERIAL` is restricted (unused). |
-| 29 | 10.0 | **Scoped storage** — the app uses `cacheDir` and `getExternalCacheDir()`, both app-specific, so fine; no legacy flag needed. **Background activity starts** are restricted: the install-confirmation activity is started from the app while it is in the foreground (the user just pressed a button), so allowed — but a future auto-install path would not be. |
+| 29 | 10.0 | **Scoped storage** — the app uses `cacheDir` and `getExternalCacheDir()`, both app-specific, so fine; no legacy flag needed. **Background activity starts** are restricted: the install-confirmation activity is started from the app while it is in the foreground (the user just pressed a button), so allowed. `InstallResultReceiver` starts it too, but only for `STATUS_PENDING_USER_ACTION` — which the platform stops sending once it shows the dialog itself (API 26+), so it can never be a background start on a platform that enforces the rule. A future auto-install path would not be allowed. |
 | 30 | 11.0 | **Package visibility** — `<queries>` for `com.edde746.plezy` is already declared. `ACTION_DELETE` still launches the stock uninstaller; installing still needs `REQUEST_INSTALL_PACKAGES` (declared). |
-| 31 | 12.0 | **`PendingIntent` mutability** — every app-created `PendingIntent` must set `FLAG_IMMUTABLE`/`FLAG_MUTABLE`. **Notification trampolines** are blocked: a notification tap must not start an activity from a receiver — post the notification or use an activity instead. |
-| 33 | 13.0 | **`POST_NOTIFICATIONS` is a runtime permission** — must be requested; on the stick there is no such permission, so guard it. |
+| 31 ✅ | 12.0 | **Done in `0.6.0`.** **`PendingIntent` mutability** — `ApkInstaller`'s session-result `PendingIntent` is `FLAG_UPDATE_CURRENT \| FLAG_MUTABLE` (the platform writes the session status into it, and on API 25 the confirmation intent too); `Notifier`'s notification `PendingIntent` is `FLAG_IMMUTABLE` (it only opens `MainActivity`). Both add the flag only when `SDK_INT >= S`, so the API 25–30 flags stay `0`; `FLAG_MUTABLE`/`FLAG_IMMUTABLE` are compile-time constants, so naming them is safe and dex inlines them. **Notification trampolines** — the notification's `contentIntent` is already an activity, started directly, not a receiver that starts one: verified on `tv30`, nothing to change. **`REQUEST_DELETE_PACKAGES`** — declared; the platform's package-visibility rules make it necessary to send `ACTION_DELETE` on newer Android (declared, but *not* empirically tested by removing it). **Also fixed here** — the downgrade handshake raced the platform ([08](08-app-implementation.md#finding-5--the-uninstall-handshake-raced-the-platform-on-android-12)). Verified end to end on the `phone34` emulator (API 34) **and on the real `phone35` (API 35)**. |
+| 33 | 13.0 | **`POST_NOTIFICATIONS` is a runtime permission** — must be requested; on the stick there is no such permission, so guard it. Observed on the API 35 phone: the manifest declares it but a `targetSdk 31` app is never granted it, so `appops get … POST_NOTIFICATION` → `ignore` and the update notification is posted but not shown. Requesting it is the first change of this step. |
 | 34 | 14.0 | Foreground-service types and further implicit-intent restrictions; check the notification and alarm paths. |
+| 35 | 15.0 | Nothing new beyond 33/34 seen on the `phone35` run (LineageOS 22.1): the five flows pass on it, which is the point — the newest platform here is exercised end to end. |
 
 The order of the real work inside a bump is: notification channel (26) → job scheduling (26) →
 `PendingIntent` flags (31) → notification permission (33). Each is hand-written against the platform
 API and each keeps an API 25 fallback.
 
 **Verify.** A bump must not change behaviour on the stick: re-run the five flows and the quota
-broadcast on API 25 after every step, and additionally on a newer emulator for the branch that
-actually changed. For the 26 step the API 25 side was done in full (jobs armed / cancelled /
-re-armed, the one-off `runNow` path, the legacy notification, all five flows and the de/fr/es
+broadcast on API 25 after every step, and additionally on a newer emulator (or the real phone) for the
+branch that actually changed. For the 26 step the API 25 side was done in full (jobs armed / cancelled
+/ re-armed, the one-off `runNow` path, the legacy notification, all five flows and the de/fr/es
 smokes); the API 26+ side — channel creation and the background-execution limit the job is there to
-avoid — had **no device or emulator to run on** and stays logic-verified
-([08](08-app-implementation.md#background-checks-jobscheduler-targetsdk-26)).
+avoid — had no device to run on and stayed logic-verified. **The emulator lane now closes that gap**
+([`test/README.md`](../test/README.md#emulator-lane)): `tv30` reaches the channel and
+background-limit branches, `phone34` (Android 14) enforces the `targetSdk` 31 rules and runs the
+whole Plezy flow, `tv25` repeats the API 25 platform without the stick, and `phone35` runs the whole
+flow on a **real** API 35 arm64 phone. The 31 step was verified on `phone34` and `phone35` end to
+end, and the 26 step's API 26+ branches are now exercised on `tv30`.
 
 ## Suggested order
 
@@ -248,10 +263,17 @@ avoid — had **no device or emulator to run on** and stays logic-verified
    `test/jvm/run.sh`.
 4. ~~**`targetSdk` bump, step 1 (25 → 26)**~~ — **done** 2026-11-17, `0.5.0`; notification channel +
    `JobScheduler` in place of the alarm + `IntentService`, with the API 25 path re-verified on the
-   stick and the API 26+ branches logic-verified only (no newer device exists here).
-5. **`targetSdk` bump, further steps** (28 → 31 → 33 → …) — item 5 continued, one step per release,
-   each with the API 25 flows as the regression test.
-6. **Touch UI** (item 3, layout half) — last, because it is the one that cannot be verified here.
+   stick. The API 26+ branches were logic-verified at the time and are device-verified on `tv30`
+   now that the lane exists.
+5. ~~**Emulator lane + `targetSdk` bump to 31**~~ — **done** 2026-11-18, `0.6.0`; the SDK and three
+   AVDs (`tv25`, `tv30`, `phone34`), `test/emulator.sh` and the device profiles, then the 26 → 31
+   jump, plus the real-phone lane (`phone35`, API 35 arm64). The lane paid for itself at once: it
+   caught the Android 12+ downgrade race (twice — the second time on the real phone) and the
+   all-caps dialog buttons the harness had assumed away.
+6. **`targetSdk` bump, further steps** (33 → …) — `POST_NOTIFICATIONS` (API 33) is the next real
+   one; each step keeps the API 25 flows as the regression test and the lane for the new branch.
+7. **Touch UI** (item 3, layout half) — last: `phone34` can *drive* a touch device now, but an
+   emulator is not a real phone, so the layout half stays the least-verifiable item.
 
 ## Guardrails
 
@@ -259,12 +281,13 @@ avoid — had **no device or emulator to run on** and stays logic-verified
   regression test.
 - **One build, one key.** The APK stays ABI-free, and everything is signed with the same key, so any
   build can replace any other ([Build and install](08-app-implementation.md#build-and-install)).
-- **Say what was not verified.** The arm64/x86_64 *signers* are now checked off-device, but their
-  *installs* and the `err_no_native_libs` path stay unverified on this 32-bit stick; the Android TV
-  and touch branches of device detection and the `-finger` wording are **logic**-verified (JVM tests,
-  string-parity check) but never seen on a real Android TV or phone; the API 26+ notification-channel
-  and background-execution-limit branches are **logic**-verified too (no newer device here); and the
-  touch *layout* is not done at all. They join the list until a second device exists.
+- **Say what was not verified.** All three installs — `armeabi-v7a`, `x86_64`, `arm64-v8a` — are now
+  verified end to end (stick, `phone34` emulator, real `phone35` phone); only the
+  `err_no_native_libs` path stays logic-only. The Android TV and touch branches of device detection,
+  the `-finger` wording, and the API 26+ channel / background-limit branches are **device**-verified
+  on the emulator lane and (touch, API 35) on the real phone. What still has no device here: a real
+  Android TV (only emulators), Fire OS's own quirks beyond the stick, and the touch *layout*, which is
+  not built yet.
 - **Testable decisions live outside `android.*`.** `DeviceKind` takes a plain `Signals` bundle and has
   no platform import, which is what lets `test/jvm/run.sh` cover the branches this stick cannot
   produce. Keep new decision logic on that side of the line.

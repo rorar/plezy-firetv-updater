@@ -9,9 +9,10 @@ The forward-looking items now live in the [roadmap](11-roadmap.md), so this stay
 
 - **Android TV / phone compatibility — the layout half.** The wording half landed in `0.4.0`
   ([roadmap item 3](11-roadmap.md#3-android-tv--phone-compatibility)); the TV-first sizing and the
-  two-pane pickers still assume a D-pad, and no touch device is available to verify them on.
-- **`targetSdk` bump, further steps** — the 25 → 26 step landed in `0.5.0`; 28 → 31 → 33 → … remain,
-  one step per release ([roadmap item 5](11-roadmap.md#5-targetsdk-bump-matrix)).
+  two-pane pickers still assume a D-pad. The emulator lane's `phone34` profile can now *drive* the
+  flows on a touch device, but the layout itself is unchanged.
+- **`targetSdk` bump, further steps** — 25 → 26 landed in `0.5.0` and 26 → 31 in `0.6.0`;
+  33 → … remain, one step per release ([roadmap item 5](11-roadmap.md#5-targetsdk-bump-matrix)).
 
 Nothing here is a commitment; the roadmap explains the order and the reasoning.
 
@@ -23,16 +24,26 @@ Nothing here is a commitment; the roadmap explains the order and the reasoning.
   `JobScheduler` job (`UpdateJob` / `CheckJobService`, periodic 2001, one-off 2002) — chosen because
   it exists since API 21, so the stick and newer Android share one code path with no AndroidX. The
   API 25 side was re-verified on the stick (jobs armed/cancelled/re-armed, the `runNow` one-off path,
-  the legacy notification, all five flows, de/fr/es smokes); the API 26+ branches are logic-verified
-  only, with no newer device available. See [11 § 5](11-roadmap.md#5-targetsdk-bump-matrix) and
+  the legacy notification, all five flows, de/fr/es smokes); the API 26+ branches were logic-verified
+  at the time and are now device-verified on the emulator lane (`tv30`). See
+  [11 § 5](11-roadmap.md#5-targetsdk-bump-matrix) and
   [08](08-app-implementation.md#background-checks-jobscheduler-targetsdk-26).
+
+- **`targetSdk` 26 → 31 (roadmap item 5, second step) and the emulator lane.** Landed 2026-11-18
+  (`0.6.0`): `PendingIntent` mutability flags guarded by `SDK_INT >= S`, `REQUEST_DELETE_PACKAGES`,
+  and the Android 12+ downgrade-handshake race fixed. The new `test/emulator.sh` + device profiles
+  gave the project a second platform to test on for the first time, and a real API 35 arm64 phone
+  (`phone35`) closed the arm64-install gap and verified the whole flow over touch. See
+  [11 § 5](11-roadmap.md#5-targetsdk-bump-matrix).
 
 - **Device detection (roadmap item 2).** Landed 2026-11-17 (`0.4.0`): `DeviceKind` (the decision, a
   pure enum with no `android.*` import) and `Device` (the Android wrapper) answer *what is this
   running on?* once, with the precedence Fire TV > Android TV > touch > other. `isTouch()` is the
   touchscreen *resource qualifier*, not the `android.hardware.touchscreen` feature flag. The result
   rides along on the A3 diagnostics broadcast (`device=fire_tv;tv=1;touch=0`) and the flow harness
-  asserts it; the branches this stick cannot produce are covered by `test/jvm/run.sh` (25 cases). See
+  asserts it; the branches this stick cannot produce are covered by `test/jvm/run.sh` (25 cases) and,
+  since the emulator lane, seen on a device too (`android_tv` on `tv25`/`tv30`, `touch` on
+  `phone34` and the real `phone35`). See
   [11 § 2](11-roadmap.md#2-device-detection-fire-tv-vs-android-tv-vs-phone) and
   [08](08-app-implementation.md#device-detection-fire-tv--android-tv--touch).
 
@@ -201,5 +212,8 @@ Nothing here is a commitment; the roadmap explains the order and the reasoning.
   `test/jvm/run.sh` and `test/check_strings.py`, both device-free. What is left is the touch
   **layout** and the `targetSdk` bump.
 - **`targetSdk` 25 → 26** (roadmap item 5, first step) landed on 2026-11-17 (updater `0.5.0`):
-  notification channel on API 26+, `JobScheduler` in place of the alarm + service. The remaining
-  steps (28 → 31 → 33 → …) are still open, and the touch **layout** is still the last item.
+  notification channel on API 26+, `JobScheduler` in place of the alarm + service. **26 → 31**
+  (second step) landed on 2026-11-18 (updater `0.6.0`): `PendingIntent` mutability flags,
+  `REQUEST_DELETE_PACKAGES`, and the Android 12+ downgrade race fixed; the emulator lane that
+  verified it is new too. The remaining steps (33 → …) are still open, and the touch **layout** is
+  still the last item.

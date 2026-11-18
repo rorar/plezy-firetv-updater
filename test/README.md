@@ -28,13 +28,17 @@ python3 test/run.py all --yes                    # the whole sequence
 python3 test/run.py upgrade --yes                # downgrade → Main View → upgrade
 python3 test/run.py install --app-lang de        # set the app to German first, then run
 python3 test/run.py all --yes --build            # build + install the updater first
+python3 test/run.py all --yes --profile phone34 --serial emulator-5554   # emulator lane
+python3 test/run.py all --yes --profile phone35   # real phone (PHONE_SERIAL in local.env)
 ```
 
 The updater is **runtime-switchable** (Settings → Language), so `--app-lang` is the language the
 run *sets* before the flows — not a build variant. There is one build; the run drives
 **Settings → Language** with the D-pad first, then verifies the app came back in that language.
 
-Options: `--serial` (defaults to `$FIRE_TV_SERIAL` — copy `local.env.example` to `local.env`),
+Options: `--serial` (explicit address; else the profile's `serial_env` variable, else
+`$FIRE_TV_SERIAL` — copy `local.env.example` to `local.env`),
+`--profile` (which device the run expects — see [Device profiles](#device-profiles)),
 `--latest` / `--older` (override the versions),
 `--system-lang` (default: auto-detected from `persist.sys.locale`), `--from-lang` (the app's
 language now, if it should not be auto-detected), `--no-set-language` (skip the switch),
@@ -45,6 +49,74 @@ does not erase data itself, but it starts by downgrading if Plezy is not already
 release), so they need `--yes`.
 
 The harness leaves Plezy on the **latest** release; the last flow in `all` is the clean install.
+
+## Device profiles
+
+One run targets one device, and the things that differ between devices are not in the flows. They
+live in `config.json` → `profiles`, and `--profile <name>` selects one (default:
+`config.json`'s `default_profile`, the stick). A profile flattens onto the config top level:
+
+| Field | Meaning |
+|---|---|
+| `installer_activity` / `uninstaller_activity` | the stock installer's package + activity |
+| `expected_device` | what `device=…;tv=…;touch=…` must report (`kind` / `tv` / `touch`) |
+| `system_lang` | the locale to use when `--system-lang auto` cannot read one |
+| `system_strings` | (optional) the exact stock-installer string file to load |
+| `navigation` | `dpad` or `touch` — how the app's own screens are driven |
+| `serial_env` | (optional) the environment variable holding the device's address |
+| `avd` / `image` | the emulator to boot (emulator profiles only) |
+
+Five profiles ship: `stick` (the Fire TV, the regression target), `tv25` and `tv30` (Android TV
+emulators), `phone34` (an Android 14 phone emulator), and `phone35` (a **real** Android 15 / API 35
+arm64 phone). The emulators are why this exists: the stick is API 25, so the notification-channel,
+background-limit, and `targetSdk` 31 branches cannot be reached on it at all; the real phone adds
+arm64 and API 35.
+
+A profile may name the environment variable that holds its address (`serial_env`), so
+`--profile phone35` needs no `--serial` — `run.py` reads the profile first and resolves the serial
+from the flag, then `serial_env`, then `$FIRE_TV_SERIAL`. The **real address stays out of the repo**:
+it lives only in the gitignored `local.env` (`PHONE_SERIAL`; copy `local.env.example`).
+
+## Emulator lane
+
+`test/emulator.sh` creates, boots, and provisions the AVDs named by the profiles:
+
+```bash
+export ANDROID_HOME=~/Android/Sdk        # with emulator + platform-tools + the system images
+test/emulator.sh create    tv30          # make the AVD from the profile's system image
+test/emulator.sh start     tv30          # boot it headless, wait for adb, print the serial
+test/emulator.sh provision tv30          # install the updater + grant "install unknown apps"
+test/emulator.sh stop      tv30
+```
+
+`provision` does the two things a test device needs that a real user does by hand, so a lane needs
+no manual setup: install `app/build/plezy-updater.apk`, and on API 26+ grant the
+`REQUEST_INSTALL_PACKAGES` **appop** — from Android 8 that is a per-app permission, denied by
+default, and without it the stock installer aborts the session with
+`INSTALL_FAILED_ABORTED: User rejected permissions`. (`run.py --build` grants it too, after
+installing.) Pass `--serial <emulator-…>` to `run.py` as well: the stick may be connected over TCP
+at the same time, and adb would otherwise not know which device to use.
+
+`phone35` is not an emulator — it is a real phone over wireless adb, so there is no `create`/`start`
+for it. Source `local.env` (which sets `PHONE_SERIAL`) and run `--profile phone35`; the profile's
+`serial_env` resolves the address, and its `system_strings` (`system.de.api34.json`) supplies the
+German AOSP installer's labels.
+
+What each lane is for:
+
+| Profile | API | ABI | Runs |
+|---|---|---|---|
+| `tv25` | 25 | x86 | updater-side checks (device classification, diagnostics, jobs) |
+| `tv30` | 30 | x86 | the API 26+ channel / background-limit / implicit-broadcast behaviour |
+| `phone34` | 34 | x86_64 | the **full Plezy flows**, and the only *emulator* here that enforces the `targetSdk` 31 rules |
+| `phone35` | 35 | arm64-v8a | a **real phone** (not an emulator): the full flows over touch on the newest platform here, and the only arm64 device |
+
+Plezy itself ships `arm64-v8a` / `armeabi-v7a` / `x86_64` only, so the 32-bit x86 TV images cannot
+install it — they exercise the updater, not a Plezy install. `phone34` (x86_64) is the emulator that
+runs everything end to end, and it is also the lane that proves the `targetSdk` 31 work (mutable vs
+immutable `PendingIntent`s, the notification trampoline rule). `phone35` repeats that on real
+hardware and closes the arm64 gap. The emulators boot headless; `phone35` is the user's own phone,
+reachable over wireless adb (`PHONE_SERIAL` in `local.env`).
 
 ## Strings are configuration, not code
 
@@ -57,7 +129,20 @@ from JSON, so the same flows run against any app language and any device locale:
 - `strings/system.<lang>.json` — the **stock installer / uninstaller** labels (`INSTALLIEREN`,
   `ABBRECHEN`, `OK`, …). These follow the *device* locale, not the app's, and are auto-detected
   (`persist.sys.locale`), overridable with `--system-lang`. Only the device's language is needed;
-  this stick is `de-DE`.
+  this stick is `de-DE`. A platform whose installer is worded differently gets an optional
+  `strings/system.<lang>.<variant>.json` (e.g. `system.en.api34.json`, `system.de.api34.json`), named
+  by a profile's `system_strings`: the Google installer on Android TV (API 25/30) says `Install` /
+  `Cancel` and reuses `Install` for an update, the Material installer on API 31+ says `Install` but
+  `Update` when replacing, and the AOSP installer on Android 15 (German) says `Installieren` /
+  `Aktualisieren` / `Abbrechen`. `check_strings.py` keeps a variant's key set identical to its base
+  file. Labels are matched **case-insensitively**: `Theme.Material` upper-cases dialog buttons on
+  API 31+ (`Uninstall & install` → `UNINSTALL & INSTALL`) while Fire OS renders them as written.
+- A confirm label may be a **list of alternatives**, not just one string. `installer.confirm` and
+  `installer.update_confirm` are tried in order and `_confirm_system_install` taps whichever is on
+  screen, up to three dialogs — because an update from a *different* installer than the app's original
+  one adds a second dialog on the API 31+ AOSP installer: **`Trotzdem aktualisieren`** ("Update
+  anyway") before the plain **`Aktualisieren`**. A two-dialog platform needs no special case; a
+  single-dialog one just matches its one label.
 
 The **Settings → Language** rows are language-independent: each language is listed by its own name
 (English, Deutsch, Français, Español). Those names live in `config.json` (`language_rows`), which is
@@ -70,8 +155,8 @@ vs `tap` from Android's own touchscreen resource qualifier (`res/values-finger/`
 nothing for the harness to set. `check_strings.py` keeps those files in parity.
 
 `config.json` holds the non-localised bits: package/activity names, the language-picker rows, the
-diagnostics broadcast action, the expected device classification, and the two versions the flows use
-(`latest`, `older`). Bump the versions when upstream moves on, or pass `--latest` / `--older`.
+diagnostics broadcast action, the device profiles, and the two versions the flows use (`latest`,
+`older`). Bump the versions when upstream moves on, or pass `--latest` / `--older`.
 
 ## Quota + device check (A3 + item 2)
 
@@ -79,14 +164,20 @@ diagnostics broadcast action, the expected device classification, and the two ve
 check and reads the report back, with no screen involved. `Flows.check_quota()` sends
 
 ```bash
-adb shell am broadcast --include-stopped-packages -a dev.rorar.plezyupdater.action.DIAGNOSTICS
+adb shell am broadcast -p dev.rorar.plezyupdater --include-stopped-packages \
+    -a dev.rorar.plezyupdater.action.DIAGNOSTICS
 ```
 
 and parses the ordered-broadcast result, which `am broadcast` prints as
 `Broadcast completed: result=-1, data="status=ok;remaining=59;limit=60;reset_ms=…;checked_ms=…;device=fire_tv;tv=1;touch=0"`.
 The preamble prints `GitHub API quota: 59/60 requests left`. The action lives in
 `config.json` (`diagnostics_action`); the report is a quote-free `key=value;…` string by design, so
-it survives that channel. The same report is written to the app's `quota.txt` (external cache dir)
+it survives that channel.
+
+**`-p <package>` is required on API 26+.** Since Android 8 the platform will not deliver an
+*implicit* broadcast to a manifest receiver (`Background execution not allowed` in logcat), so the
+bare `-a <action>` form works on the API 25 stick but is silently dropped on newer Android. Naming
+the package makes it explicit — this was one of the first real findings of the emulator lane. The same report is written to the app's `quota.txt` (external cache dir)
 as a second way in — and it carries the same suffix, so the two channels cannot drift.
 
 The trailing `device=…;tv=…;touch=…` is `Device.report()`: the device classification (roadmap item
@@ -105,8 +196,9 @@ python3 test/check_strings.py
 
 It fails when a locale is missing a key that `values/` has (bar the handful that are deliberately
 the same in every language), when a `values-finger/` file invents a key instead of overriding one,
-when a translation drops or renumbers a `%1$s` placeholder, or when the `test/strings/app.<lang>.json`
-labels disagree on their keys. It runs as the pre-flight step of `run.py`.
+when a translation drops or renumbers a `%1$s` placeholder, when the `test/strings/app.<lang>.json`
+labels disagree on their keys, or when a `test/strings/system.<lang>.<variant>.json` carries a
+different key set than its base file. It runs as the pre-flight step of `run.py`.
 
 ## JVM tests
 
@@ -126,20 +218,32 @@ thin Android wrapper that only reads the platform.
 
 ```
 test/
-  run.py                 CLI: pick flows + languages, print a summary
+  run.py                 CLI: pick flows + languages + profile, print a summary
   harness.py             Device (adb + uiautomator) and the parsed Screen/Node model
   flows.py               the five flows, in remote-press terms
   check_strings.py       static parity check for res/values*/strings.xml
+  emulator.sh            create / start / provision / stop the AVDs (the emulator lane)
   config.json            package/activity names, the diagnostics action, the versions,
-                         and the expected device classification
+                         and the device profiles (stick, tv25, tv30, phone34, phone35)
   jvm/DeviceKindTest.java  plain-Java tests for DeviceKind
   jvm/run.sh             compile + run them (no Android, no device)
-  strings/app.<lang>.json      app labels      (per app language)
-  strings/system.<lang>.json   system labels   (per device locale)
+  strings/app.<lang>.json            app labels    (per app language)
+  strings/system.<lang>.json         system labels (per device locale)
+  strings/system.<lang>.<variant>.json  a platform whose installer is worded differently
 ```
 
 ## Notes
 
+- **Every flow starts by clearing a stray system window.** If a previous run (or a hand test) left the
+  stock installer or uninstaller in front, `Flows.open_updater()` BACK-cancels it before it starts —
+  loudly — and fails if it will not go away. A leftover dialog otherwise makes the run drive the wrong
+  window and look like an app regression (that is exactly how a stale updater-confirmation dialog once
+  made a whole `0.6.0` stick run look broken). The list of system windows lives in
+  `Flows._SYSTEM_DIALOGS`.
+- **The "Open Plezy?" prompt is asserted, not just dismissed.** `clean-install` presses **Open** and
+  proves Plezy's `MainActivity` comes to the front (`Flows.assert_open_prompt_opens_plezy`), then
+  leaves the updater in front again. The other flows only ever dismiss the prompt (tap **Not now**),
+  so before this the positive button had never been exercised.
 - **"Choose version…" is a developer option and off by default**, so it is absent after a fresh
   install or an uninstall (which wipes the prefs). Every picker flow therefore opens the updater
   first and, if the button is missing, `Flows.open_picker()` turns on **Settings → Developer →
@@ -150,6 +254,15 @@ test/
   `lastUpdateTime`). The `upgrade` flow uses the two timestamps to tell a **replace** from a fresh
   install: `firstInstallTime` must not move, `lastUpdateTime` must.
 - A dump can come back empty if the screen is asleep; `Device.dump()` wakes the stick and retries.
+- On API 34 an app that targets below `Build.VERSION.MIN_SUPPORTED_TARGET_SDK_INT` (28 there) gets a
+  system `DeprecatedTargetSdkVersionDialog` on every activity start, which hides the app and would
+  time out `wait_focus("MainActivity")`. `Flows._dismiss_deprecation_warning()` presses **OK**, not
+  BACK: OK is what records the per-package `FLAG_HIDE_DEPRECATED_SDK` in `/data/system/appwarnings.xml`,
+  so the warning is not raised again — BACK only closes it once. A build targeting 31+ does not
+  trigger it at all.
+- Which `dumpsys` prints the focused window moved: `dumpsys window windows` up to ~API 30,
+  `dumpsys window displays` on API 34 (the former no longer contains `mCurrentFocus`).
+  `Device.current_focus()` tries the one that worked last, then the other.
 - The **GitHub API rate-limits** unauthenticated clients to 60 requests/hour. The updater no longer
   spends that budget: the latest check uses the unmetered web feed and the picker's API call is
   conditional, so a run should not hit 403. The strongest test is therefore to run **while the
