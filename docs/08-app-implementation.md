@@ -1004,6 +1004,7 @@ Stick (API 25), updater `0.8.0` / `versionCode 8` (APK 315 114 B, `sha256 daa5e3
 | API 25 regression | the permission and the receiver flag are inert below their API levels; every flow runs as in `0.7.0`, and no `SecurityException`/`IllegalArgumentException` from `registerReceiver` or `JobScheduler` appears in logcat |
 | English `all` | **5/5 PASS** — install 132s, downgrade 67s, upgrade 41s, uninstall 71s, clean-install 52s |
 | German `all` | **5/5 PASS** — install 52s, downgrade 65s, upgrade 42s, uninstall 72s, clean-install 53s |
+| Self-update `0.7.0` → `0.8.0` | the stick was reset to a fresh `v0.7.0` (API 25 refuses the in-place downgrade of the updater), then **Settings → About → "Plezy Updater aktualisieren…"** found `0.8.0`, downloaded and verified it (`verified self-update 0.8.0 (8) signer 62bc02eb…`), and the stock installer showed an **update** dialog; after **INSTALLIEREN** → `versionCode 7 → 8`, `firstInstallTime 2026-11-18 18:40:49` **unchanged**, `lastUpdateTime 18:41:55` |
 
 `phone34` (Google APIs phone, API 34) and the real `phone35` (API 35), updater `0.8.0` / `versionCode 8`:
 
