@@ -105,8 +105,13 @@ is_device() {
 }
 
 # Every address the phone currently advertises over mDNS (`_adb-tls-connect._tcp`).
+# Extract the `ip:port` by *shape*, not by field position: the service name can contain a space
+# (adb appends " (2)" when a device is registered twice), which shifts `awk`'s fields so `$3`
+# would yield the service type instead of the address. `$NF`/a regex survive that.
 mdns_candidates() {
-    "$ADB" mdns services 2>/dev/null | awk '/_adb-tls-connect\._tcp/ {print $3}'
+    "$ADB" mdns services 2>/dev/null \
+        | awk '/_adb-tls-connect\._tcp/ {print $NF}' \
+        | grep -E '^[0-9]{1,3}(\.[0-9]{1,3}){3}:[0-9]+$'
 }
 
 # Connect to one candidate and wait (briefly) for it to report `device`.
