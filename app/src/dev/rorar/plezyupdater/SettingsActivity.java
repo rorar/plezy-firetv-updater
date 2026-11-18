@@ -9,7 +9,9 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.view.View;
 import android.widget.Button;
 import android.widget.CompoundButton;
@@ -38,6 +40,8 @@ public class SettingsActivity extends Activity {
     private TextView intervalSummary;
     private TextView autoCheckSummary;
     private TextView languageSummary;
+    private TextView notificationSummary;
+    private Button notificationSettingsButton;
     private Button quotaButton;
     private TextView quotaSummary;
     private Button selfUpdateButton;
@@ -65,8 +69,10 @@ public class SettingsActivity extends Activity {
         addLanguage();
         addSwitch(getString(R.string.set_toast_label), getString(R.string.set_toast_desc),
                 Prefs.KEY_TOAST, Prefs.toastEnabled(this));
-        addSwitch(getString(R.string.set_notification_label), getString(R.string.set_notification_desc),
+        notificationSummary = addSwitch(getString(R.string.set_notification_label),
+                getString(R.string.set_notification_desc),
                 Prefs.KEY_NOTIFICATION, Prefs.notificationEnabled(this));
+        addNotificationSettings();
         addSwitch(getString(R.string.set_open_prompt_label), getString(R.string.set_open_prompt_desc),
                 Prefs.KEY_OPEN_PROMPT, Prefs.openPromptEnabled(this));
 
@@ -162,6 +168,7 @@ public class SettingsActivity extends Activity {
         super.onResume();
         refreshUninstallRow();
         refreshLanguageRow();
+        refreshNotificationRow();
         refreshQuotaRow();
         // A self-update flow that opened the installer and was then cancelled comes back here with
         // the row still busy; release it so the check can be run again.
@@ -176,6 +183,22 @@ public class SettingsActivity extends Activity {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == REQUEST_INTERVAL) {
             refreshIntervalRow();
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions,
+            int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == Notifier.REQUEST_POST_NOTIFICATIONS) {
+            Notifier.logPermissionResult(permissions, grantResults);
+            refreshNotificationRow();
+            // Post the confirmation now that the permission exists, so turning the switch on has
+            // the same visible result whether the dialog was needed or not.
+            if (Notifier.systemAllows(this)) {
+                Notifier.notification(this, getString(R.string.notifications_title),
+                        getString(R.string.toast_notifications_on));
+            }
         }
     }
 
@@ -215,6 +238,54 @@ public class SettingsActivity extends Activity {
                     getString(R.string.language_system_current, LocaleHelper.name(this, device)));
         } else {
             languageSummary.setText(LocaleHelper.name(this, current));
+        }
+    }
+
+    /**
+     * The extra row under the Notifications switch, shown only when Android is blocking the
+     * notification (roadmap item 5, step 33): from API 33 the {@code POST_NOTIFICATIONS} permission
+     * has to be granted, and a user can revoke it (or the whole channel) in the system settings.
+     * The switch still reads as on — the app is willing to post — so the warning explains why
+     * nothing arrives and offers the one place that can change it. On the API 25 stick
+     * {@link Notifier#systemAllows} is always true and the row never appears.
+     */
+    private void addNotificationSettings() {
+        notificationSettingsButton = Ui.actionButton(this,
+                getString(R.string.set_notification_settings));
+        notificationSettingsButton.setVisibility(View.GONE);
+        notificationSettingsButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                openNotificationSettings();
+            }
+        });
+        content.addView(notificationSettingsButton, buttonParams(8));
+        refreshNotificationRow();
+    }
+
+    private void refreshNotificationRow() {
+        if (notificationSummary == null || notificationSettingsButton == null) {
+            return;
+        }
+        boolean blocked = Prefs.notificationEnabled(this) && !Notifier.systemAllows(this);
+        notificationSummary.setText(blocked
+                ? getString(R.string.set_notification_blocked)
+                : getString(R.string.set_notification_desc));
+        notificationSettingsButton.setVisibility(blocked ? View.VISIBLE : View.GONE);
+    }
+
+    /** Open the platform's per-app notification settings, the only place the block can be lifted. */
+    private void openNotificationSettings() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startActivity(new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                        .putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName()));
+            } else {
+                startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        Uri.parse("package:" + getPackageName())));
+            }
+        } catch (ActivityNotFoundException e) {
+            Notifier.toast(this, getString(R.string.toast_no_settings));
         }
     }
 
@@ -339,7 +410,8 @@ public class SettingsActivity extends Activity {
             @Override
             public void run() {
                 final Diagnostics.QuotaResult result = Diagnostics.checkQuota(SettingsActivity.this);
-                Diagnostics.writeReport(SettingsActivity.this, result.report);
+                Diagnostics.writeReport(SettingsActivity.this,
+                        Diagnostics.report(SettingsActivity.this, result));
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
@@ -487,11 +559,18 @@ public class SettingsActivity extends Activity {
             }
         } else if (Prefs.KEY_NOTIFICATION.equals(key)) {
             if (enabled) {
-                Notifier.notification(this, getString(R.string.notifications_title),
-                        getString(R.string.toast_notifications_on));
+                if (Notifier.needsPermission(this)) {
+                    // API 33+: the notification only appears once the user grants the permission,
+                    // so ask now; the confirmation is posted from onRequestPermissionsResult.
+                    Notifier.requestPermission(this);
+                } else {
+                    Notifier.notification(this, getString(R.string.notifications_title),
+                            getString(R.string.toast_notifications_on));
+                }
             } else {
                 Notifier.cancelNotification(this);
             }
+            refreshNotificationRow();
         }
     }
 

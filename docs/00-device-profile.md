@@ -32,7 +32,9 @@ question in this repo:
 - Android 8 background-execution limits do **not** apply → a short network call from a receiver is
   legal, and scheduling is simple. The updater still uses `JobScheduler` (it exists since API 21) so
   one code path works here and on newer Android (see [07](07-notification-design.md)).
-- `POST_NOTIFICATIONS` runtime permission does not exist yet (introduced in API 33).
+- `POST_NOTIFICATIONS` runtime permission does not exist yet (introduced in API 33), so the updater's
+  request path is a no-op here and every use of it is behind a `Build.VERSION.SDK_INT` guard
+  (see [08](08-app-implementation.md#targetsdk-33--post_notifications-070-2026-11-18)).
 - Per-app "install unknown apps" grants do not exist yet (introduced in API 26);
   sideloading is governed by the global `install_non_market_apps` setting.
 

@@ -11,7 +11,7 @@ import android.content.Intent;
  * <pre>
  *   adb shell am broadcast --include-stopped-packages \
  *       -a dev.rorar.plezyupdater.action.DIAGNOSTICS
- *   # Broadcast completed: result=-1, data="status=ok;remaining=57;limit=60;reset_ms=…;checked_ms=…;device=fire_tv;tv=1;touch=0"
+ *   # Broadcast completed: result=-1, data="status=ok;remaining=57;limit=60;reset_ms=…;checked_ms=…;device=fire_tv;tv=1;touch=0;notif=allowed"
  * </pre>
  *
  * <p>The answer travels in the ordered-broadcast <em>result data</em> (not extras): a shell
@@ -36,15 +36,17 @@ public class DiagnosticsReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context c, Intent i) {
         final Context app = c.getApplicationContext();
-        // Read on the main thread (cheap) so both the success and the failure branch report it.
+        // Read the device classification and the notification state on the main thread (cheap) so
+        // both the success and the failure branch can report them.
         final String device = Device.report(app);
+        final String notif = Notifier.state(app);
         final PendingResult pending = goAsync();
         new Thread(new Runnable() {
             @Override
             public void run() {
                 try {
                     Diagnostics.QuotaResult r = Diagnostics.checkQuota(app);
-                    String report = r.report + ";" + device;
+                    String report = Diagnostics.report(app, r);
                     Diagnostics.writeReport(app, report);
                     // setResultData carries a plain string out of the broadcast; setResultCode(-1)
                     // is the success code a shell broadcast prints as "result=-1".
@@ -54,7 +56,7 @@ public class DiagnosticsReceiver extends BroadcastReceiver {
                     // checkQuota already swallows everything; this is belt and braces so a stray
                     // error still leaves a result rather than a hung broadcast.
                     pending.setResultCode(0);
-                    pending.setResultData("status=error;code=receiver;" + device);
+                    pending.setResultData("status=error;code=receiver;" + device + ";notif=" + notif);
                 } finally {
                     pending.finish();
                 }

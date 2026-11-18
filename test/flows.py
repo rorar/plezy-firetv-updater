@@ -497,6 +497,20 @@ class Flows:
             raise HarnessError(f"device report {got} != expected {expect}")
         self.log(f"    ✓ device: {got['device']} (tv={got['tv']}, touch={got['touch']})")
 
+    def assert_notifications(self, report):
+        """The broadcast's notif=… must be ``allowed`` (roadmap item 5, step 33).
+
+        On API 25 there is no ``POST_NOTIFICATIONS`` permission, so ``allowed`` proves the guard
+        leaves the legacy path untouched. On API 33+ the harness grants the permission before the
+        flows, so ``allowed`` proves the new permission path is satisfied. Expected value lives in
+        config.json's "expected_notif" (default ``allowed``).
+        """
+        want = self.c.get("expected_notif", "allowed")
+        got = report.get("notif")
+        if got != want:
+            raise HarnessError(f"notification report {got!r} != expected {want!r}")
+        self.log(f"    ✓ notifications: {got}")
+
     # ------------------------------------------------------------------ #
     # assertions
     # ------------------------------------------------------------------ #

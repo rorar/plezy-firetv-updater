@@ -1,14 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="dev.rorar.plezyupdater"
-    android:versionCode="6"
-    android:versionName="0.6.0">
+    android:versionCode="7"
+    android:versionName="0.7.0">
 
-    <uses-sdk android:minSdkVersion="25" android:targetSdkVersion="31" />
+    <uses-sdk android:minSdkVersion="25" android:targetSdkVersion="33" />
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- Runtime permission from API 33 (Android 13) on: without it the platform drops every
+         notification this app posts. It does not exist on API 25..32, so it is requested only
+         when Build.VERSION.SDK_INT >= TIRAMISU (see Notifier) and the manifest entry is inert
+         below 33. targetSdk 33 is what makes the request necessary in the first place. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Needed from API 26 on to send ACTION_DELETE / ACTION_UNINSTALL_PACKAGE (the stock
          uninstaller behind "Uninstall Plezy…"). Auto-granted, and ignored on API 25. -->
     <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />

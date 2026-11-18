@@ -7,6 +7,9 @@
 
   "diagnostics_action": "dev.rorar.plezyupdater.action.DIAGNOSTICS",
 
+  "_notif_comment": "The notif=… field the diagnostics report must carry (roadmap item 5, step 33). 'allowed' on every lane: API 25..32 has no POST_NOTIFICATIONS permission, and run.py grants it on API 33+ before the flows so the one-time dialog never interrupts them.",
+  "expected_notif": "allowed",
+
   "default_profile": "stick",
 
   "profiles": {

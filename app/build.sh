@@ -22,13 +22,13 @@ KEYTOOL="$JAVA_HOME/bin/keytool"
 
 PKG="dev.rorar.plezyupdater"
 MIN_SDK=25
-TARGET_SDK=31
+TARGET_SDK=33
 
 # The app version, stamped into the manifest at link time (--replace-version), so the number in
 # the APK always comes from here and the About screen reads the same value back from PackageManager.
-# Override for a one-off build: VERSION_CODE=6 VERSION_NAME=0.6.0 ./build.sh
-VERSION_CODE="${VERSION_CODE:-6}"
-VERSION_NAME="${VERSION_NAME:-0.6.0}"
+# Override for a one-off build: VERSION_CODE=7 VERSION_NAME=0.7.0 ./build.sh
+VERSION_CODE="${VERSION_CODE:-7}"
+VERSION_NAME="${VERSION_NAME:-0.7.0}"
 
 cd "$(dirname "$0")"
 

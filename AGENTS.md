@@ -148,8 +148,10 @@ Run it from `test/` if you want to import `harness` / `flows` in an ad-hoc snipp
 Settings → Language, dismisses the "Open Plezy?" prompt, clicks `INSTALLIEREN`, and proves the
 upgrade was an in-place replace (`firstInstallTime` unchanged, `lastUpdateTime` moved). Every run
 also fires the quota diagnostics broadcast and **asserts** the `device=…;tv=…;touch=…` fields it now
-carries against `test/config.json`'s `expected_device` (`fire_tv` / `1` / `0` on this stick); a
-missing report fails the run. Details in [`test/README.md`](test/README.md).
+carries against `test/config.json`'s `expected_device` (`fire_tv` / `1` / `0` on this stick) and the
+`notif=` field against `expected_notif`; a missing report fails the run. On API 33+ the run grants
+`POST_NOTIFICATIONS` up front so the one-time dialog never lands in the middle of a flow. Details in
+[`test/README.md`](test/README.md).
 
 Two things it does before/inside a run that are easy to get wrong by hand:
 
@@ -181,7 +183,7 @@ To trigger a quota check by hand:
 
 ```bash
 adb shell am broadcast --include-stopped-packages -a dev.rorar.plezyupdater.action.DIAGNOSTICS
-# → Broadcast completed: result=-1, data="status=ok;remaining=…;limit=60;reset_ms=…;checked_ms=…;device=fire_tv;tv=1;touch=0"
+# → Broadcast completed: result=-1, data="status=ok;remaining=…;limit=60;reset_ms=…;checked_ms=…;device=fire_tv;tv=1;touch=0;notif=allowed"
 ```
 
 ## Verifying the background check (`JobScheduler`, since 0.5.0)
@@ -203,9 +205,10 @@ adb shell logcat -d -s PlezyUpdater                                 # "backgroun
   fresh process (verified), which then logs `background check starting (manual=true)`.
 - With `Check automatically` off, job 2001 is gone from `dumpsys jobscheduler`; the one-off 2002
   still runs when armed with `manual=true`.
-- The updater targets **API 31** now. The channel path (`Notifier.ensureChannel`) and the
-  background-execution-limit behaviour are **not** reachable on this API 25 stick — use the
-  emulator lane (`tv30` / `phone34`, below) for those branches.
+- The updater targets **API 33** now. The channel path (`Notifier.ensureChannel`), the
+  background-execution-limit behaviour and the `POST_NOTIFICATIONS` request are **not** reachable on
+  this API 25 stick — use the emulator lane (`tv30` / `phone34`, below) or the real `phone35` for
+  those branches.
 
 ## The emulator lane (`test/emulator.sh`) and the real phone (`phone35`)
 
@@ -233,4 +236,7 @@ Its stock installer is the AOSP one on Android 15, in German: **`Installieren`**
 **`Aktualisieren`** (update) / **`Trotzdem aktualisieren`** (update from a different installer, a
 *second* dialog) / **`Abbrechen`** — recorded in `strings/system.de.api34.json`, which the profile
 points at with `system_strings`. Wireless-debugging adbd **changes its port** whenever it restarts
-(`adb root` / `unroot`, reboot); re-discover it with `adb mdns services` (`_adb-tls-connect._tcp`).
+(`adb root` / `unroot`, reboot); re-discover it with `adb mdns services` (`_adb-tls-connect._tcp`),
+or just run `test/adb-keepalive.sh --daemon`, which watches the device and reconnects by itself
+(`--once` prints the working address; the address stays in the gitignored `local.env`). A lost
+*pairing* is different — pair once with `adb pair <ip>:<pair-port> <code>` from the on-screen code.

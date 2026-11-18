@@ -97,7 +97,12 @@ every 12 hours just to say that something is available.
   `dumpsys notification --noredact` shows `NotificationChannel{mId='updates' …}` and the notification
   posted on it — see
   [08](08-app-implementation.md#emulator-lane-2026-11-18-updater-060--versioncode-6).
-- **No `POST_NOTIFICATIONS` runtime permission.** Introduced in API 33.
+- **`POST_NOTIFICATIONS` is a runtime permission from API 33.** Since `0.7.0` (`targetSdk` 33) the
+  app requests it — once automatically on the first `MainActivity` resume while the *Notifications*
+  switch is on, and again from that switch on toggle-on — and warns in Settings when Android is still
+  blocking the notification. It does not exist below 33, so `Notifier`'s helpers are no-ops on the
+  API 25 stick. The diagnostics report carries `notif=allowed|blocked`
+  ([08](08-app-implementation.md#targetsdk-33--post_notifications-070-2026-11-18)).
 - **Content intent is the whole UX.** Verified: selecting the card and pressing OK opens the
   target activity directly. It must land on "Install 2.27.0", not on a generic home screen.
 - **Keep the text short.** Title `Plezy 2.27.0 available`, text `Press OK to open` (the

@@ -151,12 +151,19 @@ def main(argv=None):
     if args.build:
         build_and_install(device, args, config["updater_package"])
 
+    # API 33+ only: grant POST_NOTIFICATIONS so the one-time dialog does not land in the middle
+    # of a flow. Below 33 the permission does not exist and this is a no-op.
+    notif = device.grant_notification_permission(config["updater_package"])
+    if notif:
+        print(f"  notification permission: {notif.splitlines()[0] if notif else notif}")
+
     flows = Flows(device, strings, config)
 
     # Exercise A3 the way it is meant to be used: a script triggers the check and reads the
     # report back over the broadcast, without a screen. The same report now carries the device
-    # classification (item 2), so it is asserted here rather than on a screen.
-    print("\n=== diagnostics: GitHub quota + device ===")
+    # classification (item 2) and the notification state (item 5, step 33), so both are asserted
+    # here rather than on a screen.
+    print("\n=== diagnostics: GitHub quota + device + notifications ===")
     quota = flows.check_quota()
     if quota and quota.get("status") == "ok":
         print(f"  GitHub API quota: {quota.get('remaining')}/{quota.get('limit')} requests left")
@@ -165,6 +172,7 @@ def main(argv=None):
     if quota:
         try:
             flows.assert_device(quota)
+            flows.assert_notifications(quota)
         except HarnessError as exc:
             print(f"  ✗ {exc}")
             return 1

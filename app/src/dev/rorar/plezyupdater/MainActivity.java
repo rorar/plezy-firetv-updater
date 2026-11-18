@@ -139,6 +139,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        maybeRequestNotificationPermission();
         // A *null* read right around a PackageInstaller session is a transient — PackageManager
         // briefly hides the package being replaced — so the screen keeps showing the last known
         // version rather than flickering to "not installed".
@@ -191,6 +192,33 @@ public class MainActivity extends Activity {
             instance = null;
         }
         super.onDestroy();
+    }
+
+    /**
+     * Ask for {@code POST_NOTIFICATIONS} once, when the app is first opened with notifications
+     * switched on (roadmap item 5, step 33). The permission does not exist below API 33, so
+     * {@link Notifier#needsPermission} is false on the stick and this does nothing there. The
+     * persisted {@code notifAsked} flag keeps the dialog from reappearing on every resume; the
+     * Settings row asks again if the user turns notifications back on after denying.
+     */
+    private void maybeRequestNotificationPermission() {
+        if (!Prefs.notificationEnabled(this) || !Notifier.needsPermission(this)
+                || Prefs.notifAsked(this)) {
+            return;
+        }
+        Prefs.setNotifAsked(this, true);
+        Notifier.requestPermission(this);
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions,
+            int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == Notifier.REQUEST_POST_NOTIFICATIONS) {
+            // Nothing to redraw here — the Settings row and the diagnostics report the state — but
+            // logging the outcome makes a phone-lane run readable from logcat.
+            Notifier.logPermissionResult(permissions, grantResults);
+        }
     }
 
     /** The install dialog is done: take the new version, ask GitHub again, offer to open Plezy. */

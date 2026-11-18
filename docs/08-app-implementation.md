@@ -1,11 +1,12 @@
 # 08 — The updater app, as built
 
-`app/` is the working updater: `dev.rorar.plezyupdater` **0.6.0** (`versionCode 6`),
-minSdk **25** / targetSdk **31**, plain Java, programmatic UI, **no Gradle and no AndroidX**. It is
+`app/` is the working updater: `dev.rorar.plezyupdater` **0.7.0** (`versionCode 7`),
+minSdk **25** / targetSdk **33**, plain Java, programmatic UI, **no Gradle and no AndroidX**. It is
 verified end-to-end on the API 25 stick (AFTMM, Fire OS 6.7.1.1 / API 25) and, on 2026-11-18, on the
 emulator lane (Android TV API 25/30, phone API 34) **and on a real arm64 phone** (LineageOS 22.1 =
 Android 15 = API 35). All five flows pass 5/5 in English and German, with French and Spanish
-`install` smokes, on both the stick and the phone.
+`install` smokes, on the stick, the API 34 emulator and the phone; the API 33
+`POST_NOTIFICATIONS` request path is verified by hand on both API 33+ devices.
 
 ## What it does
 
@@ -316,7 +317,7 @@ and report identically; the row also renders the **last stored** values without 
 ```bash
 adb shell am broadcast --include-stopped-packages \
     -a dev.rorar.plezyupdater.action.DIAGNOSTICS
-# Broadcast completed: result=-1, data="status=ok;remaining=59;limit=60;reset_ms=…;checked_ms=…;device=fire_tv;tv=1;touch=0"
+# Broadcast completed: result=-1, data="status=ok;remaining=59;limit=60;reset_ms=…;checked_ms=…;device=fire_tv;tv=1;touch=0;notif=allowed"
 ```
 
 `DiagnosticsReceiver` is **exported** (so a shell broadcast reaches it) but guarded by
@@ -324,21 +325,25 @@ adb shell am broadcast --include-stopped-packages \
 the ordered-broadcast **result data** — `setResultCode(-1)` + `setResultData(report)`, printed by
 `am broadcast` as `data="…"` — because that is the one channel a script can read without `run-as`.
 The report is a **quote-free, space-free** `key=value;…` string (`status=ok;remaining=…;limit=…;
-reset_ms=…;checked_ms=…;device=…;tv=…;touch=…`, or `status=error;code=…` on failure) so it survives
-that channel intact, and the same report is written to **`quota.txt`** in the app's external cache
-dir (`getExternalCacheDir()`) as a second, permission-free way in. The check is a network call, so it
-runs off the main thread through `goAsync()`; `finish()` always runs, even on failure, or the
+reset_ms=…;checked_ms=…;device=…;tv=…;touch=…;notif=…`, or `status=error;code=…` on failure) so it
+survives that channel intact, and the same report is written to **`quota.txt`** in the app's external
+cache dir (`getExternalCacheDir()`) as a second, permission-free way in. The check is a network call,
+so it runs off the main thread through `goAsync()`; `finish()` always runs, even on failure, or the
 broadcast would hang until the system times it out.
 
 The trailing `device=…;tv=…;touch=…` is `Device.report()` — the [device
 classification](#device-detection-fire-tv--android-tv--touch) riding along on the check that was
-already happening, because it is otherwise invisible from the outside. It is read on the main thread
-(cheap) so both the success and the failure branch carry it, and it is appended to the string
-*before* it is written to `quota.txt`, so the two channels cannot drift apart.
+already happening, because it is otherwise invisible from the outside — and `notif=allowed|blocked`
+is `Notifier.state()`: whether Android will actually deliver a notification (`areNotificationsEnabled`,
+and from API 33 the `POST_NOTIFICATIONS` grant). Both are read on the main thread (cheap) so the
+success and the failure branch carry them, and they are appended to the string *before* it is written
+to `quota.txt`, so the two channels cannot drift apart.
 
-The flow harness uses exactly this path: `run.py` fires the broadcast before the flows, prints the
-quota, and **asserts** the device fields against `test/config.json`'s `expected_device`
-([test/README](../test/README.md)). A missing report or a mismatched value fails the run.
+The flow harness uses exactly this path: `run.py` grants `POST_NOTIFICATIONS` on API 33+ (so the
+one-time dialog never lands in a flow), fires the broadcast before the flows, prints the quota, and
+**asserts** the device fields against `test/config.json`'s `expected_device` and the notification
+state against `expected_notif` ([test/README](../test/README.md)). A missing report or a mismatched
+value fails the run.
 
 ## Settings
 
@@ -353,6 +358,7 @@ rows are action rows, not switches.
 |---|---|---|---|---|
 | Toast notifications | User | `toast_enabled` | on | Bottom-of-screen toasts |
 | Notifications | User | `notification_enabled` | on | Fire TV notification-centre entry |
+| Open notification settings | User | — | — | Shown only while Android blocks the notification (API 33+ `POST_NOTIFICATIONS` missing, or the app's notifications turned off in the system settings); opens the platform's per-app notification settings |
 | Prompt to open Plezy | User | `open_prompt_enabled` | **on** | Offers to start Plezy after a successful install (A1) |
 | Language | User | `app_language` | System default | Opens the language picker (below) |
 | Check automatically | Advanced | `auto_check_enabled` | on | Periodic job + boot re-arm |
@@ -365,6 +371,18 @@ rows are action rows, not switches.
 
 Every message goes through `Notifier`, so a switched-off channel stays silent everywhere,
 including the "Test toast" / "Test notification" buttons.
+
+**The API 33 notification permission.** From Android 13 a notification also needs the
+`POST_NOTIFICATIONS` runtime permission, so the updater (which now targets 33) requests it: once
+automatically on the first `MainActivity` resume while the *Notifications* switch is on (guarded by
+the persisted `notif_asked` flag so it is not asked again on every resume), and again from the
+*Notifications* switch whenever the user turns it back on. `Notifier.needsPermission` /
+`requestPermission` are no-ops below API 33, so the API 25 stick is untouched. When the switch is on
+but Android is still blocking the notification — permission denied, or the app's notifications turned
+off in the system settings — the row's summary changes to **"Blocked by Android. Allow notifications
+so update notices appear."** and an **Open notification settings** action appears underneath it,
+opening `ACTION_APP_NOTIFICATION_SETTINGS` (falling back to the app details screen below API 26).
+`Notifier.systemAllows` is the single answer both the row and the diagnostics report use.
 
 **Toggled rows align with button rows.** The rows that carry a `Switch` on the right and the rows
 that are plain buttons used to have different horizontal paddings, so their labels did not line up.
@@ -889,6 +907,45 @@ release the flow downgrades first, so `upgrade` also runs on its own.
 
 ## Verified on hardware (2026-11-14/18)
 
+### `targetSdk` 33 + `POST_NOTIFICATIONS` (`0.7.0`), 2026-11-18
+
+The next roadmap step: raise `targetSdk` 31 → 33 and handle the one behaviour that turns on at API 33
+— `POST_NOTIFICATIONS` became a **runtime** permission, so a `targetSdk 33` app's notifications are
+dropped until the user grants it (the thing `0.6.0` had observed on the phone, where the permission
+was declared but never requested). Everything new is behind a `VERSION.SDK_INT >= TIRAMISU` guard, so
+the API 25 stick keeps the legacy path.
+
+Stick (API 25), updater `0.7.0` / `versionCode 7` (APK 315 114 B, `sha256 8bb22b98…`):
+
+| Step | Result |
+|---|---|
+| Build identity | `dumpsys package dev.rorar.plezyupdater` → `versionCode=7 minSdk=25 targetSdk=33`, `versionName=0.7.0`; `aapt2 dump badging` → `targetSdkVersion:'33'`, `POST_NOTIFICATIONS` among the permissions |
+| Notification state on API 25 | `notif=allowed` — `POST_NOTIFICATIONS` does not exist below 33, so the guard leaves the report at the legacy answer; the notification row is *not* blocked and the extra action stays hidden |
+| Quota / device report | `data="status=ok;…;device=fire_tv;tv=1;touch=0;notif=allowed"` — the new `notif=` field asserted by the harness |
+| English `all` | **5/5 PASS** — install 116s, downgrade 65s, upgrade 34s, uninstall 70s, clean-install 58s |
+| German `all` | **5/5 PASS** — install 52s, downgrade 67s, upgrade 36s, uninstall 70s, clean-install 53s |
+| API 25 regression | no `POST_NOTIFICATIONS` dialog, no permission code path runs, every flow byte-for-byte as `0.6.0` |
+
+`phone34` (Google APIs phone, API 34) and the real `phone35` (API 35), updater `0.7.0` / `versionCode 7`:
+
+| Step | Result |
+|---|---|
+| Build identity | both → `versionCode=7 minSdk=25 targetSdk=33`, `versionName=0.7.0` |
+| Permission state | `run.py` grants `POST_NOTIFICATIONS` on API 33+ before the flows (`pm grant`, `dumpsys package` → `granted=true`), so the one-time dialog never lands in a flow; the report reads `notif=allowed` |
+| **Request path (phone35)** | installed `0.7.0` over `0.6.0` with the permission ungranted; the first launch showed the system dialog — `"Plezy Updater erlauben, dir Benachrichtigungen zu senden?"` / **Zulassen** / Nicht zulassen — and tapping **Zulassen** left `POST_NOTIFICATIONS: granted=true` (`flags=[USER_SET…]`) |
+| **Request path (phone34)** | revoking the permission (`pm revoke`) and relaunching re-showed the dialog on API 34 too — `notif_asked` was still unset, so the auto-request fired exactly as designed |
+| **Notification actually shows (phone35)** | Settings → *Test notification* → `dumpsys notification --noredact` → `NotificationRecord(pkg=dev.rorar.plezyupdater id=1001 … channel=updates)` |
+| **Blocked UI (phone34)** | with the permission denied and the switch on, the row read **"Bloqueado por Android. Permite las notificaciones…"** and the **Abrir ajustes de notificaciones** action appeared; tapping it opened `com.android.settings/.Settings$AppNotificationSettingsActivity` — the platform's per-app notification settings |
+| `phone34` English `all` | **5/5 PASS** — install 36s, downgrade 45s, upgrade 18s, uninstall 81s, clean-install 29s |
+| `phone34` German `all` | **5/5 PASS** — install 35s, downgrade 41s, upgrade 18s, uninstall 84s, clean-install 27s |
+| `phone35` English `all` | **5/5 PASS** — install 45s, downgrade 58s, upgrade 23s, uninstall 63s, clean-install 34s |
+| `phone35` German `all` | **5/5 PASS** — install 37s, downgrade 54s, upgrade 23s, uninstall 92s, clean-install 37s |
+| French / Spanish smokes | `install --app-lang fr\|es` on `phone34` → **1/1 each** (34/36s) |
+
+The request dialog is the one thing the harness deliberately does **not** drive: it would be
+nondeterministic (the platform shows it at most twice, and a prior denial changes the outcome), so
+`run.py` grants the permission up front and the dialog itself is verified by hand, above.
+
 | Step | Result |
 |---|---|
 | GitHub check | `Installed: 2.26.0 / Latest upstream: 2.26.0 (up to date)` |
@@ -1122,11 +1179,14 @@ screen, up to three dialogs, so a two-dialog platform needs no special case.
   under the background-execution limits the bump is about
   ([above](#emulator-lane-2026-11-18-updater-060--versioncode-6)). The API 25 path is what the stick
   flows cover. See [Background checks](#background-checks-jobscheduler-targetsdk-26).
-- **`POST_NOTIFICATIONS` is not granted on the API 35 phone.** The manifest declares it, but the
-  updater targets 31, so the runtime permission is not requested and the platform denies it by
-  default (`appops get … POST_NOTIFICATION` → `ignore`) — the notification is posted but not shown.
-  That is the first item of the `targetSdk` 33 step, not a regression
-  ([roadmap item 5](11-roadmap.md#5-targetsdk-bump-matrix)).
+- **`POST_NOTIFICATIONS` is handled from `0.7.0` on.** Before that the manifest declared it but the
+  updater targeted 31, so the runtime permission was never requested and the platform denied it by
+  default — the notification was posted but not shown. Since `0.7.0` the app targets 33 and requests
+  the permission (automatically once, and from the Notifications switch), the Settings row shows a
+  blocked hint with an **Open notification settings** action when it is missing, and the diagnostics
+  report carries `notif=allowed|blocked`. Verified on the API 34 emulator and the API 35 phone
+  ([above](#targetsdk-33--post_notifications-070-2026-11-18)); the API 25 stick never sees the
+  permission. See [roadmap item 5](11-roadmap.md#5-targetsdk-bump-matrix).
 - **A job does not wake a sleeping TV.** The old `RTC_WAKEUP` alarm could; `JobScheduler` runs the
   check while the TV is on, which the UI already promises ("Runs while the TV is on"). Also, a newly
   scheduled periodic job runs once almost immediately on this build before settling into its

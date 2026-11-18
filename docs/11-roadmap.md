@@ -2,7 +2,8 @@
 
 Where the updater goes after Round 1 (the A1–A7 + B2 set, updater `0.2.0`; self-update in `0.3.0`;
 device detection and device-aware wording in `0.4.0`; `targetSdk` 25 → 26 in `0.5.0`; the emulator
-lane, a real-phone lane and `targetSdk` 26 → 31 in `0.6.0`). Each item says what it
+lane, a real-phone lane and `targetSdk` 26 → 31 in `0.6.0`; `targetSdk` 31 → 33 with
+`POST_NOTIFICATIONS` in `0.7.0`). Each item says what it
 is, what it would take, what can go wrong, and **how it would be verified on the stick** — including
 the honest cases where this hardware cannot verify it (the emulator lane now covers some of those).
 Order is a suggestion, not a commitment.
@@ -231,7 +232,7 @@ unchanged.
 | 29 | 10.0 | **Scoped storage** — the app uses `cacheDir` and `getExternalCacheDir()`, both app-specific, so fine; no legacy flag needed. **Background activity starts** are restricted: the install-confirmation activity is started from the app while it is in the foreground (the user just pressed a button), so allowed. `InstallResultReceiver` starts it too, but only for `STATUS_PENDING_USER_ACTION` — which the platform stops sending once it shows the dialog itself (API 26+), so it can never be a background start on a platform that enforces the rule. A future auto-install path would not be allowed. |
 | 30 | 11.0 | **Package visibility** — `<queries>` for `com.edde746.plezy` is already declared. `ACTION_DELETE` still launches the stock uninstaller; installing still needs `REQUEST_INSTALL_PACKAGES` (declared). |
 | 31 ✅ | 12.0 | **Done in `0.6.0`.** **`PendingIntent` mutability** — `ApkInstaller`'s session-result `PendingIntent` is `FLAG_UPDATE_CURRENT \| FLAG_MUTABLE` (the platform writes the session status into it, and on API 25 the confirmation intent too); `Notifier`'s notification `PendingIntent` is `FLAG_IMMUTABLE` (it only opens `MainActivity`). Both add the flag only when `SDK_INT >= S`, so the API 25–30 flags stay `0`; `FLAG_MUTABLE`/`FLAG_IMMUTABLE` are compile-time constants, so naming them is safe and dex inlines them. **Notification trampolines** — the notification's `contentIntent` is already an activity, started directly, not a receiver that starts one: verified on `tv30`, nothing to change. **`REQUEST_DELETE_PACKAGES`** — declared; the platform's package-visibility rules make it necessary to send `ACTION_DELETE` on newer Android (declared, but *not* empirically tested by removing it). **Also fixed here** — the downgrade handshake raced the platform ([08](08-app-implementation.md#finding-5--the-uninstall-handshake-raced-the-platform-on-android-12)). Verified end to end on the `phone34` emulator (API 34) **and on the real `phone35` (API 35)**. |
-| 33 | 13.0 | **`POST_NOTIFICATIONS` is a runtime permission** — must be requested; on the stick there is no such permission, so guard it. Observed on the API 35 phone: the manifest declares it but a `targetSdk 31` app is never granted it, so `appops get … POST_NOTIFICATION` → `ignore` and the update notification is posted but not shown. Requesting it is the first change of this step. |
+| 33 ✅ | 13.0 | **Done in `0.7.0`.** **`POST_NOTIFICATIONS` is a runtime permission** — a `targetSdk 33` app's notifications are dropped until it is granted. `Notifier` gained `systemAllows` / `needsPermission` / `requestPermission` (all guarded by `SDK_INT >= TIRAMISU`, so the API 25 stick is untouched), `MainActivity` asks once on the first resume while the *Notifications* switch is on (persisted `notif_asked`), and the Settings row asks again on toggle-on and shows a **Blocked by Android…** hint plus an **Open notification settings** action while the notification is blocked. The diagnostics report gained `notif=allowed\|blocked`, asserted by the harness. Verified on `phone34` (API 34) and the real `phone35` (API 35) — request dialog, grant, and a posted notification — and the API 25 flows are unchanged ([08](08-app-implementation.md#targetsdk-33--post_notifications-070-2026-11-18)). |
 | 34 | 14.0 | Foreground-service types and further implicit-intent restrictions; check the notification and alarm paths. |
 | 35 | 15.0 | Nothing new beyond 33/34 seen on the `phone35` run (LineageOS 22.1): the five flows pass on it, which is the point — the newest platform here is exercised end to end. |
 
@@ -249,7 +250,9 @@ avoid — had no device to run on and stayed logic-verified. **The emulator lane
 background-limit branches, `phone34` (Android 14) enforces the `targetSdk` 31 rules and runs the
 whole Plezy flow, `tv25` repeats the API 25 platform without the stick, and `phone35` runs the whole
 flow on a **real** API 35 arm64 phone. The 31 step was verified on `phone34` and `phone35` end to
-end, and the 26 step's API 26+ branches are now exercised on `tv30`.
+end, and the 26 step's API 26+ branches are now exercised on `tv30`. The 33 step was verified the same
+way, with the `POST_NOTIFICATIONS` request dialog driven by hand on both API 33+ devices (the harness
+grants the permission up front so a flow is not at the mercy of the one-time dialog).
 
 ## Suggested order
 
@@ -270,8 +273,13 @@ end, and the 26 step's API 26+ branches are now exercised on `tv30`.
    jump, plus the real-phone lane (`phone35`, API 35 arm64). The lane paid for itself at once: it
    caught the Android 12+ downgrade race (twice — the second time on the real phone) and the
    all-caps dialog buttons the harness had assumed away.
-6. **`targetSdk` bump, further steps** (33 → …) — `POST_NOTIFICATIONS` (API 33) is the next real
-   one; each step keeps the API 25 flows as the regression test and the lane for the new branch.
+6. ~~**`targetSdk` bump, step 33**~~ — **done** 2026-11-18, `0.7.0`; `POST_NOTIFICATIONS` is requested
+   (auto once + on toggle), the Settings row warns when Android blocks the notification, and the
+   diagnostics report carries `notif=`. Verified on `phone34` (API 34) and `phone35` (API 35), with
+   the API 25 flows re-run on the stick. The **next** real step is `targetSdk` 34 (foreground-service
+   types and the further implicit-intent / receiver-export rules — the custom
+   `ACTION_INSTALL_FINISHED` receiver is the thing to check there); each step keeps the API 25 flows
+   as the regression test and the lane for the new branch.
 7. **Touch UI** (item 3, layout half) — last: `phone34` can *drive* a touch device now, but an
    emulator is not a real phone, so the layout half stays the least-verifiable item.
 

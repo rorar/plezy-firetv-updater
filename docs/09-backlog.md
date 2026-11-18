@@ -11,8 +11,20 @@ The forward-looking items now live in the [roadmap](11-roadmap.md), so this stay
   ([roadmap item 3](11-roadmap.md#3-android-tv--phone-compatibility)); the TV-first sizing and the
   two-pane pickers still assume a D-pad. The emulator lane's `phone34` profile can now *drive* the
   flows on a touch device, but the layout itself is unchanged.
-- **`targetSdk` bump, further steps** — 25 → 26 landed in `0.5.0` and 26 → 31 in `0.6.0`;
-  33 → … remain, one step per release ([roadmap item 5](11-roadmap.md#5-targetsdk-bump-matrix)).
+- **Choose version: make the picker phone-ready (user request, 2026-11-18).** On a phone in
+  landscape the versions|changelog side-by-side does not read well, and the pane is still built for
+  D-pad focus. Requested: a per-version control that slides the changelog in from the right with a
+  close button (or a better touch-native solution) instead of the always-on two panes; landscape
+  layout specifically called out. This is the concrete first slice of the item above.
+- **Device-aware wording, beyond the input hint (user request, 2026-11-18).** `0.4.0`'s wording is
+  only the *input* hint ("press OK" vs "tap"); the behaviour strings still say TV ("runs while the
+  TV is on", "after the TV boots", "confirm the install on the TV"). Requested: say "TV" on an
+  Android TV / Fire TV and "phone" (or neutral) on a touch device. Today's wording is deliberately
+  TV-first because the layout is too ([08](08-app-implementation.md#device-aware-wording)); this
+  request is to carry it the rest of the way.
+- **`targetSdk` bump, further steps** — 25 → 26 landed in `0.5.0`, 26 → 31 in `0.6.0`, 31 → 33 in
+  `0.7.0`; 34 → … remain, one step per release
+  ([roadmap item 5](11-roadmap.md#5-targetsdk-bump-matrix)).
 
 Nothing here is a commitment; the roadmap explains the order and the reasoning.
 
@@ -35,6 +47,18 @@ Nothing here is a commitment; the roadmap explains the order and the reasoning.
   gave the project a second platform to test on for the first time, and a real API 35 arm64 phone
   (`phone35`) closed the arm64-install gap and verified the whole flow over touch. See
   [11 § 5](11-roadmap.md#5-targetsdk-bump-matrix).
+
+- **`targetSdk` 31 → 33 (roadmap item 5, third step): `POST_NOTIFICATIONS`.** Landed 2026-11-18
+  (`0.7.0`): from API 33 the permission is a *runtime* grant, so `Notifier` gained
+  `systemAllows` / `needsPermission` / `requestPermission` (all guarded by `SDK_INT >= TIRAMISU`),
+  `MainActivity` asks once on first resume while the *Notifications* switch is on, and the Settings
+  row asks on toggle-on and shows a **Blocked by Android…** hint plus an **Open notification
+  settings** action while the notification is blocked. The diagnostics report carries
+  `notif=allowed|blocked`, asserted by the harness. Verified on `phone34` (API 34) and the real
+  `phone35` (API 35) — the request dialog, the grant and a posted notification — with the API 25
+  flows re-run unchanged on the stick. See
+  [11 § 5](11-roadmap.md#5-targetsdk-bump-matrix) and
+  [08](08-app-implementation.md#targetsdk-33--post_notifications-070-2026-11-18).
 
 - **Device detection (roadmap item 2).** Landed 2026-11-17 (`0.4.0`): `DeviceKind` (the decision, a
   pure enum with no `android.*` import) and `Device` (the Android wrapper) answer *what is this
@@ -215,5 +239,8 @@ Nothing here is a commitment; the roadmap explains the order and the reasoning.
   notification channel on API 26+, `JobScheduler` in place of the alarm + service. **26 → 31**
   (second step) landed on 2026-11-18 (updater `0.6.0`): `PendingIntent` mutability flags,
   `REQUEST_DELETE_PACKAGES`, and the Android 12+ downgrade race fixed; the emulator lane that
-  verified it is new too. The remaining steps (33 → …) are still open, and the touch **layout** is
-  still the last item.
+  verified it is new too. **31 → 33** (third step) landed on 2026-11-18 (updater `0.7.0`):
+  `POST_NOTIFICATIONS` requested once automatically and from the Settings switch, a blocked hint
+  with an **Open notification settings** action, and `notif=` in the diagnostics report; verified on
+  the API 34 emulator and the real API 35 phone. The remaining steps (34 → …) are still open, and the
+  touch **layout** is still the last item.

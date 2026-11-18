@@ -144,6 +144,12 @@ case "$cmd" in
       adb_ shell appops set "$PKG" REQUEST_INSTALL_PACKAGES allow || true
       echo "   appops: $(adb_ shell appops get "$PKG" REQUEST_INSTALL_PACKAGES | tr -d '\r')"
     fi
+    if [ "${API:-0}" -ge 33 ]; then
+      # From API 33 POST_NOTIFICATIONS is a runtime permission the app asks for on first launch;
+      # grant it here so the one-time dialog does not interrupt a flow (run.py grants it too).
+      adb_ shell pm grant "$PKG" android.permission.POST_NOTIFICATIONS || true
+      echo "   notif: $(adb_ shell appops get "$PKG" POST_NOTIFICATION | tr -d '\r')"
+    fi
     adb_ shell input keyevent KEYCODE_WAKEUP || true
     adb_ shell svc power stayon true || true
     adb_ shell settings put global window_animation_scale 0 || true

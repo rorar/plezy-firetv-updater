@@ -422,6 +422,19 @@ class Device:
         self.shell(f"appops set {pkg} REQUEST_INSTALL_PACKAGES allow", check=False)
         return self.shell(f"appops get {pkg} REQUEST_INSTALL_PACKAGES", check=False).strip()
 
+    def grant_notification_permission(self, pkg):
+        """Grant ``POST_NOTIFICATIONS`` for ``pkg``; no-op (returns None) below API 33.
+
+        The permission does not exist before API 33, so the manifest entry is inert on the stick
+        and on the API 30 emulator. From API 33 on the updater asks for it on first launch; a run
+        grants it up front so the one-time dialog never lands in the middle of a flow. The request
+        path itself is verified by hand (see docs/08). Returns the appop line for the log.
+        """
+        if self.api_level() < 33:
+            return None
+        self.shell(f"pm grant {pkg} android.permission.POST_NOTIFICATIONS", check=False)
+        return self.shell(f"appops get {pkg} POST_NOTIFICATION", check=False).strip()
+
     def free_data_kb(self):
         """Free KB on the data partition, or None when ``df`` output cannot be parsed.
 

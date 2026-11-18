@@ -65,6 +65,17 @@ public final class Diagnostics {
     }
 
     /**
+     * The full machine report: the quota result plus the two things a script cannot see from the
+     * outside — the device classification and whether Android is currently allowing notifications
+     * ({@code device=…;tv=…;touch=…;notif=allowed|blocked}). The Settings row and
+     * {@link DiagnosticsReceiver} both build their report here, so the broadcast result and the
+     * {@code quota.txt} file stay identical.
+     */
+    public static String report(Context c, QuotaResult r) {
+        return r.report + ";" + Device.report(c) + ";notif=" + Notifier.state(c);
+    }
+
+    /**
      * "57 of 60 left · resets 13:25", built from the last stored values so the row reads correctly
      * without a fresh network call. {@link #NEVER} values fall back to "not checked yet".
      */

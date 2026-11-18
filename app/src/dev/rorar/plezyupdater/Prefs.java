@@ -19,6 +19,9 @@ public final class Prefs {
     private static final String KEY_PENDING_DOWNGRADE = "pending_downgrade_tag";
     private static final String KEY_INTERVAL_VALUE = "interval_value";
     private static final String KEY_INTERVAL_UNIT = "interval_unit";
+    // Set once the first POST_NOTIFICATIONS request has been made (API 33+ only), so the app asks
+    // at most once on its own; the Settings row can still ask again after a toggle.
+    private static final String KEY_NOTIF_ASKED = "notif_asked";
 
     // The last "latest release" we saw, kept so a rate-limited or offline check can still show a
     // version instead of a bare HTTP error. The asset URL is deliberately *not* stored: it is
@@ -66,6 +69,19 @@ public final class Prefs {
 
     public static boolean notificationEnabled(Context c) {
         return sp(c).getBoolean(KEY_NOTIFICATION, true);
+    }
+
+    /**
+     * Whether the app has already asked for {@code POST_NOTIFICATIONS} by itself. Persisted so a
+     * process restart (or a re-entry into MainActivity) does not pop the dialog again; the
+     * Settings row requests explicitly when the user turns notifications back on.
+     */
+    public static boolean notifAsked(Context c) {
+        return sp(c).getBoolean(KEY_NOTIF_ASKED, false);
+    }
+
+    public static void setNotifAsked(Context c, boolean value) {
+        sp(c).edit().putBoolean(KEY_NOTIF_ASKED, value).apply();
     }
 
     public static boolean autoCheckEnabled(Context c) {

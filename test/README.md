@@ -14,7 +14,7 @@ they are both a test and a record of *what to click*.
 
 `all` runs them in that order: it starts from "latest installed" and ends back on "latest
 installed". Every run also fires the diagnostics broadcast first (see
-[Quota + device check](#quota--device-check-a3--item-2)), so A3 is exercised on each invocation.
+[Quota + device + notification check](#quota--device--notification-check-a3--item-2--item-5)), so A3 is exercised on each invocation.
 
 Before any of that, `run.py` runs the static string-parity check (`test/check_strings.py`) — no
 device needed, and a locale that drifted from `values/` would otherwise make a flow look for a
@@ -60,6 +60,7 @@ live in `config.json` → `profiles`, and `--profile <name>` selects one (defaul
 |---|---|
 | `installer_activity` / `uninstaller_activity` | the stock installer's package + activity |
 | `expected_device` | what `device=…;tv=…;touch=…` must report (`kind` / `tv` / `touch`) |
+| `expected_notif` | what `notif=…` must report (default `allowed`) |
 | `system_lang` | the locale to use when `--system-lang auto` cannot read one |
 | `system_strings` | (optional) the exact stock-installer string file to load |
 | `navigation` | `dpad` or `touch` — how the app's own screens are driven |
@@ -118,6 +119,22 @@ immutable `PendingIntent`s, the notification trampoline rule). `phone35` repeats
 hardware and closes the arm64 gap. The emulators boot headless; `phone35` is the user's own phone,
 reachable over wireless adb (`PHONE_SERIAL` in `local.env`).
 
+**Keeping the phone reachable.** Wireless-debugging adbd picks a new port whenever it restarts
+(`adb root` / `unroot`, a reboot, toggling Wireless debugging), so a `PHONE_SERIAL` that worked a
+minute ago can suddenly refuse. [`test/adb-keepalive.sh`](adb-keepalive.sh) watches the device and
+re-discovers the port over mDNS, reconnecting as needed; the address stays in the gitignored
+`local.env`, never in the repo:
+
+```bash
+source local.env
+test/adb-keepalive.sh --daemon      # keep $PHONE_SERIAL reachable (writes a pidfile + a log)
+test/adb-keepalive.sh --once        # reconnect once, print the working address
+test/adb-keepalive.sh --stop        # stop the daemon
+```
+
+If the phone has lost its *pairing* (a fresh pairing code is on screen), pair once with
+`adb pair <ip>:<pair-port> <code>` — the keepalive only re-connects, it does not pair.
+
 ## Strings are configuration, not code
 
 Nothing in `harness.py` or `flows.py` contains a user-visible label. Two dimensions are loaded
@@ -158,7 +175,7 @@ nothing for the harness to set. `check_strings.py` keeps those files in parity.
 diagnostics broadcast action, the device profiles, and the two versions the flows use (`latest`,
 `older`). Bump the versions when upstream moves on, or pass `--latest` / `--older`.
 
-## Quota + device check (A3 + item 2)
+## Quota + device + notification check (A3 + item 2 + item 5)
 
 `run.py` exercises the diagnostics feature the way it is meant to be used — a script triggers the
 check and reads the report back, with no screen involved. `Flows.check_quota()` sends
@@ -169,7 +186,7 @@ adb shell am broadcast -p dev.rorar.plezyupdater --include-stopped-packages \
 ```
 
 and parses the ordered-broadcast result, which `am broadcast` prints as
-`Broadcast completed: result=-1, data="status=ok;remaining=59;limit=60;reset_ms=…;checked_ms=…;device=fire_tv;tv=1;touch=0"`.
+`Broadcast completed: result=-1, data="status=ok;remaining=59;limit=60;reset_ms=…;checked_ms=…;device=fire_tv;tv=1;touch=0;notif=allowed"`.
 The preamble prints `GitHub API quota: 59/60 requests left`. The action lives in
 `config.json` (`diagnostics_action`); the report is a quote-free `key=value;…` string by design, so
 it survives that channel.
@@ -184,7 +201,12 @@ The trailing `device=…;tv=…;touch=…` is `Device.report()`: the device clas
 2) rides along on the check that was already happening, because it is otherwise invisible from the
 outside. `Flows.assert_device()` compares it against `config.json`'s `expected_device`
 (`fire_tv` / `1` / `0` for this stick) and the run **fails** if the receiver does not answer or the
-values differ.
+values differ. The last field, `notif=allowed|blocked`, is `Notifier.state()` — whether Android will
+actually deliver a notification (item 5, step 33: the API 33 `POST_NOTIFICATIONS` grant plus
+`areNotificationsEnabled`) — asserted by `Flows.assert_notifications()` against `expected_notif`.
+On API 33+ `run.py` also grants `POST_NOTIFICATIONS` before the flows (`Device.grant_notification_permission`,
+a no-op below 33) so the one-time request dialog never lands in the middle of a flow; the dialog
+itself is verified by hand.
 
 ## String parity
 

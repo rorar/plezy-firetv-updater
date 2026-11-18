@@ -51,6 +51,8 @@
     <string name="set_toast_desc">Court message en bas de l\'écran.</string>
     <string name="set_notification_label">Notifications</string>
     <string name="set_notification_desc">Entrée dans la zone de notifications.</string>
+    <string name="set_notification_blocked">Bloqué par Android. Autorisez les notifications pour voir les avis de mise à jour.</string>
+    <string name="set_notification_settings">Ouvrir les réglages de notification</string>
     <string name="set_open_prompt_label">Proposer d\'ouvrir Plezy</string>
     <string name="set_open_prompt_desc">Après une installation, proposer de lancer Plezy.</string>
     <string name="set_auto_label">Vérifier automatiquement</string>
@@ -74,6 +76,7 @@
     <string name="set_uninstall_message">Cela supprime Plezy et efface ses données — serveurs, paramètres et téléchargements. Android vous demandera de confirmer.</string>
     <string name="set_uninstall_confirm">Désinstaller</string>
     <string name="toast_no_uninstaller">Aucun désinstalleur trouvé</string>
+    <string name="toast_no_settings">Réglages de notification introuvables</string>
     <string name="toast_uninstalled">Plezy désinstallé</string>
     <string name="toast_toast_on">Notifications toast activées</string>
     <string name="toast_notifications_on">Les notifications sont activées</string>

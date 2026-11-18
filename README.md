@@ -17,7 +17,7 @@ Releases (the APK is attached to each): **<https://github.com/rorar/plezy-firetv
 
 Verified on **2026-11-13/18** with Plezy `2.26.0`, ADB `1.0.41` (platform-tools `37.0.0`) — on the
 stick (API 25) end to end, on the emulator lane (Android TV API 25/30, phone API 34), and on a real
-arm64 phone (API 35) for `0.6.0`.
+arm64 phone (API 35) for `0.6.0`/`0.7.0`.
 
 ---
 
@@ -68,21 +68,23 @@ arm64 phone (API 35) for `0.6.0`.
 | Launcher | 24 `LEANBACK_LAUNCHER` entries, app appears in the Fire TV home row |
 | APK used | `derFrisson/plezy-apks` `2.26.0` → `plezy-android-armeabi-v7a.apk` (90,748,577 bytes) |
 | Installed size | ~87 MB in `/data/app/com.edde746.plezy-1` |
-| Updater | `dev.rorar.plezyupdater` `0.6.0` (`versionCode 6`, minSdk 25 / targetSdk 31) — see [docs/08](docs/08-app-implementation.md) |
+| Updater | `dev.rorar.plezyupdater` `0.7.0` (`versionCode 7`, minSdk 25 / targetSdk 33) — see [docs/08](docs/08-app-implementation.md) |
 
 ## The updater app
 
-`app/` builds to a ~304 KB APK (the launcher icon, TV banner and the language flags at every density
+`app/` builds to a ~308 KB APK (the launcher icon, TV banner and the language flags at every density
 are the bulk of it; the code and vectors are small). It polls the upstream GitHub release on a
 user-set interval (default twice a day) and after boot, posts a notification when something newer
 exists, and installs it with one confirmation on the stock Fire OS installer screen. It detects what
 it is running on — Fire TV, another Android TV, or a touch device — and picks its wording to match
-("press OK" vs "tap"). It is minSdk 25 / **targetSdk 31**, so the periodic check is a `JobScheduler`
+("press OK" vs "tap"). It is minSdk 25 / **targetSdk 33**, so the periodic check is a `JobScheduler`
 job and the notification uses a platform channel on Android 8+ while the API 25 stick keeps the
 legacy path — one code path, no AndroidX. Settings are grouped into User / Advanced / Developer
 sections:
 
-- **Toast notifications** and **Notifications** — each output can be turned off independently.
+- **Toast notifications** and **Notifications** — each output can be turned off independently. From
+  Android 13 the *Notifications* switch also requests the `POST_NOTIFICATIONS` runtime permission and
+  warns (with a shortcut into the system settings) when Android is blocking the notification.
 - **Prompt to open Plezy** — on by default: after a successful install, offer to start Plezy.
 - **Check automatically** — enables the periodic background check (a `JobScheduler` job) + boot re-arm.
 - **Edit check interval…** — every *n* hours / days / weeks / months (1–30), default 12 hours.
