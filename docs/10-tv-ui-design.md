@@ -5,6 +5,12 @@ The plan behind the interface overhaul, and the rules the screens now follow. Th
 checked on the stick at **1920×1080, density 320 (2.0×) → a 960×540 dp canvas**, with a D-pad
 remote as the only input.
 
+The design is **TV-first** — 10-foot text, a D-pad focus model — but the app also runs on a phone.
+`0.9.0` added a **touch branch** for the one screen that needed it, the Choose-Version picker
+([below](#choose-version--two-panes-on-tv-a-fly-in-on-touch)); the touch layout was verified on the
+real `phone35` and on `tv30` (an Android TV that reports a touchscreen). The rest of this file
+describes the TV look; the touch differences are called out where they exist.
+
 ## The problem
 
 The first version worked but was written screen by screen, each with its own colours and paddings.
@@ -62,6 +68,11 @@ accent fill, everything else light grey on the dark surface).
   two *chosen* values; the version picker's other pane is read-only notes.)
 - A `ScrollView` wraps any screen that can exceed 540 dp, and it **scrolls to the focused row**
   automatically, so nothing is ever unreachable.
+- **A touch device takes the touch branch** (`Device.isTouch`): the Choose-Version picker becomes a
+  single pane with a fly-in notes overlay instead of two panes, so no interaction needs left/right
+  (see [Choose version](#choose-version--two-panes-on-tv-a-fly-in-on-touch)). The rest of the UI is
+  already plain vertical lists and works as-is; the interval picker is the one remaining D-pad-only
+  screen, queued in [09](09-backlog.md#requested--not-started).
 
 ## Screens
 
@@ -105,7 +116,7 @@ D-pad leaves their column, so the preview always matches something visible. This
 stays usable with only a D-pad, and it needs no library (see
 [08](08-app-implementation.md#check-interval) for why a prebuilt picker is not an option here).
 
-### Choose version — two panes, install in place
+### Choose version — two panes on TV, a fly-in on touch
 
 Versions newest-first on the left, the highlighted release's notes on the right. Up/down moves the
 version and the notes follow; right moves into the notes pane to scroll a long changelog, left comes
@@ -114,11 +125,25 @@ progress and the final "Installed 2.26.0." line appear at the bottom of this sam
 never bounces back to the dashboard to press Install. (The dashboard still owns the first install,
 when Plezy is not yet present.)
 
+**On a touch device the picker is a single pane** (`0.9.0`, [roadmap item 3](11-roadmap.md#3-android-tv--phone-compatibility)).
+A touch user has no left/right, so the always-on notes pane would be dead weight and the two panes
+read badly on a phone. Instead each row is a full-width version **label** (tap it to install) with a
+**Notes** button; tapping Notes flies the release notes in from the right as a **full-width overlay**
+with a `✕` close button, a Back handler, and an **Install this version** action at the bottom. The
+overlay is `clickable`, so a tap on a dead zone is consumed rather than falling through to the list
+and starting an install ([Finding 7](08-app-implementation.md#finding-7--the-touch-notes-overlay-let-taps-fall-through)).
+The branch is chosen once, on `Device.isTouch(this)` — the same signal the `values-*-finger/` wording
+rides — so a device that reads "tap" gets the single-pane picker. The TV layout is untouched.
+
+The touch picker's **Notes** button is currently a text label; a follow-up will reuse the main
+screen's **What's new** icon ([09](09-backlog.md#requested--not-started)). The **check-interval**
+picker above is still two-pane and D-pad-only — a known touch gap, also queued in [09](09-backlog.md#requested--not-started).
+
 ### Changelog — styled release notes
 
 Headings are bold, `#6EA8C8` and 120 % of body size; bullets hang-indent under their text; inline
-bold/code/links keep emphasis. The same renderer feeds both the two-pane picker's notes pane and
-the single-release **What's new** screen.
+bold/code/links keep emphasis. The same renderer feeds the picker's notes (the two-pane pane on TV,
+the fly-in overlay on touch) and the single-release **What's new** screen.
 
 ### Language — one row per shipped language
 

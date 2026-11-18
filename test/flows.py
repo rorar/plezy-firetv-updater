@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The five verification flows, written the way a person with the remote does them.
+"""The six verification flows, written the way a person with the remote does them.
 
 Every step is "find the labelled button on screen, tap its centre, wait for the
 next window" — no coordinates are hard-coded, so the same flows run against an
@@ -7,6 +7,7 @@ English or a German build (labels come from strings/app.<lang>.json) and against
 a German or English Fire OS (strings/system.<lang>.json).
 
     install        pick the latest version in the picker and install it
+    picker-notes   read a version's release notes (touch overlay / TV pane); no install
     downgrade      pick an older version and drive uninstall-then-install
     upgrade        back to the Main View and install the latest again
     uninstall      Settings -> Advanced -> Uninstall Plezy…
@@ -93,6 +94,16 @@ class Flows:
             raise HarnessError(msg)
         self.log(f"    (note: {msg})")
         return False
+
+    def _expect_gone(self, text, what=None, timeout=15):
+        """Wait for ``text`` to disappear — an overlay that should have closed."""
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            if not self.d.dump().has(text):
+                self.log(f"    ✓ {what or text!r} is gone")
+                return
+            time.sleep(1)
+        raise HarnessError(f"{what or text!r} is still on screen after {timeout}s")
 
     # ------------------------------------------------------------------ #
     # screens
@@ -320,8 +331,10 @@ class Flows:
     # the install pipeline's dialogs
     # ------------------------------------------------------------------ #
 
-    def _await_install_dialog(self, timeout=180):
+    def _await_install_dialog(self, timeout=None):
         """Return what the pipeline raised: 'installer', 'uninstaller' or 'downgrade'."""
+        if timeout is None:
+            timeout = harness.INSTALL_TIMEOUT
         deadline = time.time() + timeout
         while time.time() < deadline:
             focus = self.d.current_focus()
@@ -336,7 +349,7 @@ class Flows:
             time.sleep(2)
         raise HarnessError("no install dialog appeared (download still running?)")
 
-    def _confirm_system_install(self, timeout=90):
+    def _confirm_system_install(self, timeout=None):
         """Tap the stock installer's positive button, once or twice as the platform needs.
 
         The label depends on the platform *and* on the situation: the AOSP installer (API 25) says
@@ -348,6 +361,8 @@ class Flows:
         each be one label or a list of alternatives; the loop taps whichever is on screen and stops
         once the installer window is gone, so a two-dialog platform needs no special case.
         """
+        if timeout is None:
+            timeout = harness.INSTALL_TIMEOUT
         self.d.wait_focus("PackageInstallerActivity", timeout=timeout)
         time.sleep(1)
         candidates = (self.s.sys_candidates("installer.confirm")
@@ -559,6 +574,53 @@ class Flows:
         self.log(self._space_note(before))
         return version
 
+    def picker_notes(self):
+        """The release-notes view (roadmap item 3: the touch layout).
+
+        Touch devices get a single-pane picker where each row carries a *Notes* button; tapping it
+        flies the release notes in from the right, with a close button and an "Install this version"
+        action. TV devices keep the two-pane layout, where the notes pane follows the highlighted
+        row — this proves the pane fills in when a version is selected.
+
+        Non-destructive: it opens the notes and closes them again, never starting an install.
+        """
+        self.log("[picker-notes] open the picker and read a version's release notes")
+        self.open_picker()
+        version = self.c["versions"]["latest"]
+        screen, row = self._picker_row(version)
+
+        if self.c.get("navigation") == "touch":
+            notes = self._require(screen, "row Notes button",
+                                  exact=self.s.app("picker.notes_button"))
+            self._tap(notes, "Notes")
+            self._wait_for(self.s.app("picker.install_button"),
+                           what="release-notes overlay", timeout=20)
+            self._expect_text(self.s.app("picker.notes_heading"), fatal=True)
+            self._tap(self._require(self.d.dump(), "overlay close button",
+                                    exact=self.s.app("picker.close")), "✕")
+            self._expect_gone(self.s.app("picker.install_button"),
+                              what="release-notes overlay", timeout=15)
+            # Back must close it too (the second way out of the overlay).
+            self._tap(notes, "Notes")
+            self._wait_for(self.s.app("picker.install_button"),
+                           what="release-notes overlay", timeout=20)
+            self.d.key("KEYCODE_BACK")
+            self._expect_gone(self.s.app("picker.install_button"),
+                              what="release-notes overlay", timeout=15)
+        else:
+            # TV: the notes pane starts on the placeholder and fills in when a row is highlighted.
+            self._expect_text(self.s.app("picker.select"), fatal=True)
+            deadline = time.time() + 20
+            while time.time() < deadline:
+                self.d.key("KEYCODE_DPAD_DOWN")  # the first event after the window opens can drop
+                time.sleep(1)
+                if not self.d.dump().has(self.s.app("picker.select")):
+                    break
+            else:
+                raise HarnessError("the notes pane never filled in after selecting a version")
+            self.log("    ✓ the notes pane follows the highlighted version")
+        return version
+
     def downgrade(self, older=None):
         """Downgrade to an older version from the picker (uninstall-then-install)."""
         older = older or self.c["versions"]["older"]
@@ -612,7 +674,7 @@ class Flows:
         if not node.enabled:
             raise HarnessError(f"the {label!r} button is disabled:\n{screen.pretty()}")
         self._tap(node, label)
-        self._confirm_system_install(timeout=180)
+        self._confirm_system_install()
         self.assert_installed(version)
         self._dismiss_open_prompt()
 
@@ -666,7 +728,7 @@ class Flows:
         if node is None:
             raise HarnessError(f"install button not found:\n{screen.pretty()}")
         self._tap(node, node.label)
-        self._confirm_system_install(timeout=180)
+        self._confirm_system_install()
         self.assert_installed(version)
         # Prove the "Open Plezy?" prompt's positive button really launches Plezy (item 6), then
         # leave the updater in front. The other flows only ever dismiss this prompt.

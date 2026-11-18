@@ -17,7 +17,12 @@
     "title": "Version wählen",
     "installed_suffix": "(installiert)",
     "progress_installed": "{version} installiert.",
-    "progress_confirm": "Die Installation auf dem Fernseher bestätigen."
+    "progress_confirm": "Die Installation auf dem Fernseher bestätigen.",
+    "notes_button": "Notizen",
+    "install_button": "Diese Version installieren",
+    "close": "✕",
+    "notes_heading": "Versionshinweise",
+    "select": "Version auswählen, um die Versionshinweise zu sehen."
   },
 
   "settings": {

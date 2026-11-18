@@ -4,7 +4,8 @@ Where the updater goes after Round 1 (the A1–A7 + B2 set, updater `0.2.0`; sel
 device detection and device-aware wording in `0.4.0`; `targetSdk` 25 → 26 in `0.5.0`; the emulator
 lane, a real-phone lane and `targetSdk` 26 → 31 in `0.6.0`; `targetSdk` 31 → 33 with
 `POST_NOTIFICATIONS` in `0.7.0`; `targetSdk` 33 → 34 with the runtime-receiver export flags and the
-`ACCESS_NETWORK_STATE` job permission in `0.8.0`). Each item says what it
+`ACCESS_NETWORK_STATE` job permission in `0.8.0`; the touch layout — single-pane Choose-Version with
+a right-side changelog fly-in — in `0.9.0`). Each item says what it
 is, what it would take, what can go wrong, and **how it would be verified on the stick** — including
 the honest cases where this hardware cannot verify it (the emulator lane now covers some of those).
 Order is a suggestion, not a commitment.
@@ -136,22 +137,24 @@ hardware; the Android TV branch only on emulators (no real Android TV here).
 
 ## 3. Android TV / phone compatibility
 
-**Wording: done** (2026-11-17, `0.4.0`). **Layout: not started** — and it is the least-verifiable
-item: `phone34` (emulator) and `phone35` (a real phone) can *drive* a touch device now, but that is
-not a tuned touch layout.
+**Wording: done** (2026-11-17, `0.4.0`). **Layout: done** (2026-11-18, `0.9.0`). The touch
+Choose-Version is now a single pane with a right-side changelog fly-in, and the behaviour strings say
+"device" on a touch device. The TV two-pane layout and the D-pad path are unchanged.
 
 ### Device-aware wording — done
 
 The app used to ship one TV-flavoured sentence. It now picks it by device **without a line of Java**,
 using Android's own touchscreen resource qualifier: `values-finger/` (and `values-de|fr|es-finger/`)
-override three strings — `notif_available_text`, `set_test_notification_msg`, `picker_hint` — with
-"tap" instead of "press OK". Because the qualifier *is* `Configuration.touchscreen ==
+override the strings that talk about *how* the user acts and *what the device is* — "tap" instead of
+"press OK", and "device" instead of "TV". Because the qualifier *is* `Configuration.touchscreen ==
 TOUCHSCREEN_FINGER`, the same field `Device.isTouch()` reads (item 2), the wording and the detection
-cannot disagree. Two strings that named the device where the generic word reads fine everywhere were
+cannot disagree. Three strings that named the device where the generic word reads fine everywhere were
 reworded instead of duplicated four ways (`set_notification_desc` "Fire TV notification center" →
 "notification area"; `err_not_enough_space` "on the Fire TV" → "on the device"; `set_delete_desc`
-"save space on the stick" → "save space"). Strings that describe *behaviour* — "runs while the TV is
-on", "after the TV boots" — stay TV-first, because the layout still is. See
+"save space on the stick" → "save space"). `0.9.0` carried the *behaviour* sentences the rest of the
+way too: `main_subtitle`, `main_hint`, `set_auto_desc`, `set_interval_runs`, `interval_note`,
+`about_thanks_text` and `progress_confirm` say "device" in `values-*-finger/` ("runs while the device
+is on", "after the device restarts", "confirm the install on the device"). See
 [08 — Device-aware wording](08-app-implementation.md#device-aware-wording).
 
 The sketch this section first carried invented three notification rows; there is really only **one**
@@ -162,36 +165,44 @@ updater:
 |---|---|---|
 | Update available | `Plezy 2.27.0 available` · `Press OK to open` | `Plezy 2.27.0 available` · `Tap to open` |
 | Test notification | `Test notification — press OK to open` | `Test notification — tap to open` |
-| Picker hint | `…press OK to install the highlighted version.` | `…tap to install the highlighted version.` |
+| Picker hint | `…press OK to install the highlighted version.` | `…tap a version to install it, or its Notes button to read the release notes.` |
+| Main hint | `…while the TV is on.` | `…while the device is on.` |
+| Auto-check | `…after the TV boots.` | `…after the device restarts.` |
+| Install confirm | `Confirm the install on the TV.` | `Confirm the install on the device.` |
 
 `test/check_strings.py` keeps the four `-finger` files honest: they may only *override* keys that
 exist in the matching base file, placeholders must survive translation, and no locale may fall behind
 `values/`. It runs as the pre-flight step of `test/run.py`, so a wording drift fails a run.
 
-### Layout — not started
+### Layout — done (2026-11-18, `0.9.0`)
 
-The UI is TV-first by design: 32–48 dp screen padding, 17 sp body text, ≥ 50 dp rows, and a focus
-model built for a D-pad ([10](10-tv-ui-design.md)). On a phone that reads as oversized, and the
-two-pane pickers (interval, version) assume **left/right moves between panes** — a touch user has no
-left/right.
+`VersionListActivity` branches once, on `Device.isTouch(this)` — the same signal the `-finger` wording
+rides — into two layouts:
 
-**Minimum viable support.**
+- **TV / D-pad** (`buildTvUi`): the original two panes, unchanged. The versions on the left, the
+  highlighted version's release notes on the right, driven by the D-pad; OK installs the highlighted
+  version.
+- **Touch** (`buildTouchUi`): a single pane of full-width rows. Tapping a row's version label installs
+  it; the row's **Notes** button flies the release notes in from the right as a full-width overlay
+  (`buildChangelogOverlay`) with a `✕` close button, a Back handler, and an **Install this version**
+  action. The overlay is `clickable`, so a tap on a dead zone is consumed instead of falling through
+  to the list beneath and starting an install.
 
-- **Make everything tappable.** The `Switch` rows, action rows and dialog buttons already respond to
-  touch; the version rows are `focusableInTouchMode` and install on tap (the flow tests rely on
-  it). The two-pane pickers are the real work: on a touch device they should be one column with a
-  segmented control, or at least accept a tap on a pane to focus it.
-- **A size factor in `Ui`.** Scale the screen padding and the row heights down when `!Device.isTv()`,
-  so the same layouts fit a 5-inch screen. `Ui` is already the single place sizes live.
-- **Keep the D-pad path intact.** The focus model must not regress on the TV; the touch behaviour is
-  additive.
+Only the *picker* needed a second layout: the main and Settings screens are already plain vertical
+lists that read fine on a phone. The D-pad path is untouched (the touch branch is additive), and the
+`values-*-finger/` wording and this layout share one signal, so a device that gets "tap" gets the
+single-pane picker.
 
 **Verify.** The emulator lane ([item 5](#5-targetsdk-bump-matrix)) provides an Android TV
 (`tv25`/`tv30`) and a touch device (`phone34`), and the real `phone35` is a touch phone too, so the
-*wording* half and the device classification are device-verified there, and `phone34`/`phone35` even
-drive the whole flow over touch. The **layout** half is still unbuilt, so there is nothing to verify
-yet: when it lands, `phone35` (a real phone) is the lane that can exercise it best. Until then it
-stays a documented, unverified branch — the same honesty the B2 note uses.
+*wording* half and the device classification are device-verified there, and `phone34`/`phone35` drive
+the whole flow over touch. The **layout** half is now device-verified as well: the harness gained a
+`picker-notes` flow that opens the notes (the overlay on touch, the pane on TV) and closes them again,
+and it passed on the stick (API 25, two-pane), `phone34` (API 34) and the real `phone35` (API 35),
+plus `tv30` (a TV that reports `touch=1`, so it exercises the *touch* picker on an Android TV) — see
+[08](08-app-implementation.md#finding-7--the-touch-notes-overlay-let-taps-fall-through). The hand
+checks covered what a flow cannot assert: the four `-finger` wordings (`device`/`Gerät`/`appareil`/
+`dispositivo`), the fly-in/out animation, and Back closing the overlay.
 
 ## 4. 64-bit / `arm64-v8a`
 
@@ -236,14 +247,14 @@ unchanged.
 | 31 ✅ | 12.0 | **Done in `0.6.0`.** **`PendingIntent` mutability** — `ApkInstaller`'s session-result `PendingIntent` is `FLAG_UPDATE_CURRENT \| FLAG_MUTABLE` (the platform writes the session status into it, and on API 25 the confirmation intent too); `Notifier`'s notification `PendingIntent` is `FLAG_IMMUTABLE` (it only opens `MainActivity`). Both add the flag only when `SDK_INT >= S`, so the API 25–30 flags stay `0`; `FLAG_MUTABLE`/`FLAG_IMMUTABLE` are compile-time constants, so naming them is safe and dex inlines them. **Notification trampolines** — the notification's `contentIntent` is already an activity, started directly, not a receiver that starts one: verified on `tv30`, nothing to change. **`REQUEST_DELETE_PACKAGES`** — declared; the platform's package-visibility rules make it necessary to send `ACTION_DELETE` on newer Android (declared, but *not* empirically tested by removing it). **Also fixed here** — the downgrade handshake raced the platform ([08](08-app-implementation.md#finding-5--the-uninstall-handshake-raced-the-platform-on-android-12)). Verified end to end on the `phone34` emulator (API 34) **and on the real `phone35` (API 35)**. |
 | 33 ✅ | 13.0 | **Done in `0.7.0`.** **`POST_NOTIFICATIONS` is a runtime permission** — a `targetSdk 33` app's notifications are dropped until it is granted. `Notifier` gained `systemAllows` / `needsPermission` / `requestPermission` (all guarded by `SDK_INT >= TIRAMISU`, so the API 25 stick is untouched), `MainActivity` asks once on the first resume while the *Notifications* switch is on (persisted `notif_asked`), and the Settings row asks again on toggle-on and shows a **Blocked by Android…** hint plus an **Open notification settings** action while the notification is blocked. The diagnostics report gained `notif=allowed\|blocked`, asserted by the harness. Verified on `phone34` (API 34) and the real `phone35` (API 35) — request dialog, grant, and a posted notification — and the API 25 flows are unchanged ([08](08-app-implementation.md#targetsdk-33--post_notifications-070-2026-11-18)). |
 | 34 ✅ | 14.0 | **Done in `0.8.0`.** **Runtime-registered receivers must declare an export flag** — a target-34 app that calls `Context.registerReceiver` without one is refused. All four sites (the custom `ACTION_INSTALL_FINISHED` receivers in `MainActivity` / `VersionListActivity`, the `ACTION_PACKAGE_REMOVED` ones in `SettingsActivity` / `InstallFlow`) now go through `Receivers.register`, which passes `Context.RECEIVER_NOT_EXPORTED` when `SDK_INT >= TIRAMISU` (the flag and the three-argument overload are API 33+) and the plain two-argument call below it, so the API 25 stick is unchanged. **`ACCESS_NETWORK_STATE` is required for a job with a network constraint** — this one is a *hard crash on launch* on API 34+: `UpdateJob.schedule` throws `SecurityException: android.permission.ACCESS_NETWORK_STATE required for jobs with a connectivity constraint`; both jobs require network, so the permission is now declared (inert on API 25). **Foreground-service types / implicit internal intents**: no foreground service and no implicit internal intents, so nothing else to change. Verified on `phone34` (API 34) and `phone35` (API 35) — the crash reproduced first, then the fix — with the API 25 flows re-run ([08](08-app-implementation.md#targetsdk-34-receiver-flags--access_network_state-080-2026-11-18)). |
-| 35 | 15.0 | Nothing new beyond 33/34 seen on the `phone35` run (LineageOS 22.1): the five flows pass on it, which is the point — the newest platform here is exercised end to end. |
+| 35 | 15.0 | Nothing new beyond 33/34 seen on the `phone35` run (LineageOS 22.1): the six flows pass on it, which is the point — the newest platform here is exercised end to end. |
 
 The order of the real work inside a bump is: notification channel (26) → job scheduling (26) →
 `PendingIntent` flags (31) → notification permission (33) → receiver export flags and the job
 network permission (34). Each is hand-written against the platform
 API and each keeps an API 25 fallback.
 
-**Verify.** A bump must not change behaviour on the stick: re-run the five flows and the quota
+**Verify.** A bump must not change behaviour on the stick: re-run the six flows and the quota
 broadcast on API 25 after every step, and additionally on a newer emulator (or the real phone) for the
 branch that actually changed. For the 26 step the API 25 side was done in full (jobs armed / cancelled
 / re-armed, the one-off `runNow` path, the legacy notification, all five flows and the de/fr/es
@@ -288,13 +299,13 @@ export flag is exercised by every flow (both activities register a receiver on s
    permission that API 34 turns into a hard crash on launch. Verified on `phone34` (API 34) and
    `phone35` (API 35) — the crash reproduced first, then the fix — with the API 25 flows re-run on the
    stick. Each step keeps the API 25 flows as the regression test and the lane for the new branch.
-8. **Touch UI** (item 3, layout half) — **next** (`0.9.0`): `phone34` can *drive* a touch device now,
-   but an emulator is not a real phone, so the layout half stays the least-verifiable item. This is
-   the single-pane touch Choose-Version with the right-side changelog fly-in (see
-   [09](09-backlog.md#requested--not-started)).
-9. **`targetSdk` bump, step 35** — after the touch UI, deliberately: API 35 enforces edge-to-edge
-   (window insets; `setStatusBarColor` deprecated), and the changelog fly-in's insets depend on the
-   touch layout existing first.
+8. ~~**Touch UI** (item 3, layout half)~~ — **done** 2026-11-18, `0.9.0`: the single-pane touch
+   Choose-Version with the right-side changelog fly-in, plus the `-finger` behaviour wording ("device"
+   not "TV"). Verified with a new `picker-notes` harness flow on the stick, `phone34` and the real
+   `phone35`, on `tv30` (touch picker on an Android TV), and by hand for the wording and the overlay.
+9. **`targetSdk` bump, step 35** — **next**, deliberately after the touch UI: API 35 enforces
+   edge-to-edge (window insets; `setStatusBarColor` deprecated), and the changelog fly-in's insets
+   depend on the touch layout existing first.
 
 ## Guardrails
 
@@ -305,10 +316,11 @@ export flag is exercised by every flow (both activities register a receiver on s
 - **Say what was not verified.** All three installs — `armeabi-v7a`, `x86_64`, `arm64-v8a` — are now
   verified end to end (stick, `phone34` emulator, real `phone35` phone); only the
   `err_no_native_libs` path stays logic-only. The Android TV and touch branches of device detection,
-  the `-finger` wording, and the API 26+ channel / background-limit branches are **device**-verified
-  on the emulator lane and (touch, API 35) on the real phone. What still has no device here: a real
-  Android TV (only emulators), Fire OS's own quirks beyond the stick, and the touch *layout*, which is
-  not built yet.
+  the `-finger` wording, the touch picker, and the API 26+ channel / background-limit branches are
+  **device**-verified on the emulator lane and (touch, API 35) on the real phone. What still has no
+  device here: a real Android TV (only emulators), Fire OS's own quirks beyond the stick, and the
+  touch layout on a small *landscape* phone (the emulator is 320×640 portrait; the fly-in is designed
+  to be full-width and height-agnostic, but landscape was not driven).
 - **Testable decisions live outside `android.*`.** `DeviceKind` takes a plain `Signals` bundle and has
   no platform import, which is what lets `test/jvm/run.sh` cover the branches this stick cannot
   produce. Keep new decision logic on that side of the line.

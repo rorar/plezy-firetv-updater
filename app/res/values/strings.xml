@@ -163,6 +163,11 @@
     <string name="picker_installed_suffix">(installed)</string>
     <string name="picker_could_not_load">Could not load releases:\n%1$s</string>
     <string name="picker_empty">No releases found.</string>
+    <!-- touch layout only: the row's release-notes button and the overlay it opens -->
+    <string name="picker_notes">Notes</string>
+    <string name="picker_install_this">Install this version</string>
+    <string name="picker_close">✕</string>
+    <string name="picker_close_desc">Close</string>
     <string name="progress_preparing">Preparing…</string>
     <string name="progress_downloading">Downloading…</string>
     <string name="progress_downloading_pct">Downloading… %1$d%%</string>

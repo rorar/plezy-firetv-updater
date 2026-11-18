@@ -3,5 +3,14 @@
 <resources>
     <string name="notif_available_text">Zum Öffnen tippen</string>
     <string name="set_test_notification_msg">Test-Benachrichtigung — zum Öffnen tippen</string>
-    <string name="picker_hint">Neueste zuerst. Installiert: %1$s   —   tippen, um die markierte Version zu installieren.</string>
+    <string name="picker_hint">Neueste zuerst. Installiert: %1$s   —   Version antippen zum Installieren, Notizen für die Versionshinweise.</string>
+
+    <!-- "Fernseher" → "Gerät" -->
+    <string name="main_subtitle">Hält com.edde746.plezy auf diesem Gerät aktuell.</string>
+    <string name="main_hint">Prüft %1$s, solange das Gerät an ist. Ein Update braucht eine Bestätigung im System-Installer.</string>
+    <string name="set_auto_desc">Läuft im folgenden Intervall und nach dem Start des Geräts.</string>
+    <string name="set_interval_runs">Läuft %1$s und nach dem Start des Geräts.</string>
+    <string name="about_thanks_text">Plezy Updater ist ein kleines Sideload-Hilfsprogramm, das com.edde746.plezy auf diesem Gerät aktuell hält. Dank an das Plezy-Projekt für die App, die es aktualisiert, und an GitHub für das Hosten der Releases.</string>
+    <string name="interval_note">Läuft, solange das Gerät an ist. Ein Monat wird als 30 Tage behandelt.</string>
+    <string name="progress_confirm">Die Installation auf dem Gerät bestätigen.</string>
 </resources>

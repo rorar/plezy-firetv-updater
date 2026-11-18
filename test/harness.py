@@ -16,6 +16,10 @@ import xml.etree.ElementTree as ET
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
 TMP = os.environ.get("PLEZY_TEST_TMP", "/tmp/opencode/plezy-test")
+# How long to wait for the install/uninstall/downgrade dialog to appear. The download runs before
+# the dialog, so on a slow link (or a throttled emulator) the ~50 MB asset can take minutes. Raise
+# it with PLEZY_INSTALL_TIMEOUT=<seconds> instead of failing a flow that is only waiting on network.
+INSTALL_TIMEOUT = int(os.environ.get("PLEZY_INSTALL_TIMEOUT", "180"))
 
 
 class HarnessError(RuntimeError):

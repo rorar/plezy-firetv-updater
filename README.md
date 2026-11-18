@@ -11,13 +11,14 @@ follows from it.
 > Status: **a working updater app** (`app/`) plus the findings that led to it (`docs/`), the
 > artwork sources (`design/`), the on-device **flow tests** (`test/`) and a throwaway probe
 > (`probe/`). Verified end-to-end on the stick, UI overhaul, original artwork, the shared
-> install routine, the Round-1 feature set, and **self-update** (the updater updates itself).
+> install routine, the Round-1 feature set, **self-update** (the updater updates itself) and the
+> **touch layout** for phones.
 
 Releases (the APK is attached to each): **<https://github.com/rorar/plezy-firetv-updater/releases>**.
 
 Verified on **2026-11-13/18** with Plezy `2.26.0`, ADB `1.0.41` (platform-tools `37.0.0`) — on the
 stick (API 25) end to end, on the emulator lane (Android TV API 25/30, phone API 34), and on a real
-arm64 phone (API 35) for `0.6.0`/`0.7.0`/`0.8.0`.
+arm64 phone (API 35) for `0.6.0`/`0.7.0`/`0.8.0`/`0.9.0`.
 
 ---
 
@@ -68,11 +69,11 @@ arm64 phone (API 35) for `0.6.0`/`0.7.0`/`0.8.0`.
 | Launcher | 24 `LEANBACK_LAUNCHER` entries, app appears in the Fire TV home row |
 | APK used | `derFrisson/plezy-apks` `2.26.0` → `plezy-android-armeabi-v7a.apk` (90,748,577 bytes) |
 | Installed size | ~87 MB in `/data/app/com.edde746.plezy-1` |
-| Updater | `dev.rorar.plezyupdater` `0.8.0` (`versionCode 8`, minSdk 25 / targetSdk 34) — see [docs/08](docs/08-app-implementation.md) |
+| Updater | `dev.rorar.plezyupdater` `0.9.0` (`versionCode 9`, minSdk 25 / targetSdk 34) — see [docs/08](docs/08-app-implementation.md) |
 
 ## The updater app
 
-`app/` builds to a ~308 KB APK (the launcher icon, TV banner and the language flags at every density
+`app/` builds to a ~312 KB APK (the launcher icon, TV banner and the language flags at every density
 are the bulk of it; the code and vectors are small). It polls the upstream GitHub release on a
 user-set interval (default twice a day) and after boot, posts a notification when something newer
 exists, and installs it with one confirmation on the stock Fire OS installer screen. It detects what
@@ -104,18 +105,20 @@ sections:
 - **About Plezy Updater…** (Diagnostics) — the installed version, the third-party licence and a
   thanks note.
 
-**Choose version…** opens a two-pane picker (versions left, release notes right), and **What's
-new** shows the selected release's notes. Release notes are rendered with real typography —
-coloured, larger section headings and hanging-indented bullets — through a hand-written
-`Markdown.toStyled`. It also shows free space and refuses to start a download that would not fit.
+**Choose version…** opens the release picker: on a **TV** it is two panes (versions left, release
+notes right), and on a **touch device** it is a single pane where each row installs on tap and a
+**Notes** button flies the release notes in from the right. **What's new** shows the selected
+release's notes. Release notes are rendered with real typography — coloured, larger section headings
+and hanging-indented bullets — through a hand-written `Markdown.toStyled`. It also shows free space
+and refuses to start a download that would not fit.
 
-The picker **installs in place**: pressing OK on a version downloads, verifies and installs it right
-there, showing the progress and the outcome on the same screen — no trip back to the dashboard. The
-dashboard keeps the first install for when Plezy is not yet present. Both screens drive the one
-shared `InstallFlow` (download → extract → verify → `PackageInstaller` → downgrade handshake), and
-after a successful install the app offers to **open Plezy**. The tarball it downloads is chosen per
-device from `Build.SUPPORTED_ABIS` (`arm64-v8a` / `armeabi-v7a` / `x86_64`), so one APK fits a 32-bit
-stick and a 64-bit Android TV alike.
+The picker **installs in place**: pressing OK (TV) or tapping a version (touch) downloads, verifies
+and installs it right there, showing the progress and the outcome on the same screen — no trip back to
+the dashboard. The dashboard keeps the first install for when Plezy is not yet present. Both screens
+drive the one shared `InstallFlow` (download → extract → verify → `PackageInstaller` → downgrade
+handshake), and after a successful install the app offers to **open Plezy**. The tarball it downloads
+is chosen per device from `Build.SUPPORTED_ABIS` (`arm64-v8a` / `armeabi-v7a` / `x86_64`), so one APK
+fits a 32-bit stick and a 64-bit Android TV alike.
 
 The dashboard reads at a glance: a status glyph beside the headline (green check, accent up-arrow,
 amber warning, red cross), a leading icon on every action row, and an original app icon and TV
@@ -150,10 +153,10 @@ adb install -r build/plezy-updater.apk
 
 ## Flow tests
 
-The five flows — **install**, **downgrade**, **upgrade**, **uninstall**, **clean-install** — are
-written down as code in [`test/`](test/README.md). They drive the real stick over ADB exactly as a
-person with the remote would (find the labelled button, tap it), so they double as a record of what
-to click:
+The six flows — **install**, **picker-notes**, **downgrade**, **upgrade**, **uninstall**,
+**clean-install** — are written down as code in [`test/`](test/README.md). They drive the real stick
+over ADB exactly as a person with the remote would (find the labelled button, tap it), so they double
+as a record of what to click:
 
 ```bash
 python3 test/run.py install          # forward path (non-destructive)

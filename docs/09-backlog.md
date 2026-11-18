@@ -7,24 +7,39 @@ parking lot. Status is checked against the code in `app/`.
 
 The forward-looking items now live in the [roadmap](11-roadmap.md), so this stays a short pointer:
 
-- **Android TV / phone compatibility — the layout half.** The wording half landed in `0.4.0`
-  ([roadmap item 3](11-roadmap.md#3-android-tv--phone-compatibility)); the TV-first sizing and the
-  two-pane pickers still assume a D-pad. The emulator lane's `phone34` profile can now *drive* the
-  flows on a touch device, but the layout itself is unchanged.
-- **Choose version: make the picker phone-ready (user request, 2026-11-18).** On a phone in
-  landscape the versions|changelog side-by-side does not read well, and the pane is still built for
-  D-pad focus. Requested: a per-version control that slides the changelog in from the right with a
-  close button (or a better touch-native solution) instead of the always-on two panes; landscape
-  layout specifically called out. This is the concrete first slice of the item above.
-- **Device-aware wording, beyond the input hint (user request, 2026-11-18).** `0.4.0`'s wording is
-  only the *input* hint ("press OK" vs "tap"); the behaviour strings still say TV ("runs while the
-  TV is on", "after the TV boots", "confirm the install on the TV"). Requested: say "TV" on an
-  Android TV / Fire TV and "phone" (or neutral) on a touch device. Today's wording is deliberately
-  TV-first because the layout is too ([08](08-app-implementation.md#device-aware-wording)); this
-  request is to carry it the rest of the way.
+- **Main View footer: one line each, an interval glyph, a data glyph (user request, 2026-11-18).**
+  Three small tweaks to the bottom of the main screen:
+  - the update-check text and the free-space line each get their **own line** (today they read as
+    one wrapped hint plus a line);
+  - the long check sentence — `Checks every 12 hours while the device is on. An update needs one
+    confirmation on the system installer screen.` — is shortened to **`⏳ Update check: <n> <m>`**
+    (e.g. `⏳ Update check: 12 hours`); the "one confirmation on the installer" caveat moves into
+    Settings (where the interval already lives);
+  - a **data glyph** (`⛃` or similar) is added before the free-space text (`⛃ Free space: 5.83 GB`).
+- **Bug — `Settings → Edit check interval…` has no touch path (user request, 2026-11-18).** The
+  interval picker (`IntervalActivity`) is driven by the D-pad (value/unit columns, LEFT/RIGHT between
+  panes) and does not respond to touch, so it is unusable on a phone — the one screen the `0.9.0`
+  touch pass did not cover. Fix it touch-first (e.g. a single scrolling list of intervals, or make
+  the two columns tappable) and then **sweep the other screens for the same gap**: the two-pane
+  interval picker is the known one; check any other D-pad-only interaction (focus-only rows, panes
+  that need LEFT/RIGHT) the way `VersionListActivity` was checked.
+- **README: add Android TV + phone screenshots (user request, 2026-11-18).** The README has no
+  screenshots; add captures of the Android TV (two-pane) and the phone (touch) views — main screen,
+  Settings, and the two Choose-Version layouts.
+- **README: rewrite for non-technical users (user request, 2026-11-18).** A second README pass aimed
+  at the highest user experience for someone who just wants the app on their TV/phone: lead with
+  *what it does* and *how to install*, keep the engineering depth in `docs/`. Do it in a separate
+  session (`claude` from inside the repo) so it is not entangled with the release work.
+- **Choose version (touch): use an icon, not the word "Notes" (user request, 2026-11-18).** The
+  touch picker's per-row *Notes* button should reuse the main screen's **What's new** icon instead
+  of the text label — a small, self-contained follow-up to the `0.9.0` touch picker.
 - **`targetSdk` bump, further steps** — 25 → 26 landed in `0.5.0`, 26 → 31 in `0.6.0`, 31 → 33 in
   `0.7.0`, 33 → 34 in `0.8.0`; 35 → … remains, one step per release
   ([roadmap item 5](11-roadmap.md#5-targetsdk-bump-matrix)).
+
+The two former requests here — **make the touch Choose-Version phone-ready** and **device-aware
+wording beyond the input hint** — both landed in `0.9.0`; see
+[Already implemented](#already-implemented).
 
 Nothing here is a commitment; the roadmap explains the order and the reasoning.
 
@@ -71,6 +86,23 @@ Nothing here is a commitment; the roadmap explains the order and the reasoning.
   that permission is still required on API 34 (the stock uninstaller refuses). See
   [11 § 5](11-roadmap.md#5-targetsdk-bump-matrix) and
   [08](08-app-implementation.md#targetsdk-34-receiver-flags--access_network_state-080-2026-11-18).
+
+- **Touch layout: single-pane Choose-Version + right-side changelog fly-in (roadmap item 3, layout
+  half).** Landed 2026-11-18 (`0.9.0`): `VersionListActivity` branches once on `Device.isTouch(this)`
+  into the unchanged TV two-pane layout and a new touch layout — full-width version rows (tap the
+  label to install) with a per-row **Notes** button that flies the release notes in from the right as
+  a full-width overlay (`✕` close, Back closes it, an **Install this version** action). The
+  `-finger` wording was carried the rest of the way: the *behaviour* sentences (`main_subtitle`,
+  `main_hint`, `set_auto_desc`, `set_interval_runs`, `interval_note`, `about_thanks_text`,
+  `progress_confirm`) now say "device" not "TV" on a touch device, plus the new `picker_hint`. A new
+  **`picker-notes`** harness flow (six flows total) opens and closes the notes on both layouts; the
+  overlay is `clickable` so a tap on a dead zone is consumed instead of falling through to the list
+  and starting an install
+  ([Finding 7](08-app-implementation.md#finding-7--the-touch-notes-overlay-let-taps-fall-through)).
+  Verified on the stick (two-pane), `phone34` and the real `phone35` (touch), and `tv30` — an
+  Android TV that reports `touch=1`, so it exercises the touch picker on a TV. See
+  [11 § 3](11-roadmap.md#3-android-tv--phone-compatibility) and
+  [11 § 3 · Layout](11-roadmap.md#layout--done-2026-11-18-090).
 
 - **Device detection (roadmap item 2).** Landed 2026-11-17 (`0.4.0`): `DeviceKind` (the decision, a
   pure enum with no `android.*` import) and `Device` (the Android wrapper) answer *what is this
@@ -125,8 +157,9 @@ Nothing here is a commitment; the roadmap explains the order and the reasoning.
   4:3 (A5); the row reads **Edit check interval…** because it opens a picker (A6).
 
 - **`upgrade` flow in the harness (A2).** The flow tests now drive Downgrade → **Main View** →
-  Upgrade and prove an in-place replace (`firstInstallTime` unchanged, `lastUpdateTime` moved). Five
-  flows total. See [08](08-app-implementation.md#flow-tests-test) and
+  Upgrade and prove an in-place replace (`firstInstallTime` unchanged, `lastUpdateTime` moved). Six
+  flows total (the `picker-notes` flow joined in `0.9.0`). See
+  [08](08-app-implementation.md#flow-tests-test) and
   [test/README](../test/README.md).
 
 - **App languages: English, German, French and Spanish, with a Settings → Language picker.** All

@@ -145,6 +145,9 @@
     <string name="picker_installed_suffix">(instalado)</string>
     <string name="picker_could_not_load">No se pudieron cargar las versiones:\n%1$s</string>
     <string name="picker_empty">No se encontraron versiones.</string>
+    <string name="picker_notes">Notas</string>
+    <string name="picker_install_this">Instalar esta versión</string>
+    <string name="picker_close_desc">Cerrar</string>
     <string name="progress_preparing">Preparando…</string>
     <string name="progress_downloading">Descargando…</string>
     <string name="progress_downloading_pct">Descargando… %1$d%%</string>

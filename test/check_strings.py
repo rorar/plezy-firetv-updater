@@ -35,8 +35,10 @@ LABELS = os.path.join(HERE, "strings")
 LANGS = ["de", "fr", "es"]
 
 # Deliberately the same in every language: the app name, the language names (each written in
-# itself, so the picker reads the same whatever the app is set to), and the notification title.
-UNTRANSLATED = {"app_name", "lang_de", "lang_en", "lang_es", "lang_fr", "notifications_title"}
+# itself, so the picker reads the same whatever the app is set to), the notification title, and
+# the touch picker's close glyph (a symbol, not a word).
+UNTRANSLATED = {"app_name", "lang_de", "lang_en", "lang_es", "lang_fr", "notifications_title",
+                "picker_close"}
 
 # %1$s, %2$d, %s, %d … and the literal %%.
 FORMAT = re.compile(r"%(?:\d+\$)?[a-zA-Z%]")

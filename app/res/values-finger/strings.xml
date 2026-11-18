@@ -4,14 +4,28 @@
 
   The "finger" here is the touchscreen resource qualifier (values-finger), not a hardware
   feature flag: Android picks this file when Configuration.touchscreen is TOUCHSCREEN_FINGER,
-  which is exactly the same signal Device.isTouch() reads. So the wording and the detection
-  can never disagree — a device that gets "tap" here is a device that reports TOUCH there.
+  which is exactly the same signal Device.isTouch() reads. So the wording, the layout branch
+  in VersionListActivity and the detection can never disagree — a device that gets "tap" here
+  is a device that reports TOUCH there, and one that gets the two-pane picker.
 
-  Only the strings that talk about *how* the user acts are overridden. Everything else keeps
-  the default values/ wording, which is the no-touch (TV / remote) variant.
+  Two kinds of strings are overridden:
+
+  - How the user acts: "tap" instead of "press OK" (the notification and the picker hint).
+  - What the device is: "device" instead of "TV". The default values/ wording is TV-first
+    (Fire TV / Android TV / remote); a phone is not a TV, so the same sentences are reworded
+    neutrally here. Everything else keeps the default values/ wording.
 -->
 <resources>
     <string name="notif_available_text">Tap to open</string>
     <string name="set_test_notification_msg">Test notification — tap to open</string>
-    <string name="picker_hint">Newest first. Installed: %1$s   —   tap to install the highlighted version.</string>
+    <string name="picker_hint">Newest first. Installed: %1$s   —   tap a version to install it, or its Notes button to read the release notes.</string>
+
+    <!-- "TV" → "device" -->
+    <string name="main_subtitle">Keeps com.edde746.plezy up to date on this device.</string>
+    <string name="main_hint">Checks %1$s while the device is on. An update needs one confirmation on the system installer screen.</string>
+    <string name="set_auto_desc">Runs on the interval below and after the device restarts.</string>
+    <string name="set_interval_runs">Runs %1$s and after the device restarts.</string>
+    <string name="about_thanks_text">Plezy Updater is a small sideload helper that keeps com.edde746.plezy current on this device. Thanks to the Plezy project for the app it updates, and to GitHub for hosting the releases.</string>
+    <string name="interval_note">Runs while the device is on. A month is treated as 30 days.</string>
+    <string name="progress_confirm">Confirm the install on the device.</string>
 </resources>

@@ -47,6 +47,16 @@ adb install -r build/plezy-updater.apk
   (the `install` / `downgrade` / `upgrade` flows do exactly that, every run). `KEYCODE_DPAD_DOWN/UP`
   + `KEYCODE_DPAD_CENTER` still works and is the fallback if a tap lands off-target. Buttons
   (Settings rows, main-screen buttons, dialog buttons) respond to taps too.
+- **The picker has two layouts.** `VersionListActivity` branches on `Device.isTouch(this)`: a **TV**
+  (`touch=0`) gets the two-pane versions|notes picker driven by the D-pad (OK installs); a **touch**
+  device gets a single pane where each row is a version label (tap installs) plus a **Notes** button
+  that flies the release notes in from the right. The overlay closes with its `✕` button or Back, and
+  its **Install this version** button installs. So on a phone the labels to drive are `picker.select`
+  is *absent*, and `Notes` / `Install this version` / `✕` are present; on the TV the opposite. The
+  harness's `picker-notes` flow covers both.
+- **The install dialog can be slow to appear.** The download runs before the installer window, so on
+  a slow link (or a throttled emulator) it can take minutes. The wait is `PLEZY_INSTALL_TIMEOUT`
+  seconds (default 180); raise it rather than diagnosing a network wait as an app bug.
 - The GitHub API allows **60 unauthenticated requests/hour**. The app now avoids the metered API:
   the latest check uses the unmetered `github.com/.../releases/latest` redirect + `releases.atom`,
   the picker's API call is conditional (`If-None-Match`; `304`s are free), and a spent quota falls
@@ -136,7 +146,7 @@ Prefer the harness over hand-driving when you can:
 ```bash
 cd ~/Code/plezy-firetv-updater
 source local.env                                   # sets FIRE_TV_SERIAL
-python3 -u test/run.py all --yes                   # five flows
+python3 -u test/run.py all --yes                   # six flows
 python3 -u test/run.py upgrade --yes
 python3 -u test/run.py install --app-lang de
 ```

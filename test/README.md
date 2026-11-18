@@ -1,12 +1,13 @@
 # `test/` — on-device flow tests
 
-The five verification flows, written down as code. Each flow does exactly what a person with the
+The six verification flows, written down as code. Each flow does exactly what a person with the
 remote does — find the labelled button on screen, tap its centre, wait for the next window — so
 they are both a test and a record of *what to click*.
 
 | Flow | What it drives |
 |---|---|
 | `install` | open **Choose version…**, install the highlighted (latest) release |
+| `picker-notes` | open a version's release notes and close them again (touch overlay / TV pane); no install |
 | `downgrade` | pick an older release and drive the uninstall-then-install handshake |
 | `upgrade` | go back to the **Main View** and install the latest again (in-place replace) |
 | `uninstall` | **Settings → Advanced → Uninstall Plezy…** plus the stock uninstaller |
@@ -15,6 +16,11 @@ they are both a test and a record of *what to click*.
 `all` runs them in that order: it starts from "latest installed" and ends back on "latest
 installed". Every run also fires the diagnostics broadcast first (see
 [Quota + device + notification check](#quota--device--notification-check-a3--item-2--item-5)), so A3 is exercised on each invocation.
+
+`picker-notes` is the one **non-destructive** flow besides `install`: it opens the release notes
+(the touch picker's fly-in overlay, or the TV picker's notes pane) and closes them again without
+tapping a version label, so it installs nothing. On touch it also proves both ways out of the
+overlay work — the `✕` button and the remote/gesture **Back**.
 
 Before any of that, `run.py` runs the static string-parity check (`test/check_strings.py`) — no
 device needed, and a locale that drifted from `values/` would otherwise make a flow look for a
@@ -43,6 +49,13 @@ Options: `--serial` (explicit address; else the profile's `serial_env` variable,
 `--system-lang` (default: auto-detected from `persist.sys.locale`), `--from-lang` (the app's
 language now, if it should not be auto-detected), `--no-set-language` (skip the switch),
 `-v` (echo every adb command).
+
+The environment variable **`PLEZY_INSTALL_TIMEOUT`** (default `180`) is how long a flow waits for
+the install/uninstall/downgrade dialog to appear. The ~50 MB Plezy asset downloads *before* the
+dialog, so on a slow link — or a throttled emulator, where the host's GitHub throughput can drop
+below 250 KB/s — a download can take minutes; raise it (e.g. `PLEZY_INSTALL_TIMEOUT=420`) instead
+of watching a flow fail on a network wait. `PLEZY_TEST_TMP` (default `/tmp/opencode/plezy-test`)
+relocates the scratch dir so concurrent runs do not collide.
 
 `downgrade`, `upgrade`, `uninstall`, `clean-install` and `all` **erase Plezy's data** (the upgrade
 does not erase data itself, but it starts by downgrading if Plezy is not already on the older
@@ -243,7 +256,7 @@ thin Android wrapper that only reads the platform.
 test/
   run.py                 CLI: pick flows + languages + profile, print a summary
   harness.py             Device (adb + uiautomator) and the parsed Screen/Node model
-  flows.py               the five flows, in remote-press terms
+  flows.py               the six flows, in remote-press terms
   check_strings.py       static parity check for res/values*/strings.xml
   emulator.sh            create / start / provision / stop the AVDs (the emulator lane)
   config.json            package/activity names, the diagnostics action, the versions,

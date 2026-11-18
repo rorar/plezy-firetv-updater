@@ -1,12 +1,13 @@
 # 08 — The updater app, as built
 
-`app/` is the working updater: `dev.rorar.plezyupdater` **0.8.0** (`versionCode 8`),
+`app/` is the working updater: `dev.rorar.plezyupdater` **0.9.0** (`versionCode 9`),
 minSdk **25** / targetSdk **34**, plain Java, programmatic UI, **no Gradle and no AndroidX**. It is
 verified end-to-end on the API 25 stick (AFTMM, Fire OS 6.7.1.1 / API 25) and, on 2026-11-18, on the
 emulator lane (Android TV API 25/30, phone API 34) **and on a real arm64 phone** (LineageOS 22.1 =
-Android 15 = API 35). All five flows pass 5/5 in English and German, with French and Spanish
-`install` smokes, on the stick, the API 34 emulator and the phone; the API 33
-`POST_NOTIFICATIONS` request path is verified by hand on both API 33+ devices.
+Android 15 = API 35). All six flows pass 6/6 in English and German, with French and Spanish
+`install` smokes, on the stick, the API 34 emulator and the phone. The UI is TV-first but the version
+picker now has a **touch layout** too (`0.9.0`, [roadmap item 3](11-roadmap.md#3-android-tv--phone-compatibility)),
+and the API 33 `POST_NOTIFICATIONS` request path is verified by hand on both API 33+ devices.
 
 ## What it does
 
@@ -209,6 +210,39 @@ emulator lane is what caught it — the flow's first step (`open the updater`) t
 launcher still focused, and logcat named the exception; the fix was confirmed by relaunching on both
 API 34+ devices before re-running the flows.
 
+## Finding 7 — the touch notes overlay let taps fall through
+
+The `0.9.0` touch picker renders the release notes as a full-screen overlay that slides in from the
+right ([roadmap item 3](11-roadmap.md#3-android-tv--phone-compatibility)). The overlay is a
+`FrameLayout` holding a panel with a heading row, a scroll view and an **Install this version**
+button — but a `View` is **not** clickable by default, and a tap that lands on a region no child
+consumes is dispatched to whatever is *behind* it in the same window. Behind the overlay is the
+version list, whose full-width rows install on tap.
+
+The symptom was nasty precisely because the visible path was fine: tapping **Notes** opened the
+overlay, and tapping **Install this version** or **✕** worked — those are real buttons. But a tap on
+a dead zone (the panel padding, or the gap between the header and the first notes line) fell through
+to the row underneath and **started an install** of whatever version sat there, while the overlay was
+still up. On a phone that reads as "the Notes screen installed a version on its own".
+
+The fix is one idea, applied twice in `buildChangelogOverlay()`: make the container **consume** the
+tap instead of letting it pass.
+
+```java
+overlay.setClickable(true);        // the full-screen scrim eats any tap it does not handle
+changelogPanel.setClickable(true); // and the panel itself, so padding is not a hole
+```
+
+A clickable view with no `OnClickListener` still counts as handling the event, so the tap is
+swallowed and nothing behind it runs; the real buttons keep their own listeners. This is the touch
+counterpart of the D-pad branch, which never had the problem because the two panes sit side by side
+and a stray OK only ever acts on the focused version.
+
+It was caught by hand, not by a flow: the harness's taps aim at labelled nodes (buttons, rows), so it
+never hit a dead zone. The `picker-notes` flow now asserts the overlay opens and closes, but the
+**click-through** fix is verified by hand — tapping the empty space around the notes heading leaves
+the picker unchanged (no install, no `INSTALL_FINISHED`), then a label tap installs as before.
+
 ## Install routine (shared)
 
 The "get an APK onto the TV" pipeline — download, extract, verify, `PackageInstaller` commit, the
@@ -219,10 +253,12 @@ chrome; the flow owns the state machine.
 
 **The picker installs in place.** Pressing OK on a highlighted version in **Choose version…** runs
 the whole pipeline right there and leaves the user on the picker — there is no detour back to the
-main screen to press **Install update**. The picker shows the progress line itself ("Downloading…
-42 %", "Unpacking…", "Opening the installer…", "Confirm the install on the TV.", then
-"Installed 2.26.0.") and refreshes its hint and `(installed)` tag from the `INSTALL_FINISHED`
-broadcast, so the outcome is visible without navigating.
+main screen to press **Install update**. On a **touch device** the gesture is a tap on the version
+label (or the overlay's **Install this version**) instead of OK; the same pipeline runs. The picker
+shows the progress line itself ("Downloading… 42 %", "Unpacking…", "Opening the installer…",
+"Confirm the install on the device.", then "Installed 2.26.0.") and refreshes its hint and
+`(installed)` tag from the `INSTALL_FINISHED` broadcast, so the outcome is visible without
+navigating.
 
 **The main screen keeps the initial-install flow.** When Plezy is *not* installed at all, the
 dashboard's **Install update** button is the entry point and still runs the same `InstallFlow`
@@ -747,11 +783,15 @@ understands the shape every Plezy release uses — a flat list of `## Section` h
 
 Two places show the notes:
 
-- **`VersionListActivity`** is a two-pane picker: versions on the left, the highlighted version's
+- **`VersionListActivity`** is the release picker, and it has two layouts (`0.9.0`, chosen on
+  `Device.isTouch`). On a **TV** it is two panes: versions on the left, the highlighted version's
   notes on the right, updating as the D-pad moves. The list takes focus so up/down changes the
   version; pressing right moves into the notes pane to scroll a long changelog. **OK installs the
   highlighted version right here** (see [Install routine](#install-routine-shared)) — there is no
-  detour back to the main screen just to press Install.
+  detour back to the main screen just to press Install. On **touch** it is a single pane of rows:
+  tapping a version label installs it, and the row's **Notes** button flies the same notes in from
+  the right as an overlay with a `✕` close button, a Back handler and an **Install this version**
+  action.
 - **`ChangelogActivity`** is a single-release view opened from the main screen's **What's new**
   button, which is only visible while a release is selected.
 
@@ -874,7 +914,7 @@ no longer be replaced by a new build.
 
 ## Flow tests (`test/`)
 
-The five flows below are also written down as runnable code in [`test/`](../test/README.md). The
+The six flows below are also written down as runnable code in [`test/`](../test/README.md). The
 harness drives the real stick over ADB the way a person with the remote does — it reads the screen
 with `uiautomator dump`, finds the labelled button, and taps its centre — so the tests double as a
 record of *what to click* for each flow:
@@ -882,6 +922,7 @@ record of *what to click* for each flow:
 | Flow | What it drives |
 |---|---|
 | `install` | open **Choose version…**, install the highlighted (latest) release |
+| `picker-notes` | open a version's release notes and close them again (non-destructive) |
 | `downgrade` | pick an older release and drive the uninstall-then-install handshake |
 | `upgrade` | from the Main View, install the latest again (A2) — an in-place replace |
 | `uninstall` | **Settings → Advanced → Uninstall Plezy…** plus the stock uninstaller |
@@ -889,7 +930,7 @@ record of *what to click* for each flow:
 
 ```bash
 python3 test/run.py install                    # forward path (non-destructive)
-python3 test/run.py all --yes                   # the whole sequence (five flows)
+python3 test/run.py all --yes                   # the whole sequence (six flows)
 python3 test/run.py install --app-lang de       # against a German build
 ```
 
@@ -926,6 +967,14 @@ press cannot escape into the Fire TV launcher. It then presses **Install <versio
 dashboard and proves a *replace* from the package identity: `firstInstallTime` must not move while
 `lastUpdateTime` must, because a fresh install would move both. If Plezy is not already on the older
 release the flow downgrades first, so `upgrade` also runs on its own.
+
+The **`picker-notes` flow (`0.9.0`)** covers the release-notes path on both layouts. It opens
+**Choose version…** and, per `Device.isTouch`, either taps a row's **Notes** button and asserts the
+changelog overlay appears (heading `RELEASE NOTES`, an **Install this version** action, a `✕` close
+button) and closes it twice — once with `✕`, once with the remote's BACK — or, on the D-pad branch,
+asserts the two-pane hint (`Select a version to see its release notes.`) and presses DOWN until the
+notes pane fills in. It is **non-destructive**: it never taps a version label, so it installs nothing.
+It is the flow that would have caught [Finding 7](#finding-7--the-touch-notes-overlay-let-taps-fall-through).
 
 ## Verified on hardware (2026-11-14/18)
 
@@ -1019,6 +1068,80 @@ Stick (API 25), updater `0.8.0` / `versionCode 8` (APK 315 114 B, `sha256 daa5e3
 | `phone35` English `all` | **5/5 PASS** — install 50s, downgrade 52s, upgrade 22s, uninstall 64s, clean-install 42s |
 | `phone35` German `all` | **5/5 PASS** — install 43s, downgrade 52s, upgrade 24s, uninstall 92s, clean-install 33s |
 | French / Spanish smokes | `install --app-lang fr\|es` on `phone34` → **1/1 each** (33s / 35s) |
+
+### Touch layout for the version picker (`0.9.0`), 2026-11-18
+
+The layout half of roadmap item 3: the app was TV-first, and one screen — the version picker —
+assumed a D-pad (two panes, left/right to move between them). `0.9.0` gives that screen a second,
+touch layout. Still one APK on API 25, still no AndroidX and no Gradle.
+
+- **One branch, one signal.** `VersionListActivity` chooses its layout once, in `buildUi()`, on
+  `Device.isTouch(this)` — the same `Configuration.touchscreen == TOUCHSCREEN_FINGER` signal the
+  `values-*-finger/` wording rides (roadmap item 2), so the wording, the layout and the detection
+  cannot disagree.
+- **TV / D-pad (`buildTvUi`).** The original two panes, unchanged: versions on the left, the
+  highlighted version's release notes on the right, OK installs the highlighted version. The touch
+  branch is additive — the stick's screen and D-pad path are as in `0.8.0`.
+- **Touch (`buildTouchUi`).** A single pane of full-width rows. Tapping a row's version **label**
+  installs it; the row's **Notes** button flies the release notes in from the right as a full-width
+  overlay (`buildChangelogOverlay`) with a `✕` close button, a Back handler and an **Install this
+  version** action. The overlay is `clickable`, so a tap on a dead zone is consumed instead of
+  falling through to the list beneath and starting an install
+  ([Finding 7](#finding-7--the-touch-notes-overlay-let-taps-fall-through)).
+- **Wording carried the rest of the way.** Seven behaviour strings that still named the device are
+  overridden in `values-finger/` (and `-de`/`-fr`/`-es`): `main_subtitle`, `main_hint`,
+  `set_auto_desc`, `set_interval_runs`, `interval_note`, `about_thanks_text` and `progress_confirm`
+  say "device" instead of "TV", and the picker hint now reads *"…tap a version to install it, or its
+  Notes button to read the release notes."* `test/check_strings.py` keeps the four `-finger` files
+  honest (they may only override keys in the matching base file, and placeholders must survive).
+
+Nothing else needed a second layout: the main and Settings screens are already plain vertical lists
+that read fine on a phone, and the one remaining D-pad-only screen (the check-interval picker) is
+queued in [09](09-backlog.md#requested--not-started).
+
+**A slow link, and the one harness change it forced.** The ~50 MB Plezy asset downloads *before* the
+stock installer appears, so the flow's "wait for the install dialog" step is really a network wait.
+The emulator lane is throttled and the host's own GitHub throughput was only ~240–313 KB/s while this
+ran, so a single download can take ~4 minutes. The wait is now the environment variable
+`PLEZY_INSTALL_TIMEOUT` (default 180 s; `420` for the emulator runs, `600`–`900` for the stick)
+instead of a hard-coded 180. The link is genuinely flaky, not the app: one **stick EN** attempt
+failed `clean-install` on a *stalled* 48 MB download that never reached the installer in 600 s, and
+the immediate re-run passed it in 147 s; a `downgrade` on `phone34` also threw once inside
+`ApkInstaller.download` and passed on re-run.
+
+Stick (API 25), updater `0.9.0` / `versionCode 9` (APK 319 210 B, `sha256 49ed6a4c…`):
+
+| Step | Result |
+|---|---|
+| Build identity | `dumpsys package dev.rorar.plezyupdater` → `versionCode=9 minSdk=25 targetSdk=34`, `versionName=0.9.0`; `aapt2 dump badging` → `targetSdkVersion:'34'` |
+| TV layout unchanged | `Device.isTouch` is false on the stick, so `buildTouchUi` never runs: the picker is the same two panes as `0.8.0`, driven by the D-pad, OK installing in place; `picker-notes` reads the notes pane and leaves without installing |
+| English `all` | **6/6 PASS** — install 153s, picker-notes 26s, downgrade 157s, upgrade 137s, uninstall 72s, clean-install 147s |
+| German `all` | **6/6 PASS** — install 172s, picker-notes 27s, downgrade 183s, upgrade 148s, uninstall 72s, clean-install 169s |
+| API 25 regression | no touch code path runs, and no new platform API is called — every flow runs as in `0.8.0` |
+
+`phone34` (Google APIs phone, API 34) and the real `phone35` (API 35), updater `0.9.0` / `versionCode 9`:
+
+| Step | Result |
+|---|---|
+| Build identity | both → `versionCode=9 minSdk=25 targetSdk=34`, `versionName=0.9.0`; the diagnostics report reads `device=touch;tv=0;touch=1` on both |
+| Touch layout active | the picker is the single pane: version labels install on tap, `Notes` opens the overlay, `✕`/Back close it — `picker.select` is absent, `picker.notes_button` / `picker.install_button` / `picker.close` are present |
+| `phone34` English `all` | **6/6 PASS** — install 202s, picker-notes 27s, downgrade 221s, upgrade 188s, uninstall 87s, clean-install 221s |
+| `phone34` German `all` | **6/6 PASS** — install 195s, picker-notes 27s, downgrade 209s, upgrade 180s, uninstall 86s, clean-install 175s |
+| `phone35` English `all` | **6/6 PASS** — install 129s, picker-notes 32s, downgrade 147s, upgrade 127s, uninstall 97s, clean-install 135s |
+| `phone35` German `all` | **6/6 PASS** — install 139s, picker-notes 31s, downgrade 162s, upgrade 180s, uninstall 94s, clean-install 171s |
+| French / Spanish smokes | `install --app-lang fr\|es` on `phone34` → **1/1 each** (155s / 156s) |
+| Mobile toast + notification | `phone35`: the toast reads *"Updates sehen so aus"* (`TextToastRecord`), and the test notification posts on channel `updates` (`NotificationRecord … id=1001 channel=updates`) |
+
+Android TV lanes (`tv25` / `tv30`, updater-side checks only — Plezy ships no 32-bit `x86` build, so
+the Plezy flows cannot install there):
+
+| Step | Result |
+|---|---|
+| `tv25` (API 25) | reports `device=android_tv;tv=1;touch=0;notif=allowed`; the picker is the **two-pane** TV layout and the wording is the TV variant; the legacy toast and the legacy notification still fire |
+| `tv30` (API 30) | reports `device=android_tv;tv=1;touch=1` — an Android TV that also reports a finger touchscreen, so it exercises the **touch** picker on a TV: single pane, `Notes` overlay, `✕`/Back close; the notification posts on the API 26+ channel `updates` (`id=1001`) |
+
+The hand checks covered what a flow cannot assert: the four `-finger` wordings ("device" / "Gerät" /
+"appareil" / "dispositivo"), the fly-in/out animation of the overlay, and Back closing it.
 
 ### Round-1 verification phases (2026-11-14/15)
 
@@ -1244,10 +1367,11 @@ screen, up to three dialogs, so a two-dialog platform needs no special case.
   a **real** touch phone (`phone35`, API 35) — see
   [above](#emulator-lane-2026-11-18-updater-060--versioncode-6). `test/jvm/run.sh` (25 cases) and
   `test/check_strings.py` still cover the decision logic and the `values-finger` wording off-device,
-  and no real Android TV (only emulators) has been seen. The **touch layout** is still not adapted at
-  all — the app is TV-first (32–48 dp padding, ≥ 50 dp rows, D-pad focus, two-pane pickers that move
-  left/right) — so a phone gets TV-sized UI; `phone34`/`phone35` *drive* the flows over touch but that
-  is not the same as a tuned touch layout. See
+  and no real Android TV (only emulators) has been seen. The UI is still **TV-first** — 32–48 dp
+  padding, ≥ 50 dp rows, D-pad focus — but `0.9.0` gave the one screen that needed it (the version
+  picker) a **touch layout** (single pane + notes fly-in), verified on `phone34`/`phone35` and on
+  `tv30` (a TV that reports `touch=1`). The remaining D-pad-only screen is the check-interval picker,
+  queued in [09](09-backlog.md#requested--not-started). See
   [roadmap item 3](11-roadmap.md#3-android-tv--phone-compatibility).
 - **The API 26+ notification-channel and job-scheduling branches are now device-verified.** The
   stick is API 25, so `Notifier.ensureChannel` and `new Notification.Builder(app, CHANNEL_ID)` never
