@@ -33,13 +33,27 @@
     "allow_older_label": "Allow older versions",
     "uninstall_confirm_title": "Uninstall Plezy?",
     "uninstall_confirm_button": "Uninstall",
-    "not_installed_summary": "Plezy is not installed."
+    "not_installed_summary": "Plezy is not installed.",
+    "interval_label": "Edit check interval…"
   },
 
   "lang": {
     "label": "Language",
     "title": "Language",
     "system": "System default"
+  },
+
+  "interval": {
+    "_comment": "Settings → Edit check interval…. The picker's live preview reads 'Every 3 days'; the Settings summary reads 'Now every 3 days.'. The unit words are the plural forms the rows and chips show (matched case-insensitively).",
+    "title": "Check interval",
+    "value_heading": "VALUE",
+    "unit_heading": "UNIT",
+    "save": "Save",
+    "cancel": "Cancel",
+    "cancel_hint": "Press Back to cancel.",
+    "preview": "Every {n} {unit}",
+    "now": "Now every {n} {unit}.",
+    "units": {"hours": "hours", "days": "days", "weeks": "weeks", "months": "months"}
   },
 
   "dialog": {

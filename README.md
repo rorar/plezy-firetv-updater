@@ -12,13 +12,13 @@ follows from it.
 > artwork sources (`design/`), the on-device **flow tests** (`test/`) and a throwaway probe
 > (`probe/`). Verified end-to-end on the stick, UI overhaul, original artwork, the shared
 > install routine, the Round-1 feature set, **self-update** (the updater updates itself) and the
-> **touch layout** for phones.
+> **touch layouts** for phones.
 
 Releases (the APK is attached to each): **<https://github.com/rorar/plezy-firetv-updater/releases>**.
 
-Verified on **2026-11-13/18** with Plezy `2.26.0`, ADB `1.0.41` (platform-tools `37.0.0`) — on the
+Verified on **2026-11-13/19** with Plezy `2.26.0`, ADB `1.0.41` (platform-tools `37.0.0`) — on the
 stick (API 25) end to end, on the emulator lane (Android TV API 25/30, phone API 34), and on a real
-arm64 phone (API 35) for `0.6.0`/`0.7.0`/`0.8.0`/`0.9.0`.
+arm64 phone (API 35) for `0.6.0`/`0.7.0`/`0.8.0`/`0.9.0` (the phone was offline for `0.9.1`).
 
 ---
 
@@ -58,7 +58,8 @@ arm64 phone (API 35) for `0.6.0`/`0.7.0`/`0.8.0`/`0.9.0`.
    picker's API call is conditional, so the updater keeps working with the quota spent. The UI is a
    TV-first dashboard
    (large text, one primary action, unmistakable D-pad focus) with real release-notes typography
-   and hand-drawn icons; the launcher icon and TV banner are original artwork. See
+   and hand-drawn icons; on a phone both pickers (Choose-Version and the check interval) switch to a
+   **touch layout**. The launcher icon and TV banner are original artwork. See
    [docs/08](docs/08-app-implementation.md) and [docs/10](docs/10-tv-ui-design.md).
 
 ## Current state of the stick
@@ -69,11 +70,11 @@ arm64 phone (API 35) for `0.6.0`/`0.7.0`/`0.8.0`/`0.9.0`.
 | Launcher | 24 `LEANBACK_LAUNCHER` entries, app appears in the Fire TV home row |
 | APK used | `derFrisson/plezy-apks` `2.26.0` → `plezy-android-armeabi-v7a.apk` (90,748,577 bytes) |
 | Installed size | ~87 MB in `/data/app/com.edde746.plezy-1` |
-| Updater | `dev.rorar.plezyupdater` `0.9.0` (`versionCode 9`, minSdk 25 / targetSdk 34) — see [docs/08](docs/08-app-implementation.md) |
+| Updater | `dev.rorar.plezyupdater` `0.9.1` (`versionCode 10`, minSdk 25 / targetSdk 34) — see [docs/08](docs/08-app-implementation.md) |
 
 ## The updater app
 
-`app/` builds to a ~312 KB APK (the launcher icon, TV banner and the language flags at every density
+`app/` builds to a ~316 KB APK (the launcher icon, TV banner and the language flags at every density
 are the bulk of it; the code and vectors are small). It polls the upstream GitHub release on a
 user-set interval (default twice a day) and after boot, posts a notification when something newer
 exists, and installs it with one confirmation on the stock Fire OS installer screen. It detects what
@@ -88,7 +89,8 @@ sections:
   warns (with a shortcut into the system settings) when Android is blocking the notification.
 - **Prompt to open Plezy** — on by default: after a successful install, offer to start Plezy.
 - **Check automatically** — enables the periodic background check (a `JobScheduler` job) + boot re-arm.
-- **Edit check interval…** — every *n* hours / days / weeks / months (1–30), default 12 hours.
+- **Edit check interval…** — every *n* hours / days / weeks / months (1–30), default 12 hours. On a
+  **TV** it is a two-pane D-pad picker; on a **touch device** a tapped number grid plus unit chips.
 - **Language** — **System default** (follows the Fire TV) or English / Deutsch / Français /
   Español, each with a bundled flag. The choice is stored and applied on the next screen.
 - **Delete APK after installing** — on by default, frees the downloaded APK once installed.
@@ -107,10 +109,11 @@ sections:
 
 **Choose version…** opens the release picker: on a **TV** it is two panes (versions left, release
 notes right), and on a **touch device** it is a single pane where each row installs on tap and a
-**Notes** button flies the release notes in from the right. **What's new** shows the selected
-release's notes. Release notes are rendered with real typography — coloured, larger section headings
-and hanging-indented bullets — through a hand-written `Markdown.toStyled`. It also shows free space
-and refuses to start a download that would not fit.
+**Notes** button flies the release notes in from the right. The **check-interval** picker follows the
+same split: two D-pad panes on a TV, a tapped number grid on a phone. **What's new** shows the
+selected release's notes. Release notes are rendered with real typography — coloured, larger section
+headings and hanging-indented bullets — through a hand-written `Markdown.toStyled`. It also shows free
+space and refuses to start a download that would not fit.
 
 The picker **installs in place**: pressing OK (TV) or tapping a version (touch) downloads, verifies
 and installs it right there, showing the progress and the outcome on the same screen — no trip back to
@@ -153,10 +156,10 @@ adb install -r build/plezy-updater.apk
 
 ## Flow tests
 
-The six flows — **install**, **picker-notes**, **downgrade**, **upgrade**, **uninstall**,
-**clean-install** — are written down as code in [`test/`](test/README.md). They drive the real stick
-over ADB exactly as a person with the remote would (find the labelled button, tap it), so they double
-as a record of what to click:
+The seven flows — **install**, **picker-notes**, **interval**, **downgrade**, **upgrade**,
+**uninstall**, **clean-install** — are written down as code in [`test/`](test/README.md). They drive
+the real stick over ADB exactly as a person with the remote would (find the labelled button, tap it),
+so they double as a record of what to click:
 
 ```bash
 python3 test/run.py install          # forward path (non-destructive)

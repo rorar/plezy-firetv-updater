@@ -29,7 +29,8 @@ import check_strings
 from harness import Device, HarnessError, load_config, load_strings
 from flows import Flows
 
-FLOW_ORDER = ["install", "picker-notes", "downgrade", "upgrade", "uninstall", "clean-install"]
+FLOW_ORDER = ["install", "picker-notes", "interval", "downgrade", "upgrade", "uninstall",
+              "clean-install"]
 DESTRUCTIVE = {"downgrade", "upgrade", "uninstall", "clean-install", "all"}
 
 

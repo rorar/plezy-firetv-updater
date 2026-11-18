@@ -1,6 +1,6 @@
 # `test/` — on-device flow tests
 
-The six verification flows, written down as code. Each flow does exactly what a person with the
+The seven verification flows, written down as code. Each flow does exactly what a person with the
 remote does — find the labelled button on screen, tap its centre, wait for the next window — so
 they are both a test and a record of *what to click*.
 
@@ -8,6 +8,7 @@ they are both a test and a record of *what to click*.
 |---|---|
 | `install` | open **Choose version…**, install the highlighted (latest) release |
 | `picker-notes` | open a version's release notes and close them again (touch overlay / TV pane); no install |
+| `interval` | open **Settings → Edit check interval…** and drive the picker (tap on touch, D-pad on TV); no install |
 | `downgrade` | pick an older release and drive the uninstall-then-install handshake |
 | `upgrade` | go back to the **Main View** and install the latest again (in-place replace) |
 | `uninstall` | **Settings → Advanced → Uninstall Plezy…** plus the stock uninstaller |
@@ -17,10 +18,12 @@ they are both a test and a record of *what to click*.
 installed". Every run also fires the diagnostics broadcast first (see
 [Quota + device + notification check](#quota--device--notification-check-a3--item-2--item-5)), so A3 is exercised on each invocation.
 
-`picker-notes` is the one **non-destructive** flow besides `install`: it opens the release notes
+`picker-notes` and `interval` are **non-destructive**: `picker-notes` opens the release notes
 (the touch picker's fly-in overlay, or the TV picker's notes pane) and closes them again without
-tapping a version label, so it installs nothing. On touch it also proves both ways out of the
-overlay work — the `✕` button and the remote/gesture **Back**.
+tapping a version label, so it installs nothing — on touch it also proves both ways out of the
+overlay work, the `✕` button and the remote/gesture **Back**. `interval` opens the picker, changes
+the interval and saves it, then restores the default `12 hours`, so the stored value is unchanged
+when the flow ends.
 
 Before any of that, `run.py` runs the static string-parity check (`test/check_strings.py`) — no
 device needed, and a locale that drifted from `values/` would otherwise make a flow look for a
@@ -256,7 +259,7 @@ thin Android wrapper that only reads the platform.
 test/
   run.py                 CLI: pick flows + languages + profile, print a summary
   harness.py             Device (adb + uiautomator) and the parsed Screen/Node model
-  flows.py               the six flows, in remote-press terms
+  flows.py               the seven flows, in remote-press terms
   check_strings.py       static parity check for res/values*/strings.xml
   emulator.sh            create / start / provision / stop the AVDs (the emulator lane)
   config.json            package/activity names, the diagnostics action, the versions,

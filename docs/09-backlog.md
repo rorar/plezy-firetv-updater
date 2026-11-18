@@ -16,13 +16,6 @@ The forward-looking items now live in the [roadmap](11-roadmap.md), so this stay
     (e.g. `⏳ Update check: 12 hours`); the "one confirmation on the installer" caveat moves into
     Settings (where the interval already lives);
   - a **data glyph** (`⛃` or similar) is added before the free-space text (`⛃ Free space: 5.83 GB`).
-- **Bug — `Settings → Edit check interval…` has no touch path (user request, 2026-11-18).** The
-  interval picker (`IntervalActivity`) is driven by the D-pad (value/unit columns, LEFT/RIGHT between
-  panes) and does not respond to touch, so it is unusable on a phone — the one screen the `0.9.0`
-  touch pass did not cover. Fix it touch-first (e.g. a single scrolling list of intervals, or make
-  the two columns tappable) and then **sweep the other screens for the same gap**: the two-pane
-  interval picker is the known one; check any other D-pad-only interaction (focus-only rows, panes
-  that need LEFT/RIGHT) the way `VersionListActivity` was checked.
 - **README: add Android TV + phone screenshots (user request, 2026-11-18).** The README has no
   screenshots; add captures of the Android TV (two-pane) and the phone (touch) views — main screen,
   Settings, and the two Choose-Version layouts.
@@ -37,9 +30,9 @@ The forward-looking items now live in the [roadmap](11-roadmap.md), so this stay
   `0.7.0`, 33 → 34 in `0.8.0`; 35 → … remains, one step per release
   ([roadmap item 5](11-roadmap.md#5-targetsdk-bump-matrix)).
 
-The two former requests here — **make the touch Choose-Version phone-ready** and **device-aware
-wording beyond the input hint** — both landed in `0.9.0`; see
-[Already implemented](#already-implemented).
+The former requests here — **make the touch Choose-Version phone-ready**, **device-aware wording
+beyond the input hint** (`0.9.0`) and the **touch check-interval picker** (`0.9.1`) — have landed;
+see [Already implemented](#already-implemented).
 
 Nothing here is a commitment; the roadmap explains the order and the reasoning.
 
@@ -87,6 +80,22 @@ Nothing here is a commitment; the roadmap explains the order and the reasoning.
   [11 § 5](11-roadmap.md#5-targetsdk-bump-matrix) and
   [08](08-app-implementation.md#targetsdk-34-receiver-flags--access_network_state-080-2026-11-18).
 
+- **Touch layout: the check-interval picker + a screen audit (roadmap item 3, follow-up).** Landed
+  2026-11-18/19 (`0.9.1`): `IntervalActivity` branches once on `Device.isTouch(this)` — a TV keeps the
+  two-pane VALUE|UNIT D-pad picker, a touch device gets a **six-column grid of number chips (1–30)**
+  and a 2×2 grid of unit chips, both tapped, with the same live preview and an explicit **Save** /
+  **Cancel** pair (stacked full-width, because a two-column row clips long labels on a narrow phone).
+  Two platform behaviours bit on the way and are worth remembering: with no view focused the window
+  stays in key mode and **swallows the first tap**, and a `focusableInTouchMode` row spends the first
+  tap *giving itself focus* — so the touch rows are clickable but not focusable and the root takes
+  focus in touch mode up front
+  ([Finding 8](08-app-implementation.md#finding-8--the-touch-interval-screen-swallowed-the-first-tap)).
+  The accompanying **screen audit** swept every other activity for the same D-pad-only gap and found
+  none: `IntervalActivity` was the only focus-only screen, every other screen drives clickable
+  `Button`/`Switch` rows. A new **`interval`** harness flow (seven flows total) drives the picker on
+  both layouts — tap/scroll on touch, up/down/right on the D-pad — and is non-destructive. See
+  [11 § 3](11-roadmap.md#3-android-tv--phone-compatibility).
+
 - **Touch layout: single-pane Choose-Version + right-side changelog fly-in (roadmap item 3, layout
   half).** Landed 2026-11-18 (`0.9.0`): `VersionListActivity` branches once on `Device.isTouch(this)`
   into the unchanged TV two-pane layout and a new touch layout — full-width version rows (tap the
@@ -95,14 +104,14 @@ Nothing here is a commitment; the roadmap explains the order and the reasoning.
   `-finger` wording was carried the rest of the way: the *behaviour* sentences (`main_subtitle`,
   `main_hint`, `set_auto_desc`, `set_interval_runs`, `interval_note`, `about_thanks_text`,
   `progress_confirm`) now say "device" not "TV" on a touch device, plus the new `picker_hint`. A new
-  **`picker-notes`** harness flow (six flows total) opens and closes the notes on both layouts; the
+  **`picker-notes`** harness flow opens and closes the notes on both layouts; the
   overlay is `clickable` so a tap on a dead zone is consumed instead of falling through to the list
   and starting an install
   ([Finding 7](08-app-implementation.md#finding-7--the-touch-notes-overlay-let-taps-fall-through)).
   Verified on the stick (two-pane), `phone34` and the real `phone35` (touch), and `tv30` — an
   Android TV that reports `touch=1`, so it exercises the touch picker on a TV. See
   [11 § 3](11-roadmap.md#3-android-tv--phone-compatibility) and
-  [11 § 3 · Layout](11-roadmap.md#layout--done-2026-11-18-090).
+  [11 § 3 · Layout](11-roadmap.md#layout--done-2026-11-1819-090--091).
 
 - **Device detection (roadmap item 2).** Landed 2026-11-17 (`0.4.0`): `DeviceKind` (the decision, a
   pure enum with no `android.*` import) and `Device` (the Android wrapper) answer *what is this
@@ -157,8 +166,8 @@ Nothing here is a commitment; the roadmap explains the order and the reasoning.
   4:3 (A5); the row reads **Edit check interval…** because it opens a picker (A6).
 
 - **`upgrade` flow in the harness (A2).** The flow tests now drive Downgrade → **Main View** →
-  Upgrade and prove an in-place replace (`firstInstallTime` unchanged, `lastUpdateTime` moved). Six
-  flows total (the `picker-notes` flow joined in `0.9.0`). See
+  Upgrade and prove an in-place replace (`firstInstallTime` unchanged, `lastUpdateTime` moved). Seven
+  flows total (the `picker-notes` flow joined in `0.9.0`, the `interval` flow in `0.9.1`). See
   [08](08-app-implementation.md#flow-tests-test) and
   [test/README](../test/README.md).
 
@@ -233,7 +242,8 @@ Nothing here is a commitment; the roadmap explains the order and the reasoning.
   both the version picker and **What's new**. See [08](08-app-implementation.md#changelog).
 - **Custom update-check interval.** **Check interval** opens `IntervalActivity` — numbers 1–30 ×
   Hours/Days/Weeks/Months — persisted and re-armed immediately. A prebuilt library is not possible
-  without resource merging, so it is hand-built. See
+  without resource merging, so it is hand-built. A TV gets the two-pane D-pad picker; a touch device
+  a tappable number grid plus unit chips (`0.9.1`). See
   [08](08-app-implementation.md#check-interval).
 - **UI overhaul.** A shared `Ui` toolkit (colours, sizes, focus selectors), a dashboard-style main
   screen, grouped settings, and a consistent D-pad focus model. See
@@ -278,8 +288,9 @@ Nothing here is a commitment; the roadmap explains the order and the reasoning.
 - **Device detection + device-aware wording** (roadmap items 2–3, wording half) landed on 2026-11-17
   (updater `0.4.0`). The classification is asserted over the diagnostics broadcast and the wording
   rides the `-finger` resource qualifier; the parts this stick cannot produce are covered by
-  `test/jvm/run.sh` and `test/check_strings.py`, both device-free. What is left is the touch
-  **layout** and the `targetSdk` bump.
+  `test/jvm/run.sh` and `test/check_strings.py`, both device-free. What was left then — the touch
+  **layout** and the `targetSdk` bump — has since partly landed (the touch layout, below); the
+  `targetSdk` 35 step remains.
 - **`targetSdk` 25 → 26** (roadmap item 5, first step) landed on 2026-11-17 (updater `0.5.0`):
   notification channel on API 26+, `JobScheduler` in place of the alarm + service. **26 → 31**
   (second step) landed on 2026-11-18 (updater `0.6.0`): `PendingIntent` mutability flags,
@@ -287,5 +298,9 @@ Nothing here is a commitment; the roadmap explains the order and the reasoning.
   verified it is new too. **31 → 33** (third step) landed on 2026-11-18 (updater `0.7.0`):
   `POST_NOTIFICATIONS` requested once automatically and from the Settings switch, a blocked hint
   with an **Open notification settings** action, and `notif=` in the diagnostics report; verified on
-  the API 34 emulator and the real API 35 phone. The remaining steps (34 → …) are still open, and the
-  touch **layout** is still the last item.
+  the API 34 emulator and the real API 35 phone. The remaining steps (34 → 35) are still open.
+- **Touch layout** landed in two halves: the **Choose-Version picker** on 2026-11-18 (updater
+  `0.9.0`) and the **check-interval picker** on 2026-11-18/19 (updater `0.9.1`), the latter with a
+  screen audit that confirmed `IntervalActivity` was the only D-pad-only screen left. With both in,
+  the touch **layout** is done; what remains for roadmap item 3 is the `targetSdk` 35 step (item 5)
+  and the README work, and item 4 (the Main View footer) is still open.

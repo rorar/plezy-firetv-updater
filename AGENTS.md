@@ -54,6 +54,16 @@ adb install -r build/plezy-updater.apk
   its **Install this version** button installs. So on a phone the labels to drive are `picker.select`
   is *absent*, and `Notes` / `Install this version` / `✕` are present; on the TV the opposite. The
   harness's `picker-notes` flow covers both.
+- **The interval picker has two layouts too** (`IntervalActivity`, `0.9.1`). A **TV** gets the
+  two-pane `VALUE`|`UNIT` D-pad picker (focus selects; LEFT/RIGHT moves between panes; **Save** at
+  the bottom; Back cancels). A **touch** device gets a **six-column grid of number chips** (1–30)
+  plus a 2×2 grid of unit chips — tap a number and a unit, watch the live "Every N …" preview, then
+  tap **Save** / **Cancel**. Both live behind **Settings → Edit check interval…** (which only exists
+  while *Check automatically* is on). Two platform traps the touch branch handles: a window with no
+  focused view **swallows the first tap**, and a `focusableInTouchMode` row spends the first tap
+  giving itself focus — so the touch chips are clickable but not focusable and the root takes focus
+  in touch mode up front ([docs/08](docs/08-app-implementation.md#finding-8--the-touch-interval-screen-swallowed-the-first-tap)).
+  The harness's `interval` flow drives both branches and is non-destructive.
 - **The install dialog can be slow to appear.** The download runs before the installer window, so on
   a slow link (or a throttled emulator) it can take minutes. The wait is `PLEZY_INSTALL_TIMEOUT`
   seconds (default 180); raise it rather than diagnosing a network wait as an app bug.
@@ -146,7 +156,7 @@ Prefer the harness over hand-driving when you can:
 ```bash
 cd ~/Code/plezy-firetv-updater
 source local.env                                   # sets FIRE_TV_SERIAL
-python3 -u test/run.py all --yes                   # six flows
+python3 -u test/run.py all --yes                   # seven flows
 python3 -u test/run.py upgrade --yes
 python3 -u test/run.py install --app-lang de
 ```

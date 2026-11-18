@@ -6,10 +6,11 @@ checked on the stick at **1920×1080, density 320 (2.0×) → a 960×540 dp canv
 remote as the only input.
 
 The design is **TV-first** — 10-foot text, a D-pad focus model — but the app also runs on a phone.
-`0.9.0` added a **touch branch** for the one screen that needed it, the Choose-Version picker
-([below](#choose-version--two-panes-on-tv-a-fly-in-on-touch)); the touch layout was verified on the
-real `phone35` and on `tv30` (an Android TV that reports a touchscreen). The rest of this file
-describes the TV look; the touch differences are called out where they exist.
+`0.9.0` added a **touch branch** for the Choose-Version picker and `0.9.1` for the check-interval
+picker ([below](#choose-version--two-panes-on-tv-a-fly-in-on-touch),
+[below](#check-interval--two-panes-on-tv-a-grid-on-touch)); the touch layouts were verified on the
+real `phone35`, on `phone34` and on `tv30` (an Android TV that reports a touchscreen). The rest of
+this file describes the TV look; the touch differences are called out where they exist.
 
 ## The problem
 
@@ -69,10 +70,12 @@ accent fill, everything else light grey on the dark surface).
 - A `ScrollView` wraps any screen that can exceed 540 dp, and it **scrolls to the focused row**
   automatically, so nothing is ever unreachable.
 - **A touch device takes the touch branch** (`Device.isTouch`): the Choose-Version picker becomes a
-  single pane with a fly-in notes overlay instead of two panes, so no interaction needs left/right
-  (see [Choose version](#choose-version--two-panes-on-tv-a-fly-in-on-touch)). The rest of the UI is
-  already plain vertical lists and works as-is; the interval picker is the one remaining D-pad-only
-  screen, queued in [09](09-backlog.md#requested--not-started).
+  single pane with a fly-in notes overlay instead of two panes, and the check-interval picker becomes
+  a tapped number grid plus unit chips instead of two D-pad columns, so no interaction needs
+  left/right (see [Choose version](#choose-version--two-panes-on-tv-a-fly-in-on-touch) and
+  [Check interval](#check-interval--two-panes-on-tv-a-grid-on-touch)). The rest of the UI is already
+  plain vertical lists and works as-is, so with both pickers branched there is no D-pad-only screen
+  left (the `0.9.1` screen audit confirmed it).
 
 ## Screens
 
@@ -108,13 +111,24 @@ uninstall, quota, version) update their own summary. Grouping turns a flat list 
 scannable. Switch rows and action rows share one label inset, so a column of labels lines up whether
 the row ends in a `Switch` or not.
 
-### Check interval — two panes
+### Check interval — two panes on TV, a grid on touch
 
-Numbers `1…30` left, units **Hours / Days / Weeks / Months** right, live "Every 3 days" preview on
-top, **Save** at the bottom. The chosen number and the chosen unit each stay highlighted when the
-D-pad leaves their column, so the preview always matches something visible. This is the shape that
-stays usable with only a D-pad, and it needs no library (see
+**TV.** Numbers `1…30` left, units **Hours / Days / Weeks / Months** right, live "Every 3 days"
+preview on top, **Save** at the bottom. The chosen number and the chosen unit each stay highlighted
+when the D-pad leaves their column, so the preview always matches something visible. This is the
+shape that stays usable with only a D-pad, and it needs no library (see
 [08](08-app-implementation.md#check-interval) for why a prebuilt picker is not an option here).
+
+**Touch** (`0.9.1`, [roadmap item 3](11-roadmap.md#3-android-tv--phone-compatibility)). The two
+columns need left/right, which a touch user does not have, and a 30-row single column shows barely
+one row on a phone. So the numbers become a **six-column grid of chips** (1–30 in five rows of six,
+each a 44 dp tap target), the units a **2×2 grid of chips**, and **Save** / **Cancel** stack
+full-width at the bottom instead of sharing a row (a two-column row clips a long label like
+"Abbrechen" on a narrow phone). The live preview is unchanged. The branch is chosen once, on
+`Device.isTouch(this)`. Two platform behaviours bit on the way and are worth remembering — a window
+with no focused view **swallows the first tap**, and a `focusableInTouchMode` row spends the first
+tap *giving itself focus* — so the touch chips are clickable but not focusable and the root takes
+focus in touch mode up front ([Finding 8](08-app-implementation.md#finding-8--the-touch-interval-screen-swallowed-the-first-tap)).
 
 ### Choose version — two panes on TV, a fly-in on touch
 
@@ -136,8 +150,7 @@ The branch is chosen once, on `Device.isTouch(this)` — the same signal the `va
 rides — so a device that reads "tap" gets the single-pane picker. The TV layout is untouched.
 
 The touch picker's **Notes** button is currently a text label; a follow-up will reuse the main
-screen's **What's new** icon ([09](09-backlog.md#requested--not-started)). The **check-interval**
-picker above is still two-pane and D-pad-only — a known touch gap, also queued in [09](09-backlog.md#requested--not-started).
+screen's **What's new** icon ([09](09-backlog.md#requested--not-started)).
 
 ### Changelog — styled release notes
 

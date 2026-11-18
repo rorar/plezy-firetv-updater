@@ -1,12 +1,14 @@
 # 08 — The updater app, as built
 
-`app/` is the working updater: `dev.rorar.plezyupdater` **0.9.0** (`versionCode 9`),
+`app/` is the working updater: `dev.rorar.plezyupdater` **0.9.1** (`versionCode 10`),
 minSdk **25** / targetSdk **34**, plain Java, programmatic UI, **no Gradle and no AndroidX**. It is
-verified end-to-end on the API 25 stick (AFTMM, Fire OS 6.7.1.1 / API 25) and, on 2026-11-18, on the
+verified end-to-end on the API 25 stick (AFTMM, Fire OS 6.7.1.1 / API 25) and, on 2026-11-18/19, on the
 emulator lane (Android TV API 25/30, phone API 34) **and on a real arm64 phone** (LineageOS 22.1 =
-Android 15 = API 35). All six flows pass 6/6 in English and German, with French and Spanish
-`install` smokes, on the stick, the API 34 emulator and the phone. The UI is TV-first but the version
-picker now has a **touch layout** too (`0.9.0`, [roadmap item 3](11-roadmap.md#3-android-tv--phone-compatibility)),
+Android 15 = API 35). All seven flows pass 7/7 in English and German, with French and Spanish
+`install` smokes, on the stick and the API 34 emulator; the real phone passed the six `0.9.0` flows
+but was offline for `0.9.1`. The UI is TV-first but both
+pickers now have a **touch layout** too (`0.9.0` for Choose-Version, `0.9.1` for the check interval,
+[roadmap item 3](11-roadmap.md#3-android-tv--phone-compatibility)),
 and the API 33 `POST_NOTIFICATIONS` request path is verified by hand on both API 33+ devices.
 
 ## What it does
@@ -243,6 +245,39 @@ never hit a dead zone. The `picker-notes` flow now asserts the overlay opens and
 **click-through** fix is verified by hand — tapping the empty space around the notes heading leaves
 the picker unchanged (no install, no `INSTALL_FINISHED`), then a label tap installs as before.
 
+## Finding 8 — the touch interval screen swallowed the first tap
+
+The `0.9.1` touch interval picker ([roadmap item 3](11-roadmap.md#3-android-tv--phone-compatibility))
+opened fine and the unit chips responded to a tap — but the **first** tap on a number did nothing;
+the second worked. It reproduced after any settle time, so it was not an activity-transition race.
+Two platform behaviours combined:
+
+1. **A window with no focused view starts in key mode.** The first touch is spent switching the
+   window to touch mode and is not delivered to the view under the finger. The TV branch never saw
+   this because it focuses its selected row on open; the touch branch focused nothing.
+2. **A `focusableInTouchMode` view spends the first tap giving itself focus**, not clicking. The
+   number rows were built `setFocusable(true); setFocusableInTouchMode(true)` — the right shape for
+   the D-pad branch, where focus *is* the selection, but wrong for a row that is only ever tapped.
+
+The fix has two halves, both in `IntervalActivity`:
+
+```java
+// 1. the touch picker uses plain Buttons (Ui.chip), not the focusable rows the D-pad branch uses:
+//    a Button is not focusableInTouchMode, so a tap clicks instead of being spent on focus.
+//    (The TV branch keeps its focusable rows — there focus *is* the selection.)
+
+// 2. and the root takes focus in touch mode up front, so the window is in touch mode from the start:
+root.setFocusableInTouchMode(true);
+root.requestFocus();
+```
+
+This is the same trick the `0.9.0` picker uses (`list.requestFocus()`), and it is why the chips —
+plain `Button`s, which are not `focusableInTouchMode` — always worked first time while the rows did
+not. The touch rows are now a **six-column grid of number chips** rather than a single-column list:
+a 30-row list shows barely one row on a phone and scrolls forever, while the grid puts the whole
+range on screen. The harness's `interval` flow taps a number and a unit, proves the live preview and
+the Settings summary follow, and restores the default — it would have caught the double-tap bug.
+
 ## Install routine (shared)
 
 The "get an APK onto the TV" pipeline — download, extract, verify, `PackageInstaller` commit, the
@@ -455,11 +490,19 @@ otherwise a background check runs and only speaks up through a notification.
 
 The cadence is no longer fixed. The Settings row is labelled **Edit check interval…** (A6) — it is an
 *action* that opens `IntervalActivity`, not a value to flip, so it reads like the other opening
-rows; the picker's own title stays **Check interval**. It is a two-pane picker:
-numbers `1…30` on the left, units **Hours / Days / Weeks / Months** on the right, with a live
-"Every 3 days" preview at the top. Up/down changes the highlighted value, left/right switches
-column, OK advances to **Save**; the remote's Back key cancels (there is deliberately no Back
-button). Saving writes `interval_value`/`interval_unit`, re-arms the job
+rows; the picker's own title stays **Check interval**. `IntervalActivity` branches once on
+`Device.isTouch(this)` (`0.9.1`, [Finding 8](#finding-8--the-touch-interval-screen-swallowed-the-first-tap)):
+
+- **TV** — a two-pane picker: numbers `1…30` on the left, units **Hours / Days / Weeks / Months** on
+  the right, with a live "Every 3 days" preview at the top. Up/down changes the highlighted value,
+  left/right switches column, OK advances to **Save**; the remote's Back key cancels (there is
+  deliberately no Back button).
+- **Touch** — a **six-column grid of number chips** (1–30) plus a 2×2 grid of unit chips, both
+  tapped, the same live preview, and full-width stacked **Save** / **Cancel** buttons. The grid
+  replaces a single-column list because a 30-row column shows barely one row on a phone; the buttons
+  stack because a two-column row clips a long label on a narrow screen.
+
+Saving writes `interval_value`/`interval_unit`, re-arms the job
 (`UpdateJob.schedule` reads `Prefs.intervalMs`), fires a confirmation toast and updates both
 summaries on the Settings screen and the footer hint on the main screen.
 
@@ -467,7 +510,10 @@ Each column keeps its own choice highlighted while the D-pad is in the other one
 number stays visible when the user moves across to the units (and the selected unit stays visible
 when they come back). A focused row gets the full accent fill (`#2F6E8F`); the selected-but-unfocused
 row gets a dimmer one (`#2A607E`); both render white text. That is `Ui.pickerRowSelector()` +
-`Ui.pickerTextColors()` plus a `setSelected(i == index)` on every row in `updatePreview()`.
+`Ui.pickerTextColors()` plus a `setSelected(i == index)` on every row in `updatePreview()`. On touch
+the same `setSelected` drives the chip fill (`Ui.chipBackground`), and the chips are plain
+`Button`s — clickable but **not** focusable, so the first tap selects instead of being spent on
+focus ([Finding 8](#finding-8--the-touch-interval-screen-swallowed-the-first-tap)).
 
 The rows are plain focusable `TextView`s, not a `ListView`. On this device a `ListView` keeps its
 own selection state and the position it reports when it first gains focus is not the one that was
@@ -914,7 +960,7 @@ no longer be replaced by a new build.
 
 ## Flow tests (`test/`)
 
-The six flows below are also written down as runnable code in [`test/`](../test/README.md). The
+The seven flows below are also written down as runnable code in [`test/`](../test/README.md). The
 harness drives the real stick over ADB the way a person with the remote does — it reads the screen
 with `uiautomator dump`, finds the labelled button, and taps its centre — so the tests double as a
 record of *what to click* for each flow:
@@ -923,6 +969,7 @@ record of *what to click* for each flow:
 |---|---|
 | `install` | open **Choose version…**, install the highlighted (latest) release |
 | `picker-notes` | open a version's release notes and close them again (non-destructive) |
+| `interval` | open **Settings → Edit check interval…** and drive the picker (non-destructive) |
 | `downgrade` | pick an older release and drive the uninstall-then-install handshake |
 | `upgrade` | from the Main View, install the latest again (A2) — an in-place replace |
 | `uninstall` | **Settings → Advanced → Uninstall Plezy…** plus the stock uninstaller |
@@ -930,7 +977,7 @@ record of *what to click* for each flow:
 
 ```bash
 python3 test/run.py install                    # forward path (non-destructive)
-python3 test/run.py all --yes                   # the whole sequence (six flows)
+python3 test/run.py all --yes                   # the whole sequence (seven flows)
 python3 test/run.py install --app-lang de       # against a German build
 ```
 
@@ -976,7 +1023,15 @@ asserts the two-pane hint (`Select a version to see its release notes.`) and pre
 notes pane fills in. It is **non-destructive**: it never taps a version label, so it installs nothing.
 It is the flow that would have caught [Finding 7](#finding-7--the-touch-notes-overlay-let-taps-fall-through).
 
-## Verified on hardware (2026-11-14/18)
+The **`interval` flow (`0.9.1`)** covers the check-interval picker on both layouts and is likewise
+**non-destructive** — it changes the interval, proves it took, then restores the default `12 hours`.
+On touch it taps a number and a unit chip, asserts the live preview and the Settings summary follow,
+saves, then reopens and restores `12 hours`. On the D-pad branch it drives both columns
+(UP clamps at the first entry, DOWN steps, RIGHT jumps to the unit column), asserts the preview moves
+in both, and cancels with Back so nothing is persisted. It is the flow that caught
+[Finding 8](#finding-8--the-touch-interval-screen-swallowed-the-first-tap).
+
+## Verified on hardware (2026-11-14/19)
 
 ### `targetSdk` 33 + `POST_NOTIFICATIONS` (`0.7.0`), 2026-11-18
 
@@ -1096,8 +1151,9 @@ touch layout. Still one APK on API 25, still no AndroidX and no Gradle.
   honest (they may only override keys in the matching base file, and placeholders must survive).
 
 Nothing else needed a second layout: the main and Settings screens are already plain vertical lists
-that read fine on a phone, and the one remaining D-pad-only screen (the check-interval picker) is
-queued in [09](09-backlog.md#requested--not-started).
+that read fine on a phone. The one remaining D-pad-only screen, the check-interval picker, was given
+its touch branch in `0.9.1` ([below](#touch-layout-for-the-check-interval-091-2026-11-1819)), and the
+`0.9.1` screen audit confirmed it was the last one.
 
 **A slow link, and the one harness change it forced.** The ~50 MB Plezy asset downloads *before* the
 stock installer appears, so the flow's "wait for the install dialog" step is really a network wait.
@@ -1142,6 +1198,47 @@ the Plezy flows cannot install there):
 
 The hand checks covered what a flow cannot assert: the four `-finger` wordings ("device" / "Gerät" /
 "appareil" / "dispositivo"), the fly-in/out animation of the overlay, and Back closing it.
+
+### Touch layout for the check interval (`0.9.1`), 2026-11-18/19
+
+The follow-up to `0.9.0`: the one remaining D-pad-only screen — the check-interval picker — gets a
+touch branch, and a screen audit confirms there is no other. Still one APK on API 25, still no
+AndroidX and no Gradle. The touch double-tap bug this found is [Finding 8](#finding-8--the-touch-interval-screen-swallowed-the-first-tap).
+
+Stick (API 25), updater `0.9.1` / `versionCode 10` (APK 323 306 B, `sha256 db4c8592…`):
+
+| Step | Result |
+|---|---|
+| Build identity | `dumpsys package dev.rorar.plezyupdater` → `versionCode=10 minSdk=25 targetSdk=34`, `versionName=0.9.1`; `aapt2 dump badging` → `targetSdkVersion:'34'` |
+| TV layout unchanged | `Device.isTouch` is false, so `buildTouchUi` never runs: the picker is the same two panes as `0.9.0`, driven by the D-pad. The `interval` flow drives UP ×30 (clamps at the first entry) → DOWN (to 2) → RIGHT into the unit column → UP/DOWN, asserts the preview moves in both (`Every 1 hour` → `Every 2 hours` → `Every 2 days`), then Back cancels without persisting |
+| English `all` | **7/7 PASS** — install 100s, picker-notes 27s, interval 116s, downgrade 118s, upgrade 82s, uninstall 73s, clean-install 97s |
+| German `all` | **7/7 PASS** — install 105s, picker-notes 27s, interval 116s, downgrade 113s, upgrade 77s, uninstall 74s, clean-install 92s |
+| French / Spanish smokes | `install --app-lang fr\|es` → **1/1 each** (100s / 86s) |
+| API 25 regression | no touch path runs and no new platform API is called — every flow runs as in `0.9.0` |
+
+`phone34` (Google APIs phone, API 34), updater `0.9.1` / `versionCode 10`:
+
+| Step | Result |
+|---|---|
+| Build identity | `versionCode=10 minSdk=25 targetSdk=34`, `versionName=0.9.1`; the diagnostics report reads `device=touch;tv=0;touch=1` |
+| Touch layout active | the picker is the number grid + unit chips: the `VALUE`/`UNIT` headings are absent, `Save`/`Cancel` are present; the `interval` flow taps number `3` + unit `days`, asserts the live preview `Every 3 days`, saves and proves the Settings summary follows, then reopens and restores `12 hours` |
+| English `all` | **7/7 PASS** — install 79s, picker-notes 27s, interval 136s, downgrade 90s, upgrade 58s, uninstall 87s, clean-install 57s |
+| German `all` | **7/7 PASS** — install 74s, picker-notes 26s, interval 129s, downgrade 152s, upgrade 147s, uninstall 85s, clean-install 157s |
+
+Android TV lanes (`tv25` / `tv30`, updater-side checks only — Plezy ships no 32-bit `x86` build, so
+the Plezy flows cannot install there; the `interval` flow installs nothing, so it runs on both):
+
+| Step | Result |
+|---|---|
+| `tv25` (API 25) | reports `device=android_tv;tv=1;touch=0;notif=allowed`; the `interval` flow takes the **D-pad** branch (two panes, unchanged) and passes in 49s |
+| `tv30` (API 30) | reports `device=android_tv;tv=1;touch=1` — an Android TV that also reports a finger touchscreen, so the `interval` flow takes the **touch** branch (number grid + unit chips) on a TV: it taps number `3` + unit `days`, asserts `Every 3 days`, saves, proves the Settings summary follows, then restores `12 hours`; passes in 132s |
+
+The hand checks covered what a flow cannot assert: the grid fits a **360×800** phone (all 30 numbers
+in five rows of six, nothing scrolls) and scrolls on a **320×640** one (the last rows are still
+reachable and Save/Cancel stay on screen), and the double-tap fix — the first tap on a number selects
+it. The real `phone35` (API 35) was **not** re-verified this round: its wireless debugging was off and
+its adbd port no longer answered, so the `0.9.1` touch layout rests on `phone34` and `tv30` for
+touch and on the stick for the D-pad.
 
 ### Round-1 verification phases (2026-11-14/15)
 
@@ -1368,10 +1465,10 @@ screen, up to three dialogs, so a two-dialog platform needs no special case.
   [above](#emulator-lane-2026-11-18-updater-060--versioncode-6). `test/jvm/run.sh` (25 cases) and
   `test/check_strings.py` still cover the decision logic and the `values-finger` wording off-device,
   and no real Android TV (only emulators) has been seen. The UI is still **TV-first** — 32–48 dp
-  padding, ≥ 50 dp rows, D-pad focus — but `0.9.0` gave the one screen that needed it (the version
-  picker) a **touch layout** (single pane + notes fly-in), verified on `phone34`/`phone35` and on
-  `tv30` (a TV that reports `touch=1`). The remaining D-pad-only screen is the check-interval picker,
-  queued in [09](09-backlog.md#requested--not-started). See
+  padding, ≥ 50 dp rows, D-pad focus — but `0.9.0` gave the version picker a **touch layout** (single
+  pane + notes fly-in) and `0.9.1` the check-interval picker (number grid + unit chips), both verified
+  on `phone34`/`phone35` and (the version picker) on `tv30` (a TV that reports `touch=1`). With both
+  in, no D-pad-only screen remains — the `0.9.1` screen audit confirmed it. See
   [roadmap item 3](11-roadmap.md#3-android-tv--phone-compatibility).
 - **The API 26+ notification-channel and job-scheduling branches are now device-verified.** The
   stick is API 25, so `Notifier.ensureChannel` and `new Notification.Builder(app, CHANNEL_ID)` never

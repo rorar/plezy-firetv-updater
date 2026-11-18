@@ -32,13 +32,26 @@
     "allow_older_label": "Autoriser les versions plus anciennes",
     "uninstall_confirm_title": "Désinstaller Plezy ?",
     "uninstall_confirm_button": "Désinstaller",
-    "not_installed_summary": "Plezy n'est pas installé."
+    "not_installed_summary": "Plezy n'est pas installé.",
+    "interval_label": "Modifier l'intervalle de vérification…"
   },
 
   "lang": {
     "label": "Langue",
     "title": "Langue",
     "system": "Par défaut du système"
+  },
+
+  "interval": {
+    "title": "Intervalle de vérification",
+    "value_heading": "VALEUR",
+    "unit_heading": "UNITÉ",
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "cancel_hint": "Appuyez sur Retour pour annuler.",
+    "preview": "Toutes les {n} {unit}",
+    "now": "Maintenant toutes les {n} {unit}.",
+    "units": {"hours": "heures", "days": "jours", "weeks": "semaines", "months": "mois"}
   },
 
   "dialog": {

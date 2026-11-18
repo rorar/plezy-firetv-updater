@@ -217,6 +217,57 @@ public final class Ui {
                 new int[]{Color.WHITE, Color.WHITE, TEXT});
     }
 
+    /**
+     * A tappable chip, as used by the touch interval picker's unit and number grids. Unlike a row
+     * it is filled by {@code state_selected}, not focus: a touch user picks one of a small set and
+     * the choice stays visible while the finger moves elsewhere.
+     */
+    public static Button chip(Context c, String label) {
+        return chip(c, label, 18);
+    }
+
+    /**
+     * A chip with an explicit label size. The number grid uses a smaller one so a two-digit value
+     * still fits a fifth-of-the-width cell, and squeezes the side padding to match. The zero
+     * minimum width overrides the platform button's default, which would otherwise force a narrow
+     * cell to overflow its column.
+     */
+    public static Button chip(Context c, String label, float sp) {
+        Button b = new Button(c);
+        b.setText(label);
+        b.setAllCaps(false);
+        b.setTextSize(TypedValue.COMPLEX_UNIT_SP, sp);
+        b.setTextColor(chipTextColors());
+        b.setGravity(Gravity.CENTER);
+        b.setMinWidth(0);
+        b.setMinimumWidth(0);
+        boolean compact = sp < 18;
+        b.setPadding(dp(c, compact ? 6 : 16), dp(c, compact ? 6 : 10),
+                dp(c, compact ? 6 : 16), dp(c, compact ? 6 : 10));
+        b.setMinimumHeight(dp(c, compact ? 44 : 48));
+        b.setBackground(chipBackground(c));
+        return b;
+    }
+
+    /** The chip fill: accent when picked, surface otherwise, with a pressed state between. */
+    public static StateListDrawable chipBackground(Context c) {
+        StateListDrawable s = new StateListDrawable();
+        s.addState(new int[]{android.R.attr.state_selected}, rounded(c, ACCENT_BRIGHT, 22));
+        s.addState(new int[]{android.R.attr.state_pressed}, rounded(c, ACCENT, 22));
+        s.addState(new int[]{}, rounded(c, SURFACE, 22));
+        return s;
+    }
+
+    /** White while picked so the chip stays readable on the accent fill. */
+    public static ColorStateList chipTextColors() {
+        return new ColorStateList(
+                new int[][]{
+                        new int[]{android.R.attr.state_selected},
+                        new int[]{}
+                },
+                new int[]{Color.WHITE, TEXT});
+    }
+
     /** White while focused so the row stays readable on the accent fill. */
     public static ColorStateList rowTextColors() {
         return new ColorStateList(

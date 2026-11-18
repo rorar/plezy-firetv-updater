@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The six verification flows, written the way a person with the remote does them.
+"""The seven verification flows, written the way a person with the remote does them.
 
 Every step is "find the labelled button on screen, tap its centre, wait for the
 next window" — no coordinates are hard-coded, so the same flows run against an
@@ -8,6 +8,7 @@ a German or English Fire OS (strings/system.<lang>.json).
 
     install        pick the latest version in the picker and install it
     picker-notes   read a version's release notes (touch overlay / TV pane); no install
+    interval       Settings -> Edit check interval… (touch grid+chips / TV two-pane)
     downgrade      pick an older version and drive uninstall-then-install
     upgrade        back to the Main View and install the latest again
     uninstall      Settings -> Advanced -> Uninstall Plezy…
@@ -620,6 +621,156 @@ class Flows:
                 raise HarnessError("the notes pane never filled in after selecting a version")
             self.log("    ✓ the notes pane follows the highlighted version")
         return version
+
+    def interval(self):
+        """Settings → Edit check interval… — the check-interval picker (roadmap item 3 follow-up).
+
+        A touch device gets a grid of number chips plus a 2×2 grid of unit chips; a TV keeps the
+        two-pane VALUE|UNIT D-pad picker. On touch this taps a number and a unit chip, proves the
+        live preview follows, saves, and proves the Settings summary picks the new value up — then
+        puts the default (12 hours) back so a re-run starts level. Non-destructive: nothing is
+        installed.
+        """
+        self.log("[interval] Settings → Edit check interval…")
+        self._open_settings()
+        self._open_interval()
+
+        if self._touch_layout():
+            self._interval_touch()
+        else:
+            self._interval_tv()
+            self.d.key("KEYCODE_BACK")
+            self.d.wait_focus("SettingsActivity", timeout=20)
+            time.sleep(1)
+        self.log("    ✓ the interval picker opened and returned to Settings")
+
+    def _touch_layout(self):
+        """True when the app itself picks the touch layout — the same signal Device.isTouch reads."""
+        return self.c.get("expected_device", {}).get("touch") == "1"
+
+    def _open_settings(self):
+        self.open_updater()
+        settings = self.s.app("main.settings")
+        self._tap(self._require(self.d.dump(), f"Settings button {settings!r}", exact=settings),
+                  settings)
+        self.d.wait_focus("SettingsActivity", timeout=20)
+        time.sleep(1)
+
+    def _open_interval(self):
+        row = self.s.app("settings.interval_label")
+        node = self._scroll_to(row, timeout=60, max_presses=25)
+        self._tap(node, row)
+        self.d.wait_focus("IntervalActivity", timeout=20)
+        time.sleep(1)
+
+    def _interval_touch(self):
+        self._expect_text(self.s.app("interval.title"), fatal=True)
+        self._expect_text(self.s.app("interval.save"), fatal=True)
+        self._expect_text(self.s.app("interval.cancel"), fatal=True)
+
+        days = self.s.app("interval.units.days")
+        self._set_interval(3, "days")
+        self._expect_text(self.s.app("interval.preview", n=3, unit=days), fatal=True)
+        self._save_interval()
+        self._scroll_to(self.s.app("interval.now", n=3, unit=days), timeout=30, max_presses=8)
+        self.log("    ✓ tapping a number and a unit chip set the interval; Settings followed")
+
+        # A clean Settings, then put the default back so a re-run starts from the same place.
+        self._open_settings()
+        self._open_interval()
+        hours = self.s.app("interval.units.hours")
+        self._set_interval(12, "hours")
+        self._expect_text(self.s.app("interval.preview", n=12, unit=hours), fatal=True)
+        self._save_interval()
+        self._scroll_to(self.s.app("interval.now", n=12, unit=hours), timeout=30, max_presses=8)
+        self.log("    ✓ restored the default interval (12 hours)")
+
+    def _interval_tv(self):
+        # The D-pad layout: two titled columns and the Back-to-cancel hint.
+        self._expect_text(self.s.app("interval.value_heading"), fatal=True)
+        self._expect_text(self.s.app("interval.unit_heading"), fatal=True)
+        self._expect_text(self.s.app("interval.cancel_hint"), fatal=True)
+
+        # Drive both columns. Up clamps at the first entry, so this is deterministic whatever the
+        # stored interval was; the flow then presses Back to cancel, so nothing is persisted.
+        for _ in range(30):
+            self.d.key("KEYCODE_DPAD_UP")
+        time.sleep(0.8)
+        one = self._interval_preview_text()
+        self.d.key("KEYCODE_DPAD_DOWN")
+        time.sleep(0.8)
+        two = self._interval_preview_text()
+        if two == one:
+            raise HarnessError(f"the D-pad did not change the value (still {one!r})")
+
+        self.d.key("KEYCODE_DPAD_RIGHT")  # jump to the unit column
+        time.sleep(0.8)
+        for _ in range(6):
+            self.d.key("KEYCODE_DPAD_UP")
+        time.sleep(0.8)
+        first_unit = self._interval_preview_text()
+        self.d.key("KEYCODE_DPAD_DOWN")
+        time.sleep(0.8)
+        second_unit = self._interval_preview_text()
+        if second_unit == first_unit:
+            raise HarnessError(f"the D-pad did not change the unit (still {first_unit!r})")
+        self.log(f"    ✓ the D-pad moves the value ({one!r} → {two!r}) "
+                 f"and the unit ({first_unit!r} → {second_unit!r})")
+
+    def _interval_preview_text(self):
+        """The picker's live preview line ("Every 12 hours"), read off the screen.
+
+        The prefix ("Every", "Alle", "Toutes les", …) is the localised preview label up to its
+        first placeholder, so this works in any language without a second label key.
+        """
+        prefix = self.s.app("interval.preview").split("{n}")[0].strip().casefold()
+        for n in self.d.dump().nodes:
+            if n.label.casefold().startswith(prefix):
+                return n.label
+        raise HarnessError("the interval preview line is not on screen")
+
+    def _set_interval(self, value, unit):
+        """Touch picker: tap number ``value`` in the grid, then the chip for ``unit``."""
+        number = self._scroll_list_to(str(value))
+        self._tap(number, f"interval {value}")
+        time.sleep(0.6)
+        label = self.s.app(f"interval.units.{unit}")
+        chip = self._require(self.d.dump(), f"unit chip {label!r}", exact=label)
+        self._tap(chip, label)
+        time.sleep(0.6)
+
+    def _save_interval(self):
+        save = self.s.app("interval.save")
+        self._tap(self._require(self.d.dump(), f"interval {save!r}", exact=save), save)
+        self.d.wait_focus("SettingsActivity", timeout=20)
+        time.sleep(1)
+
+    def _scroll_list_to(self, text, tries=12):
+        """Bring ``text`` into view inside the screen's scroll view, and return its node.
+
+        The touch interval list is longer than a phone screen, and ``uiautomator dump`` omits
+        off-screen nodes, so a number has to be scrolled to before it can be tapped. The swipe
+        stays inside the scroll view's own bounds, so the helper works on any screen size: a
+        fixed 120 px inset overshoots a short viewport (the number list is only a few rows tall
+        on a small screen), so the endpoints are inset by a fraction of the view's height.
+        """
+        screen = self.d.dump()
+        node = screen.find(exact=text)
+        if node is not None:
+            return node
+        # find() only matches labelled nodes and a ScrollView carries no text, so scan by class.
+        scroll = next((n for n in screen.nodes if "ScrollView" in n.cls), None)
+        if scroll is None:
+            raise HarnessError(f"{text!r} is not on screen and there is no scroll view")
+        inset = max(8, min(60, (scroll.y2 - scroll.y1) // 4))
+        for _ in range(tries):
+            self.d.shell(f"input swipe {scroll.cx} {scroll.y2 - inset} "
+                         f"{scroll.cx} {scroll.y1 + inset} 300", check=False)
+            time.sleep(0.5)
+            node = self.d.dump().find(exact=text)
+            if node is not None:
+                return node
+        raise HarnessError(f"could not scroll {text!r} into view")
 
     def downgrade(self, older=None):
         """Downgrade to an older version from the picker (uninstall-then-install)."""

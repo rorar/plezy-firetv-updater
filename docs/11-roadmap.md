@@ -5,7 +5,8 @@ device detection and device-aware wording in `0.4.0`; `targetSdk` 25 → 26 in `
 lane, a real-phone lane and `targetSdk` 26 → 31 in `0.6.0`; `targetSdk` 31 → 33 with
 `POST_NOTIFICATIONS` in `0.7.0`; `targetSdk` 33 → 34 with the runtime-receiver export flags and the
 `ACCESS_NETWORK_STATE` job permission in `0.8.0`; the touch layout — single-pane Choose-Version with
-a right-side changelog fly-in — in `0.9.0`). Each item says what it
+a right-side changelog fly-in — in `0.9.0`, and the touch check-interval picker with a screen audit
+in `0.9.1`). Each item says what it
 is, what it would take, what can go wrong, and **how it would be verified on the stick** — including
 the honest cases where this hardware cannot verify it (the emulator lane now covers some of those).
 Order is a suggestion, not a commitment.
@@ -137,9 +138,10 @@ hardware; the Android TV branch only on emulators (no real Android TV here).
 
 ## 3. Android TV / phone compatibility
 
-**Wording: done** (2026-11-17, `0.4.0`). **Layout: done** (2026-11-18, `0.9.0`). The touch
-Choose-Version is now a single pane with a right-side changelog fly-in, and the behaviour strings say
-"device" on a touch device. The TV two-pane layout and the D-pad path are unchanged.
+**Wording: done** (2026-11-17, `0.4.0`). **Layout: done** (2026-11-18/19, `0.9.0` + `0.9.1`). The
+touch Choose-Version is now a single pane with a right-side changelog fly-in, the check-interval
+picker is a tapped number grid plus unit chips, and the behaviour strings say "device" on a touch
+device. The TV two-pane layouts and the D-pad path are unchanged.
 
 ### Device-aware wording — done
 
@@ -174,10 +176,12 @@ updater:
 exist in the matching base file, placeholders must survive translation, and no locale may fall behind
 `values/`. It runs as the pre-flight step of `test/run.py`, so a wording drift fails a run.
 
-### Layout — done (2026-11-18, `0.9.0`)
+### Layout — done (2026-11-18/19, `0.9.0` + `0.9.1`)
 
-`VersionListActivity` branches once, on `Device.isTouch(this)` — the same signal the `-finger` wording
-rides — into two layouts:
+Two activities branch once each, on `Device.isTouch(this)` — the same signal the `-finger` wording
+rides — into two layouts.
+
+**`VersionListActivity` (`0.9.0`):**
 
 - **TV / D-pad** (`buildTvUi`): the original two panes, unchanged. The versions on the left, the
   highlighted version's release notes on the right, driven by the D-pad; OK installs the highlighted
@@ -188,21 +192,36 @@ rides — into two layouts:
   action. The overlay is `clickable`, so a tap on a dead zone is consumed instead of falling through
   to the list beneath and starting an install.
 
-Only the *picker* needed a second layout: the main and Settings screens are already plain vertical
-lists that read fine on a phone. The D-pad path is untouched (the touch branch is additive), and the
-`values-*-finger/` wording and this layout share one signal, so a device that gets "tap" gets the
-single-pane picker.
+**`IntervalActivity` (`0.9.1`):**
+
+- **TV / D-pad**: the two-pane `VALUE`|`UNIT` picker, unchanged.
+- **Touch**: a **six-column grid of number chips** (1–30) plus a 2×2 grid of unit chips, both tapped,
+  with the same live preview and full-width stacked **Save** / **Cancel** buttons. A 30-row single
+  column shows barely one row on a phone, so the grid is the whole point.
+
+Only the *pickers* needed a second layout: the main and Settings screens are already plain vertical
+lists that read fine on a phone. The D-pad paths are untouched (each touch branch is additive), and
+the `values-*-finger/` wording and these layouts share one signal, so a device that gets "tap" gets
+the touch pickers. A **screen audit** in `0.9.1` swept the other activities for the same D-pad-only
+gap and found none: `IntervalActivity` was the last one, every other screen drives clickable
+`Button`/`Switch` rows.
 
 **Verify.** The emulator lane ([item 5](#5-targetsdk-bump-matrix)) provides an Android TV
 (`tv25`/`tv30`) and a touch device (`phone34`), and the real `phone35` is a touch phone too, so the
 *wording* half and the device classification are device-verified there, and `phone34`/`phone35` drive
 the whole flow over touch. The **layout** half is now device-verified as well: the harness gained a
 `picker-notes` flow that opens the notes (the overlay on touch, the pane on TV) and closes them again,
-and it passed on the stick (API 25, two-pane), `phone34` (API 34) and the real `phone35` (API 35),
-plus `tv30` (a TV that reports `touch=1`, so it exercises the *touch* picker on an Android TV) — see
-[08](08-app-implementation.md#finding-7--the-touch-notes-overlay-let-taps-fall-through). The hand
-checks covered what a flow cannot assert: the four `-finger` wordings (`device`/`Gerät`/`appareil`/
-`dispositivo`), the fly-in/out animation, and Back closing the overlay.
+and an `interval` flow that drives the picker on both layouts (tap/scroll on touch, up/down/right on
+the D-pad) and is non-destructive. The `picker-notes` flow passed on the stick (API 25, two-pane),
+`phone34` (API 34) and the real `phone35` (API 35), plus `tv30` (a TV that reports `touch=1`, so it
+exercises the *touch* picker on an Android TV) — see
+[08](08-app-implementation.md#finding-7--the-touch-notes-overlay-let-taps-fall-through). The
+`interval` flow passed on the stick (D-pad), `phone34` (touch) and `tv25` (D-pad) / `tv30` (touch), and
+found the touch double-tap bug
+([Finding 8](08-app-implementation.md#finding-8--the-touch-interval-screen-swallowed-the-first-tap)).
+The hand checks covered what a flow cannot assert: the four `-finger` wordings (`device`/`Gerät`/
+`appareil`/`dispositivo`), the fly-in/out animation, Back closing the overlay, and the interval grid
+fitting at 360×800 and 320×640.
 
 ## 4. 64-bit / `arm64-v8a`
 
@@ -247,14 +266,14 @@ unchanged.
 | 31 ✅ | 12.0 | **Done in `0.6.0`.** **`PendingIntent` mutability** — `ApkInstaller`'s session-result `PendingIntent` is `FLAG_UPDATE_CURRENT \| FLAG_MUTABLE` (the platform writes the session status into it, and on API 25 the confirmation intent too); `Notifier`'s notification `PendingIntent` is `FLAG_IMMUTABLE` (it only opens `MainActivity`). Both add the flag only when `SDK_INT >= S`, so the API 25–30 flags stay `0`; `FLAG_MUTABLE`/`FLAG_IMMUTABLE` are compile-time constants, so naming them is safe and dex inlines them. **Notification trampolines** — the notification's `contentIntent` is already an activity, started directly, not a receiver that starts one: verified on `tv30`, nothing to change. **`REQUEST_DELETE_PACKAGES`** — declared; the platform's package-visibility rules make it necessary to send `ACTION_DELETE` on newer Android (declared, but *not* empirically tested by removing it). **Also fixed here** — the downgrade handshake raced the platform ([08](08-app-implementation.md#finding-5--the-uninstall-handshake-raced-the-platform-on-android-12)). Verified end to end on the `phone34` emulator (API 34) **and on the real `phone35` (API 35)**. |
 | 33 ✅ | 13.0 | **Done in `0.7.0`.** **`POST_NOTIFICATIONS` is a runtime permission** — a `targetSdk 33` app's notifications are dropped until it is granted. `Notifier` gained `systemAllows` / `needsPermission` / `requestPermission` (all guarded by `SDK_INT >= TIRAMISU`, so the API 25 stick is untouched), `MainActivity` asks once on the first resume while the *Notifications* switch is on (persisted `notif_asked`), and the Settings row asks again on toggle-on and shows a **Blocked by Android…** hint plus an **Open notification settings** action while the notification is blocked. The diagnostics report gained `notif=allowed\|blocked`, asserted by the harness. Verified on `phone34` (API 34) and the real `phone35` (API 35) — request dialog, grant, and a posted notification — and the API 25 flows are unchanged ([08](08-app-implementation.md#targetsdk-33--post_notifications-070-2026-11-18)). |
 | 34 ✅ | 14.0 | **Done in `0.8.0`.** **Runtime-registered receivers must declare an export flag** — a target-34 app that calls `Context.registerReceiver` without one is refused. All four sites (the custom `ACTION_INSTALL_FINISHED` receivers in `MainActivity` / `VersionListActivity`, the `ACTION_PACKAGE_REMOVED` ones in `SettingsActivity` / `InstallFlow`) now go through `Receivers.register`, which passes `Context.RECEIVER_NOT_EXPORTED` when `SDK_INT >= TIRAMISU` (the flag and the three-argument overload are API 33+) and the plain two-argument call below it, so the API 25 stick is unchanged. **`ACCESS_NETWORK_STATE` is required for a job with a network constraint** — this one is a *hard crash on launch* on API 34+: `UpdateJob.schedule` throws `SecurityException: android.permission.ACCESS_NETWORK_STATE required for jobs with a connectivity constraint`; both jobs require network, so the permission is now declared (inert on API 25). **Foreground-service types / implicit internal intents**: no foreground service and no implicit internal intents, so nothing else to change. Verified on `phone34` (API 34) and `phone35` (API 35) — the crash reproduced first, then the fix — with the API 25 flows re-run ([08](08-app-implementation.md#targetsdk-34-receiver-flags--access_network_state-080-2026-11-18)). |
-| 35 | 15.0 | Nothing new beyond 33/34 seen on the `phone35` run (LineageOS 22.1): the six flows pass on it, which is the point — the newest platform here is exercised end to end. |
+| 35 | 15.0 | Nothing new beyond 33/34 seen on the `phone35` run (LineageOS 22.1): the seven flows pass on it, which is the point — the newest platform here is exercised end to end. |
 
 The order of the real work inside a bump is: notification channel (26) → job scheduling (26) →
 `PendingIntent` flags (31) → notification permission (33) → receiver export flags and the job
 network permission (34). Each is hand-written against the platform
 API and each keeps an API 25 fallback.
 
-**Verify.** A bump must not change behaviour on the stick: re-run the six flows and the quota
+**Verify.** A bump must not change behaviour on the stick: re-run the seven flows and the quota
 broadcast on API 25 after every step, and additionally on a newer emulator (or the real phone) for the
 branch that actually changed. For the 26 step the API 25 side was done in full (jobs armed / cancelled
 / re-armed, the one-off `runNow` path, the legacy notification, all five flows and the de/fr/es
@@ -303,9 +322,18 @@ export flag is exercised by every flow (both activities register a receiver on s
    Choose-Version with the right-side changelog fly-in, plus the `-finger` behaviour wording ("device"
    not "TV"). Verified with a new `picker-notes` harness flow on the stick, `phone34` and the real
    `phone35`, on `tv30` (touch picker on an Android TV), and by hand for the wording and the overlay.
-9. **`targetSdk` bump, step 35** — **next**, deliberately after the touch UI: API 35 enforces
-   edge-to-edge (window insets; `setStatusBarColor` deprecated), and the changelog fly-in's insets
-   depend on the touch layout existing first.
+9. ~~**Touch check-interval picker + screen audit**~~ — **done** 2026-11-18/19, `0.9.1`: the
+   two-pane D-pad interval picker becomes a tapped number grid + unit chips on touch, and an audit
+   confirmed it was the last D-pad-only screen. Verified with a new non-destructive `interval` flow
+   on the stick (D-pad) and `phone34` (touch) — which caught the touch double-tap bug
+   ([Finding 8](08-app-implementation.md#finding-8--the-touch-interval-screen-swallowed-the-first-tap)).
+10. **Main View footer polish** (item 4) — next: the update-check text and the free-space line each on
+    their own line, the check sentence shortened to `⏳ Update check: <n> <m>`, and a data glyph before
+    the free-space text; plus the touch picker's **Notes** text → the **What's new** icon. Then the
+    README (screenshots, then a non-technical rewrite), and last…
+11. **`targetSdk` bump, step 35** — deliberately after the touch UI and the footer work: API 35
+    enforces edge-to-edge (window insets; `setStatusBarColor` deprecated), and the changelog fly-in's
+    insets depend on the touch layouts existing first.
 
 ## Guardrails
 
@@ -316,7 +344,7 @@ export flag is exercised by every flow (both activities register a receiver on s
 - **Say what was not verified.** All three installs — `armeabi-v7a`, `x86_64`, `arm64-v8a` — are now
   verified end to end (stick, `phone34` emulator, real `phone35` phone); only the
   `err_no_native_libs` path stays logic-only. The Android TV and touch branches of device detection,
-  the `-finger` wording, the touch picker, and the API 26+ channel / background-limit branches are
+  the `-finger` wording, the touch pickers, and the API 26+ channel / background-limit branches are
   **device**-verified on the emulator lane and (touch, API 35) on the real phone. What still has no
   device here: a real Android TV (only emulators), Fire OS's own quirks beyond the stick, and the
   touch layout on a small *landscape* phone (the emulator is 320×640 portrait; the fly-in is designed
