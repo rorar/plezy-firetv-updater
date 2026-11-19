@@ -17,8 +17,8 @@ The forward-looking items now live in the [roadmap](11-roadmap.md), so this stay
 
 The former requests here — **make the touch Choose-Version phone-ready** and **device-aware wording
 beyond the input hint** (`0.9.0`), the **touch check-interval picker** (`0.9.1`), the **Main View
-footer polish** and the **touch picker's Notes → icon** (`0.10.0`), and the **README screenshots** —
-have landed; see [Already implemented](#already-implemented).
+footer polish** and the **touch picker's Notes → icon** (`0.10.0`), the **README screenshots**, and the
+**landscape touch-layout fix** (`0.10.1`) — have landed; see [Already implemented](#already-implemented).
 
 Nothing here is a commitment; the roadmap explains the order and the reasoning.
 
@@ -312,5 +312,7 @@ Nothing here is a commitment; the roadmap explains the order and the reasoning.
   `0.9.0`) and the **check-interval picker** on 2026-11-18/19 (updater `0.9.1`), the latter with a
   screen audit that confirmed `IntervalActivity` was the only D-pad-only screen left. With both in,
   the touch **layout** is done; the **Main View footer polish** and the touch picker's notes icon
-  followed on 2026-11-19 (updater `0.10.0`). What remains for roadmap item 3 is the `targetSdk` 35
-  step (item 5) and the README work.
+  followed on 2026-11-19 (updater `0.10.0`). The last layout gap — two touch pickers that clipped on
+  a short **landscape** screen — closed on 2026-11-19 with `0.10.1` and a new `landscape` flow that
+  verifies `phone35` and `phone34`. What remains for roadmap item 3 is the `targetSdk` 35 step
+  (item 5) and the README work.

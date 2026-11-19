@@ -5,6 +5,8 @@
     python3 test/screenshots.py                          # the stick → docs/screenshots/tv-*.png
     python3 test/screenshots.py --profile phone34 --serial emulator-5554
                                                          # the phone lane → docs/screenshots/phone-*.png
+    python3 test/screenshots.py --profile phone35 --landscape
+                                                         # rotated touch layouts → phone-land-*.png
 
 The images are **generated**, not hand-taken: the script drives the app to each screen the README
 shows, `screencap`s it, and checks the capture *structurally* with a `uiautomator dump` — an
@@ -169,7 +171,11 @@ def main(argv=None):
     ap.add_argument("--app-lang", default="en", choices=list(harness.APP_LANGS),
                     help="language to set the updater to for the shots (default: en)")
     ap.add_argument("--prefix", default=None,
-                    help="file prefix (default: 'phone' on a touch device, else 'tv')")
+                    help="file prefix (default: 'phone' on a touch device, else 'tv'; "
+                         "'phone-land' with --landscape)")
+    ap.add_argument("--landscape", action="store_true",
+                    help="rotate a touch device to landscape first, restoring its rotation after "
+                         "(TV profiles are landscape already)")
     ap.add_argument("--out", default=os.path.join(harness.REPO, "docs", "screenshots"),
                     help="output directory (default: docs/screenshots)")
     ap.add_argument("--adb", default="adb", help="adb binary (default: adb)")
@@ -203,7 +209,12 @@ def main(argv=None):
     strings = load_strings(args.app_lang, system_lang, profile.get("system_strings"))
 
     touch = config.get("expected_device", {}).get("touch") == "1"
-    prefix = args.prefix or ("phone" if touch else "tv")
+    if args.landscape and not touch:
+        print("error: --landscape is only for touch devices (a TV is landscape already)",
+              file=sys.stderr)
+        return 2
+    default_prefix = "phone-land" if args.landscape else ("phone" if touch else "tv")
+    prefix = args.prefix or default_prefix
     os.makedirs(args.out, exist_ok=True)
 
     print("plezy-firetv-updater — README screenshots")
@@ -217,26 +228,30 @@ def main(argv=None):
     # API 33+ only: grant POST_NOTIFICATIONS so a one-time dialog does not land on the Main View.
     device.grant_notification_permission(config["updater_package"])
 
+    previous_orientation = device.set_orientation(1) if args.landscape else None
     shooter = Shooter(device, strings, config, args.out, prefix)
     flows = shooter.flows
-
-    # Remember what to restore, then force the README's language.
-    flows.open_updater()
-    original_lang = flows.read_app_language()
-    flows.set_app_language(args.app_lang)
-
+    original_lang = None
     try:
+        # Remember what to restore, then force the README's language.
+        flows.open_updater()
+        original_lang = flows.read_app_language()
+        flows.set_app_language(args.app_lang)
+
         shots = shooter.capture_all()
+
+        # Put the device back the way it was found (the picker shots need the developer switch on).
+        flows.open_updater()
+        if not args.keep_allow_older:
+            flows.set_allow_older(shooter.allow_older_was)
+        if not args.keep_language and original_lang != args.app_lang:
+            flows.set_app_language(original_lang)
     except HarnessError as exc:
         print(f"\n✗ {exc}", file=sys.stderr)
         return 1
-
-    # Put the device back the way it was found (the picker shots need the developer switch on).
-    flows.open_updater()
-    if not args.keep_allow_older:
-        flows.set_allow_older(shooter.allow_older_was)
-    if not args.keep_language and original_lang != args.app_lang:
-        flows.set_app_language(original_lang)
+    finally:
+        if previous_orientation is not None:
+            device.restore_orientation(previous_orientation)
 
     print("\n=== summary ===")
     for name, dim, size in shots:

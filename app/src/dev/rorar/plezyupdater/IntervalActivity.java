@@ -208,37 +208,30 @@ public class IntervalActivity extends Activity {
     private void buildTouchUi() {
         int pad = Ui.dp(this, 20);
 
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(Ui.BG);
-        root.setPadding(pad, pad, pad, pad);
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setBackgroundColor(Ui.BG);
+        content.setPadding(pad, pad, pad, pad);
 
-        root.addView(Ui.title(this, getString(R.string.interval_title)));
+        content.addView(Ui.title(this, getString(R.string.interval_title)));
 
         TextView subtitle = Ui.subtitle(this, getString(R.string.interval_subtitle));
-        root.addView(subtitle, topMargin(2));
+        content.addView(subtitle, topMargin(2));
 
         preview = Ui.text(this, "", 28, Ui.TEXT_HEADING);
-        root.addView(preview, topMargin(12));
+        content.addView(preview, topMargin(12));
 
         TextView note = Ui.muted(this, getString(R.string.interval_note));
-        root.addView(note, topMargin(2));
+        content.addView(note, topMargin(2));
 
-        // Units first: four taps that never need scrolling, then the number grid fills the rest.
-        root.addView(Ui.sectionHeading(this, getString(R.string.interval_column_unit)),
+        // Units first: four taps that never need scrolling, then the number grid below them.
+        content.addView(Ui.sectionHeading(this, getString(R.string.interval_column_unit)),
                 topMargin(18));
-        root.addView(buildUnitChips(), topMargin(8));
+        content.addView(buildUnitChips(), topMargin(8));
 
-        root.addView(Ui.sectionHeading(this, getString(R.string.interval_column_value)),
+        content.addView(Ui.sectionHeading(this, getString(R.string.interval_column_value)),
                 topMargin(18));
-
-        // The numbers live in a scroll view so a very short screen (the 320×640 emulator) can still
-        // reach the last row; on a normal phone all five rows fit and nothing scrolls.
-        ScrollView scroll = new ScrollView(this);
-        scroll.setVerticalScrollBarEnabled(true);
-        scroll.addView(buildValueGrid());
-        root.addView(scroll, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
+        content.addView(buildValueGrid());
 
         // Save and Cancel are stacked full-width rather than side by side: on a narrow phone a
         // two-column row clips a long label ("Enregistrer", "Prüfintervall…") at the button size.
@@ -249,7 +242,7 @@ public class IntervalActivity extends Activity {
                 save();
             }
         });
-        root.addView(saveButton, topMargin(16));
+        content.addView(saveButton, topMargin(16));
 
         Button cancel = Ui.actionButton(this, getString(R.string.action_cancel));
         cancel.setOnClickListener(new View.OnClickListener() {
@@ -258,17 +251,26 @@ public class IntervalActivity extends Activity {
                 finish();
             }
         });
-        root.addView(cancel, topMargin(8));
+        content.addView(cancel, topMargin(8));
 
-        setContentView(root);
+        // One scroll for the whole page. A portrait phone shows all of it without scrolling, but a
+        // short landscape screen (or the 320×640 emulator) cannot fit the fixed header, the chips
+        // and the buttons: an inner weight-1 scroll view then collapses to zero height and pushes
+        // Save/Cancel off the bottom edge (verified on a 1600×720 phone in landscape). With a single
+        // outer scroll the number grid is wrap_content and every control stays reachable.
+        ScrollView scroll = new ScrollView(this);
+        scroll.setBackgroundColor(Ui.BG);
+        scroll.setVerticalScrollBarEnabled(true);
+        scroll.addView(content);
+        setContentView(scroll);
         // With no view focused the platform holds the window in key mode, and the *first* tap is
         // spent switching it to touch mode — so the first number or chip the user taps does
         // nothing (observed on the emulator and reproducible after any settle time). Focusing a
         // non-clickable, focusable-in-touch-mode container enters touch mode up front, so the
         // first tap does what it looks like it should. (The TV branch focuses its selected row
         // for the same reason, and the 0.9.0 picker focuses its list.)
-        root.setFocusableInTouchMode(true);
-        root.requestFocus();
+        content.setFocusableInTouchMode(true);
+        content.requestFocus();
         updatePreview();
     }
 

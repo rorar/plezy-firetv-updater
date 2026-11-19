@@ -1,6 +1,6 @@
 # `test/` — on-device flow tests
 
-The seven verification flows, written down as code. Each flow does exactly what a person with the
+The eight verification flows, written down as code. Each flow does exactly what a person with the
 remote does — find the labelled button on screen, tap its centre, wait for the next window — so
 they are both a test and a record of *what to click*.
 
@@ -13,6 +13,7 @@ they are both a test and a record of *what to click*.
 | `upgrade` | go back to the **Main View** and install the latest again (in-place replace) |
 | `uninstall` | **Settings → Advanced → Uninstall Plezy…** plus the stock uninstaller |
 | `clean-install` | install from the main screen when Plezy is not installed |
+| `landscape` | rotate a touch device to landscape and check every touch screen for clipping; TV profiles skip it |
 
 `all` runs them in that order: it starts from "latest installed" and ends back on "latest
 installed". Every run also fires the diagnostics broadcast first (see
@@ -24,6 +25,14 @@ tapping a version label, so it installs nothing — on touch it also proves both
 overlay work, the `✕` button and the remote/gesture **Back**. `interval` opens the picker, changes
 the interval and saves it, then restores the default `12 hours`, so the stored value is unchanged
 when the flow ends.
+
+`landscape` (`0.10.1`) is non-destructive too. It locks `user_rotation=1` (auto-rotate off), walks the
+touch Main View, Settings, interval picker, language picker, version picker and notes overlay, and
+asserts every expected label is **fully inside the display bounds**, not merely present in a dump —
+swiping first where a page is meant to scroll. That is what caught the two clipping bugs the portrait
+flows could not see ([Finding 9](../docs/08-app-implementation.md#finding-9--short-landscape-screens-clipped-two-touch-pickers)).
+It restores the original rotation, app language and *Allow older versions* switch in a `finally`;
+on a TV profile it does nothing, since those layouts are landscape already.
 
 Before any of that, `run.py` runs the static string-parity check (`test/check_strings.py`) — no
 device needed, and a locale that drifted from `values/` would otherwise make a flow look for a
@@ -39,6 +48,7 @@ python3 test/run.py install --app-lang de        # set the app to German first, 
 python3 test/run.py all --yes --build            # build + install the updater first
 python3 test/run.py all --yes --profile phone34 --serial emulator-5554   # emulator lane
 python3 test/run.py all --yes --profile phone35   # real phone (PHONE_SERIAL in local.env)
+python3 test/run.py landscape --profile phone35   # touch layouts rotated (restores rotation after)
 ```
 
 The updater is **runtime-switchable** (Settings → Language), so `--app-lang` is the language the
@@ -76,6 +86,8 @@ source local.env
 python3 test/screenshots.py                        # the stick → docs/screenshots/tv-*.png
 python3 test/screenshots.py --profile phone34 --serial emulator-5554
                                                    # the phone lane → docs/screenshots/phone-*.png
+python3 test/screenshots.py --profile phone35 --landscape
+                                                   # rotated touch layouts → phone-land-*.png
 ```
 
 It drives the app to each screen the README shows — the Main View, Settings, the Choose-Version
@@ -83,7 +95,10 @@ picker (filling the TV notes pane, or opening the touch release-notes overlay), 
 check-interval picker — `screencap`s it, and, because the harness cannot see images, verifies the
 capture **structurally**: an expected label must be present in the same screen's `uiautomator dump`,
 so a mis-navigated shot fails loudly instead of being committed. Files are named
-`<prefix>-<screen>.png`, the prefix defaulting to `phone` on a touch device and `tv` on a TV.
+`<prefix>-<screen>.png`, the prefix defaulting to `phone` on a touch device and `tv` on a TV (or
+`phone-land` with `--landscape`, which rotates a touch device first and restores its rotation after).
+The committed README images stay portrait; the rotated variant is for inspecting the landscape
+layouts, not for the README.
 
 It is non-destructive — nothing is installed — and it restores the app language and the developer
 *Allow older versions* switch (which the picker shots need) to the state it found them in. On the
@@ -285,7 +300,7 @@ test/
   run.py                 CLI: pick flows + languages + profile, print a summary
   screenshots.py         capture the README images (Main/Settings/pickers) from a device
   harness.py             Device (adb + uiautomator) and the parsed Screen/Node model
-  flows.py               the seven flows, in remote-press terms
+  flows.py               the eight flows, in remote-press terms
   check_strings.py       static parity check for res/values*/strings.xml
   emulator.sh            create / start / provision / stop the AVDs (the emulator lane)
   config.json            package/activity names, the diagnostics action, the versions,

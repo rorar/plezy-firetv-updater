@@ -175,9 +175,10 @@ drives the app to each screen, captures it, and checks the capture against the s
 
 ## Flow tests
 
-The seven flows — **install**, **picker-notes**, **interval**, **downgrade**, **upgrade**,
-**uninstall**, **clean-install** — are written down as code in [`test/`](test/README.md). They drive
-the real stick over ADB exactly as a person with the remote would (find the labelled button, tap it),
+The eight flows — **install**, **picker-notes**, **interval**, **downgrade**, **upgrade**,
+**uninstall**, **clean-install**, **landscape** — are written down as code in
+[`test/`](test/README.md). They drive the real stick over ADB exactly as a person with the remote
+would (find the labelled button, tap it),
 so they double as a record of what to click:
 
 ```bash

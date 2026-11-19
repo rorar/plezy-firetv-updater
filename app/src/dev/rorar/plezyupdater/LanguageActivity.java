@@ -9,6 +9,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 
 /**
@@ -60,7 +61,12 @@ public class LanguageActivity extends Activity {
         backParams.topMargin = Ui.dp(this, 16);
         root.addView(back, backParams);
 
-        setContentView(root);
+        // The whole page scrolls: a landscape phone is only ~410 dp tall here, so without this the
+        // last language row and the Back button fall off the bottom with no way to reach them.
+        ScrollView scroll = new ScrollView(this);
+        scroll.setBackgroundColor(Ui.BG);
+        scroll.addView(root);
+        setContentView(scroll);
         // Put focus on the current choice. Child 0 is the title, then "System default" and the
         // shipped languages, so a language at index i sits at child i + 2 (and "System default"
         // at child 1).

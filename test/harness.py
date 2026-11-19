@@ -336,6 +336,40 @@ class Device:
     def tap(self, x, y):
         self.shell(f"input tap {int(x)} {int(y)}")
 
+    # -- orientation ------------------------------------------------------
+
+    def get_orientation(self):
+        """``(accelerometer_rotation, user_rotation)`` as ints (auto-rotate may be on)."""
+        def get(key):
+            raw = self.shell(f"settings get system {key}", check=False).strip()
+            try:
+                return int(raw)
+            except ValueError:
+                return 0
+        return get("accelerometer_rotation"), get("user_rotation")
+
+    def set_orientation(self, rotation):
+        """Lock to ``0`` (portrait) or ``1`` (landscape), turning auto-rotate off.
+
+        Returns the previous ``(accelerometer_rotation, user_rotation)`` so a caller can restore
+        it in a ``finally`` — rotating a device for a test must not leave it sideways. TVs ignore
+        ``user_rotation``; the landscape flow skips those profiles.
+        """
+        if rotation not in (0, 1):
+            raise HarnessError(f"rotation must be 0 (portrait) or 1 (landscape): {rotation!r}")
+        previous = self.get_orientation()
+        self.shell("settings put system accelerometer_rotation 0", check=False)
+        self.shell(f"settings put system user_rotation {rotation}", check=False)
+        time.sleep(2.5)  # let the window recreate at the new size before dumping
+        return previous
+
+    def restore_orientation(self, previous):
+        """Undo :meth:`set_orientation` with the tuple it returned."""
+        accel, user = previous
+        self.shell(f"settings put system user_rotation {user}", check=False)
+        self.shell(f"settings put system accelerometer_rotation {accel}", check=False)
+        time.sleep(2.5)
+
     # -- windows ----------------------------------------------------------
 
     #: Which `dumpsys window …` variant prints mCurrentFocus, learned on first use.

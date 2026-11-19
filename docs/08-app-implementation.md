@@ -278,6 +278,32 @@ a 30-row list shows barely one row on a phone and scrolls forever, while the gri
 range on screen. The harness's `interval` flow taps a number and a unit, proves the live preview and
 the Settings summary follow, and restores the default — it would have caught the double-tap bug.
 
+## Finding 9 — short landscape screens clipped two touch pickers
+
+`0.10.0`'s touch layouts were verified in portrait only. Driving them in landscape on the real phone
+(1600×720 @ 280 dpi — roughly 914×411 dp) and on the `phone34` emulator at its native 640×320 exposed
+two clips:
+
+- **`IntervalActivity`'s touch picker** put its fixed header, unit chips and buttons above a
+  `ScrollView` holding the number grid at `height=0, weight=1`. On a 411-dp-tall screen the fixed part
+  did not fit: the weighted child collapsed to zero height, the whole 1–30 grid vanished, and
+  **Save/Cancel were pushed past the bottom edge** — there was no way to save in landscape.
+- **`LanguageActivity`** had no `ScrollView` at all: the last row (`Español`) was truncated and the
+  **Back button was entirely off-screen**.
+
+Both now wrap the whole column in one outer `ScrollView` (the interval grid is plain `wrap_content`,
+with no inner scroll), matching the Main View, Settings, Changelog and About screens. A portrait phone
+still fits everything without scrolling, so the look is unchanged; a short landscape screen simply
+scrolls. The interval screen keeps its `focusableInTouchMode` root
+([Finding 8](#finding-8--the-touch-interval-screen-swallowed-the-first-tap)) after the re-parenting, so
+the first tap still selects.
+
+`run.py landscape` is the regression test: it locks `user_rotation=1`, walks every touch screen and
+asserts each expected label is not just present but **entirely inside the display bounds**, scrolling
+first where the page is meant to scroll; a clipped or off-screen control fails the flow. It restores
+the rotation, app language and *Allow older versions* switch in a `finally`, and skips TV profiles —
+their layouts are landscape already.
+
 ## Install routine (shared)
 
 The "get an APK onto the TV" pipeline — download, extract, verify, `PackageInstaller` commit, the
@@ -500,7 +526,9 @@ rows; the picker's own title stays **Check interval**. `IntervalActivity` branch
 - **Touch** — a **six-column grid of number chips** (1–30) plus a 2×2 grid of unit chips, both
   tapped, the same live preview, and full-width stacked **Save** / **Cancel** buttons. The grid
   replaces a single-column list because a 30-row column shows barely one row on a phone; the buttons
-  stack because a two-column row clips a long label on a narrow screen.
+  stack because a two-column row clips a long label on a narrow screen. The whole column is wrapped
+  in one `ScrollView` so a short landscape screen can still reach the grid and Save/Cancel
+  ([Finding 9](#finding-9--short-landscape-screens-clipped-two-touch-pickers)).
 
 Saving writes `interval_value`/`interval_unit`, re-arms the job
 (`UpdateJob.schedule` reads `Prefs.intervalMs`), fires a confirmation toast and updates both
@@ -961,7 +989,7 @@ no longer be replaced by a new build.
 
 ## Flow tests (`test/`)
 
-The seven flows below are also written down as runnable code in [`test/`](../test/README.md). The
+The eight flows below are also written down as runnable code in [`test/`](../test/README.md). The
 harness drives the real stick over ADB the way a person with the remote does — it reads the screen
 with `uiautomator dump`, finds the labelled button, and taps its centre — so the tests double as a
 record of *what to click* for each flow:
@@ -975,11 +1003,13 @@ record of *what to click* for each flow:
 | `upgrade` | from the Main View, install the latest again (A2) — an in-place replace |
 | `uninstall` | **Settings → Advanced → Uninstall Plezy…** plus the stock uninstaller |
 | `clean-install` | install from the main screen when Plezy is not installed |
+| `landscape` | rotate a touch device and check every touch screen for clipping (non-destructive; TV skips) |
 
 ```bash
 python3 test/run.py install                    # forward path (non-destructive)
-python3 test/run.py all --yes                   # the whole sequence (seven flows)
+python3 test/run.py all --yes                   # the whole sequence (eight flows)
 python3 test/run.py install --app-lang de       # against a German build
+python3 test/run.py landscape --profile phone35 # touch layouts in landscape
 ```
 
 `all` runs them in that order and ends back on "latest installed". Every run also fires the
@@ -1032,6 +1062,14 @@ saves, then reopens and restores `12 hours`. On the D-pad branch it drives both 
 (UP clamps at the first entry, DOWN steps, RIGHT jumps to the unit column), asserts the preview moves
 in both, and cancels with Back so nothing is persisted. It is the flow that caught
 [Finding 8](#finding-8--the-touch-interval-screen-swallowed-the-first-tap).
+
+The **`landscape` flow (`0.10.1`)** covers the case portrait runs cannot see
+([Finding 9](#finding-9--short-landscape-screens-clipped-two-touch-pickers)). It locks
+`user_rotation=1`, walks the touch Main View, Settings, interval picker, language picker, version
+picker and notes overlay, and asserts each expected label is **fully inside the display**, not merely
+present in the dump — swiping first where a page is meant to scroll. It restores the original
+rotation, app language and *Allow older versions* switch in a `finally`, and does nothing on TV
+profiles (whose layouts are landscape already). It is the flow that caught Finding 9.
 
 ## Verified on hardware (2026-11-14/19)
 
@@ -1308,6 +1346,22 @@ passed on the real arm64 touch device:
 | English `all` | **7/7 PASS** — install 44s, picker-notes 32s, interval 67s, downgrade 53s, upgrade 26s, uninstall 94s, clean-install 33s |
 | In-place updater update | `adb install -r` of the same key left `firstInstallTime 2026-11-18 16:13:53` unchanged while `versionName` went `0.9.0 → 0.10.0` |
 | Notes icon (touch) | the `picker-notes` flow finds the row's notes glyph by its `Notes` content description, taps it, asserts the overlay and closes it — passes on the real phone too |
+
+### Landscape touch layouts (`0.10.1`), 2026-11-19
+
+Patch release, `versionCode 12` / `versionName 0.10.1` (APK 323 306 B,
+`sha256 993df5f7…d60d`): the two touch pickers that clipped on a short landscape screen now wrap
+their whole column in one `ScrollView` ([Finding 9](#finding-9--short-landscape-screens-clipped-two-touch-pickers)).
+No new platform API and no `targetSdk` change, so the API 25 stick is unaffected beyond the build
+number.
+
+| Step | Result |
+|---|---|
+| Build identity | `versionCode=12 minSdk=25 targetSdk=34`, `versionName=0.10.1` on the stick, `phone35` and `phone34` |
+| `phone35` (API 35, real arm64 touch, 1600×720 landscape) | new `landscape` flow **PASS**: interval grid + Save/Cancel reachable, all five language rows + Back reachable, version picker + notes overlay fully on screen; rotation, app language and *Allow older versions* restored after |
+| `phone34` (API 34 emulator, native 640×320 landscape) | `landscape` **PASS** at the smallest supported size after resetting the screenshot scripts' `wm size`/`density` overrides to native; the same screens and checks |
+| Portrait regression (`phone35`) | `picker-notes` + `interval` **PASS 2/2** after the final harness changes; interval restored to 12 hours, orientation back to `accelerometer_rotation=1 / user_rotation=0` |
+| Stick (API 25, D-pad) | full `all` re-run with `0.10.1`, **8/8 PASS** — install 176s, picker-notes 28s, interval 133s, downgrade 69s, upgrade 36s, uninstall 77s, clean-install 54s, landscape 0s (skips: the TV layouts are landscape already); Plezy left on `2.26.0` |
 
 ### Round-1 verification phases (2026-11-14/15)
 

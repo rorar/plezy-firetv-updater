@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The seven verification flows, written the way a person with the remote does them.
+"""The eight verification flows, written the way a person with the remote does them.
 
 Every step is "find the labelled button on screen, tap its centre, wait for the
 next window" — no coordinates are hard-coded, so the same flows run against an
@@ -13,6 +13,7 @@ a German or English Fire OS (strings/system.<lang>.json).
     upgrade        back to the Main View and install the latest again
     uninstall      Settings -> Advanced -> Uninstall Plezy…
     clean-install  install from the main screen when nothing is installed
+    landscape      rotate a touch device and check each touch screen for clipping (TV: skips)
 
 The `all` sequence in run.py runs them in the order above, which starts from
 "latest installed" and ends back on "latest installed".
@@ -187,11 +188,16 @@ class Flows:
     def open_picker(self):
         label = self.s.app("main.choose_version")
         self.open_updater()
-        if self.d.dump().find(exact=label) is None:
+        # Scroll before deciding the developer switch is off: on a short landscape screen the
+        # button is below the fold, and toggling on a mere dump miss would switch it back OFF.
+        try:
+            self._scroll_to(label, enabled=True, timeout=15, max_presses=12)
+        except HarnessError:
             # The picker is a developer option and is off by default, so a fresh install (or one
             # whose settings were wiped by an uninstall) has no "Choose version…" button.
             self._enable_allow_older()
             self.open_updater()
+            self._scroll_to(label, enabled=True, timeout=30, max_presses=12)
         screen, node = self._wait_for(label, timeout=45)
         self._tap(node, label)
         self.d.wait_focus("VersionListActivity", timeout=20)
@@ -652,6 +658,153 @@ class Flows:
             time.sleep(1)
         self.log("    ✓ the interval picker opened and returned to Settings")
 
+    # -- landscape (touch layout on a short screen) ------------------------
+
+    def _display_size(self, screen=None):
+        """The live display size in px, read from the dump's own root bounds.
+
+        ``wm size`` keeps reporting the physical portrait size even after a rotation on the real
+        phone, so the dump is the more honest source. Falls back to ``wm size`` (swapped when
+        ``user_rotation`` is 1) when there are no root bounds.
+        """
+        screen = screen or self.d.dump()
+        m = re.match(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]", screen.root.attrib.get("bounds", ""))
+        if m:
+            return int(m.group(3)), int(m.group(4))
+        out = self.d.shell("wm size", check=False)
+        m = re.search(r"(\d+)x(\d+)", out)
+        if not m:
+            raise HarnessError(f"cannot read the display size: {out!r}")
+        w, h = int(m.group(1)), int(m.group(2))
+        return (h, w) if self.d.get_orientation()[1] == 1 else (w, h)
+
+    def _check_bounds(self, node, what, size):
+        """Assert a found node lies entirely inside the display; return it."""
+        w, h = size
+        if node.x1 < 0 or node.y1 < 0 or node.x2 > w or node.y2 > h:
+            raise HarnessError(
+                f"{what} is clipped: bounds [{node.x1},{node.y1}][{node.x2},{node.y2}] "
+                f"outside {w}x{h}")
+        self.log(f"    ✓ {what} fully on screen "
+                 f"[{node.x1},{node.y1}][{node.x2},{node.y2}]")
+        return node
+
+    def _on_screen(self, screen, label, size, **kw):
+        """Assert ``label`` is present *and entirely inside* the display; return its node.
+
+        ``uiautomator dump`` omits off-screen nodes, so a missing label already fails a clipped
+        button; the bounds check also catches a row that is only partly visible at an edge.
+        """
+        node = screen.find(exact=label, **kw)
+        if node is None:
+            raise HarnessError(f"{label!r} is not on screen:\n{screen.pretty()}")
+        return self._check_bounds(node, repr(label), size)
+
+    def _swipe_to(self, label, size, tries=12):
+        """Scroll a page by finger swipes until ``label`` appears; return ``(screen, node)``.
+
+        The interval and language pages are deliberately scrollable on a short landscape screen;
+        DPAD_DOWN does not move among the touch chips, and after returning from a sub-page the
+        wanted row can be *above* the current focus. So scroll down through the page first, then
+        back up, keeping every swipe inside the display bounds.
+        """
+        w, h = size
+        for y1, y2 in ((int(h * 0.82), int(h * 0.28)), (int(h * 0.28), int(h * 0.82))):
+            for _ in range(tries):
+                screen = self.d.dump()
+                node = screen.find(exact=label)
+                if node is not None:
+                    return screen, node
+                self.d.shell(f"input swipe {w // 2} {y1} {w // 2} {y2} 250", check=False)
+                time.sleep(0.7)
+        raise HarnessError(f"could not swipe {label!r} into view")
+
+    def landscape(self):
+        """Touch layouts on a short landscape screen — non-destructive.
+
+        The TV layouts already live in landscape; this is the touch branch's turn. Two screens
+        used to clip: the check-interval picker (its weight-1 number grid collapsed and pushed Save
+        and Cancel off the bottom) and the language picker (no scroll view at all). Drive every
+        touch screen and assert each expected label is present *and fully inside the display* —
+        scrolling first where the page is meant to scroll. All rotation/toggles are restored.
+        """
+        if not self._touch_layout():
+            self.log("[landscape] the TV layouts are already landscape — nothing to check")
+            return None
+
+        self.log("[landscape] rotate to landscape and check every touch screen")
+        original = None
+        allow_older_was = None
+        try:
+            original = self.d.set_orientation(1)
+            self.open_updater()
+            screen = self.d.dump()
+            size = self._display_size(screen)
+            self.log(f"    display: {size[0]}x{size[1]}")
+            self._on_screen(screen, self.s.app("main.title"), size)
+
+            # Main → Settings sits below the fold in landscape; open_settings scrolls to it.
+            self.open_settings()
+            self._on_screen(self.d.dump(), self.s.app("settings.title"), size)
+
+            # Interval: header first, then scroll to the grid and the Save / Cancel pair. Before the
+            # fix these were off-screen with no scroll view to reach them.
+            self.open_interval()
+            self._on_screen(self.d.dump(), self.s.app("interval.title"), size)
+            screen, _ = self._swipe_to(self.s.app("interval.save"), size)
+            self._on_screen(screen, self.s.app("interval.cancel"), size)
+            chips = [n for n in screen.nodes
+                     if n.cls.endswith("Button") and n.text.isdigit()
+                     and n.y1 >= 0 and n.y2 <= size[1] and (n.y2 - n.y1) >= 24]
+            if not chips:
+                raise HarnessError(f"no full-size number chip on the interval screen:\n"
+                                   f"{screen.pretty()}")
+            self._check_bounds(max(chips, key=lambda n: n.y2 - n.y1), "a number chip", size)
+            self.log("    ✓ the number grid and Save / Cancel are reachable in landscape")
+            self.d.key("KEYCODE_BACK")
+            self.d.wait_focus("SettingsActivity", timeout=20)
+            time.sleep(1)
+
+            # Language: every row, then Back — the last row used to be clipped and Back missing.
+            lang_label = self.s.app("lang.label")
+            _, lang_node = self._swipe_to(lang_label, size)
+            self._tap(lang_node, lang_label)
+            self.d.wait_focus("LanguageActivity", timeout=20)
+            time.sleep(1)
+            for code in self.c["language_rows"]["order"]:
+                name = (self.s.app("lang.system") if code == "system"
+                        else self.c["language_rows"]["native"][code])
+                _, node = self._swipe_to(name, size)
+                self._check_bounds(node, repr(name), size)
+            screen, _ = self._swipe_to(self.s.app("action.back"), size)
+            self.log("    ✓ all language rows and Back are reachable in landscape")
+            self.d.key("KEYCODE_BACK")
+            self.d.wait_focus("SettingsActivity", timeout=20)
+            time.sleep(1)
+
+            # Picker + notes overlay: the full-width rows and the fly-in must fit too.
+            allow_older_was = self.set_allow_older(True)
+            self.open_picker()
+            screen = self.d.dump()
+            self._on_screen(screen, self.s.app("picker.title"), size)
+            screen, row = self._picker_row(self.c["versions"]["latest"])
+            self._on_screen(screen, row.label, size)
+            notes = self._require(screen, "notes icon", desc=self.s.app("picker.notes_button"))
+            self._tap(notes, "notes icon")
+            self._wait_for(self.s.app("picker.install_button"),
+                           what="release-notes overlay", timeout=20)
+            screen = self.d.dump()
+            for key in ("picker.notes_heading", "picker.install_button", "picker.close"):
+                self._on_screen(screen, self.s.app(key), size)
+            self.log("    ✓ the picker and release-notes overlay fit in landscape")
+            return True
+        finally:
+            if allow_older_was is not None:
+                self.set_allow_older(allow_older_was)
+            if original is not None:
+                self.d.restore_orientation(original)
+            self.open_updater()
+
     def _touch_layout(self):
         """True when the app itself picks the touch layout — the same signal Device.isTouch reads."""
         return self.c.get("expected_device", {}).get("touch") == "1"
@@ -660,8 +813,10 @@ class Flows:
         """Open Settings from the Main View (shared by the interval flow and the screenshots)."""
         self.open_updater()
         settings = self.s.app("main.settings")
-        self._tap(self._require(self.d.dump(), f"Settings button {settings!r}", exact=settings),
-                  settings)
+        # In landscape the Settings button sits below the fold (the Main View scrolls), so scroll
+        # to it instead of looking only at the nodes the first dump happens to show.
+        node = self._scroll_to(settings, enabled=True, timeout=30)
+        self._tap(node, settings)
         self.d.wait_focus("SettingsActivity", timeout=20)
         time.sleep(1)
 

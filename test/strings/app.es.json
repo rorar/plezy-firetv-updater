@@ -66,5 +66,9 @@
     "message": "Plezy {version} está instalado. ¿Iniciarlo ahora?",
     "open": "Abrir",
     "not_now": "Ahora no"
+  },
+
+  "action": {
+    "back": "Atrás"
   }
 }
