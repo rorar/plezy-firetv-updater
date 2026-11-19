@@ -49,10 +49,12 @@ adb install -r build/plezy-updater.apk
   (Settings rows, main-screen buttons, dialog buttons) respond to taps too.
 - **The picker has two layouts.** `VersionListActivity` branches on `Device.isTouch(this)`: a **TV**
   (`touch=0`) gets the two-pane versions|notes picker driven by the D-pad (OK installs); a **touch**
-  device gets a single pane where each row is a version label (tap installs) plus a **Notes** button
-  that flies the release notes in from the right. The overlay closes with its `✕` button or Back, and
+  device gets a single pane where each row is a version label (tap installs) plus a **notes icon**
+  (the main screen's *What's new* glyph) that flies the release notes in from the right. The overlay
+  closes with its `✕` button or Back, and
   its **Install this version** button installs. So on a phone the labels to drive are `picker.select`
-  is *absent*, and `Notes` / `Install this version` / `✕` are present; on the TV the opposite. The
+  is *absent*, and the notes icon (matched by its `Notes` content description — an icon-only button
+  has no text) / `Install this version` / `✕` are present; on the TV the opposite. The
   harness's `picker-notes` flow covers both.
 - **The interval picker has two layouts too** (`IntervalActivity`, `0.9.1`). A **TV** gets the
   two-pane `VALUE`|`UNIT` D-pad picker (focus selects; LEFT/RIGHT moves between panes; **Save** at

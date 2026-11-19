@@ -94,8 +94,8 @@ Keeps com.edde746.plezy up to date on this TV.
 [ ↻ Check for updates ]   ← default focus
 [ ⧉ Choose version… ]     ← only when "Allow older versions" is on
 [ ☰ Settings ]
-Checks every 3 days while the TV is on. An update needs one confirmation…
-Free space: 0,91 GB
+⏳ Update check: 3 days
+⛃ Free space: 0,91 GB
 ```
 
 The headline colour carries the state at a glance — green up-to-date, bright accent update
@@ -142,15 +142,17 @@ when Plezy is not yet present.)
 **On a touch device the picker is a single pane** (`0.9.0`, [roadmap item 3](11-roadmap.md#3-android-tv--phone-compatibility)).
 A touch user has no left/right, so the always-on notes pane would be dead weight and the two panes
 read badly on a phone. Instead each row is a full-width version **label** (tap it to install) with a
-**Notes** button; tapping Notes flies the release notes in from the right as a **full-width overlay**
+**notes icon**; tapping it flies the release notes in from the right as a **full-width overlay**
 with a `✕` close button, a Back handler, and an **Install this version** action at the bottom. The
 overlay is `clickable`, so a tap on a dead zone is consumed rather than falling through to the list
 and starting an install ([Finding 7](08-app-implementation.md#finding-7--the-touch-notes-overlay-let-taps-fall-through)).
 The branch is chosen once, on `Device.isTouch(this)` — the same signal the `values-*-finger/` wording
 rides — so a device that reads "tap" gets the single-pane picker. The TV layout is untouched.
 
-The touch picker's **Notes** button is currently a text label; a follow-up will reuse the main
-screen's **What's new** icon ([09](09-backlog.md#requested--not-started)).
+The icon is the main screen's **What's new** glyph (`ic_news`, a page with a folded corner), so the
+affordance reads the same on both screens (`0.10.0`); it carries no visible text, so the word lives
+in its content description — which is also what a `uiautomator dump` exposes, so the harness still
+finds it by the same label the text button showed.
 
 ### Changelog — styled release notes
 
@@ -205,7 +207,7 @@ and sized for the couch (22–28 dp), never smaller than the text beside them.
 | ↓ down arrow | `ic_down` | an **older** release is selected |
 | ⤓ down-arrow-into-tray | `ic_download` | **Install update** |
 | ↻ circular arrow | `ic_refresh` | **Check for updates**; the "checking…" state |
-| ▤ page | `ic_news` | **What's new** |
+| ▤ page | `ic_news` | **What's new**; the touch picker's per-row notes icon (`0.10.0`) |
 | ⧉ layers | `ic_versions` | **Choose version…** |
 | ☰ sliders | `ic_settings` | **Settings** |
 | ✓ check | `ic_check` | up to date |
@@ -224,6 +226,11 @@ Two rules:
 - **Icons match their label.** A row's glyph is tinted by the row's state through a
   `StateListDrawable` (`Ui.stateIcon`) — white on the focus fill, dimmed when disabled, body
   colour otherwise — so it never contradicts the text.
+
+The main screen's footer uses two **text** glyphs rather than drawables (`0.10.0`): `⏳` before the
+shortened `Update check: <n> <m>` line and `⛃` (a draughts-king, read as a data/disk mark) before the
+free-space line. Both were confirmed to render on the API 25 stick rather than fall back to a tofu
+box — the system font covers them.
 
 The launcher icon and the TV banner are separate original artwork; the sources and the redraw
 scripts live in [`design/`](../design/README.md).

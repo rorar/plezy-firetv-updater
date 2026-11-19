@@ -208,7 +208,7 @@ class Screen:
         self.nodes = [Node(el.attrib) for el in root.iter("node")]
 
     def find(self, exact=None, startswith=None, contains=None, regex=None,
-             cls=None, enabled=None, x_max=None, x_min=None):
+             cls=None, enabled=None, x_max=None, x_min=None, desc=None):
         """Find the first node matching every given filter.
 
         Text is compared **case-insensitively**. The same app string is rendered differently by
@@ -216,10 +216,15 @@ class Screen:
         ``AlertDialog`` buttons, so "Uninstall & install" shows up as "UNINSTALL & INSTALL" on
         API 31+ (Android 12) while Fire OS 6 renders it as written. The label in the JSON is the
         app's string; the platform's casing is presentation, not a translation.
+
+        ``desc`` matches the node's ``content-desc`` instead of its text, for icon-only controls
+        (the touch picker's notes glyph) that carry no visible label.
         """
         for n in self.nodes:
             label = n.label
             if not label:
+                continue
+            if desc is not None and n.desc.casefold() != desc.casefold():
                 continue
             if exact is not None and n.text.casefold() != exact.casefold():
                 continue

@@ -18,7 +18,8 @@ Releases (the APK is attached to each): **<https://github.com/rorar/plezy-firetv
 
 Verified on **2026-11-13/19** with Plezy `2.26.0`, ADB `1.0.41` (platform-tools `37.0.0`) — on the
 stick (API 25) end to end, on the emulator lane (Android TV API 25/30, phone API 34), and on a real
-arm64 phone (API 35) for `0.6.0`/`0.7.0`/`0.8.0`/`0.9.0` (the phone was offline for `0.9.1`).
+arm64 phone (API 35) for `0.6.0`/`0.7.0`/`0.8.0`/`0.9.0` (the phone was offline for
+`0.9.1`/`0.10.0`).
 
 ---
 
@@ -70,7 +71,7 @@ arm64 phone (API 35) for `0.6.0`/`0.7.0`/`0.8.0`/`0.9.0` (the phone was offline 
 | Launcher | 24 `LEANBACK_LAUNCHER` entries, app appears in the Fire TV home row |
 | APK used | `derFrisson/plezy-apks` `2.26.0` → `plezy-android-armeabi-v7a.apk` (90,748,577 bytes) |
 | Installed size | ~87 MB in `/data/app/com.edde746.plezy-1` |
-| Updater | `dev.rorar.plezyupdater` `0.9.1` (`versionCode 10`, minSdk 25 / targetSdk 34) — see [docs/08](docs/08-app-implementation.md) |
+| Updater | `dev.rorar.plezyupdater` `0.10.0` (`versionCode 11`, minSdk 25 / targetSdk 34) — see [docs/08](docs/08-app-implementation.md) |
 
 ## The updater app
 
@@ -109,7 +110,7 @@ sections:
 
 **Choose version…** opens the release picker: on a **TV** it is two panes (versions left, release
 notes right), and on a **touch device** it is a single pane where each row installs on tap and a
-**Notes** button flies the release notes in from the right. The **check-interval** picker follows the
+**notes icon** flies the release notes in from the right. The **check-interval** picker follows the
 same split: two D-pad panes on a TV, a tapped number grid on a phone. **What's new** shows the
 selected release's notes. Release notes are rendered with real typography — coloured, larger section
 headings and hanging-indented bullets — through a hand-written `Markdown.toStyled`. It also shows free

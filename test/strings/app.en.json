@@ -18,7 +18,7 @@
     "installed_suffix": "(installed)",
     "progress_installed": "Installed {version}.",
     "progress_confirm": "Confirm the install on the TV.",
-    "_touch_comment": "The touch picker only: the row's Notes button and the overlay it opens. progress_confirm above is the TV wording; a touch device says 'on the device' (values-finger).",
+    "_touch_comment": "The touch picker only: the row's notes icon (content description) and the overlay it opens. progress_confirm above is the TV wording; a touch device says 'on the device' (values-finger).",
     "notes_button": "Notes",
     "install_button": "Install this version",
     "close": "✕",

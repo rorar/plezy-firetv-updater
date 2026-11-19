@@ -591,9 +591,9 @@ class Flows:
         screen, row = self._picker_row(version)
 
         if self.c.get("navigation") == "touch":
-            notes = self._require(screen, "row Notes button",
-                                  exact=self.s.app("picker.notes_button"))
-            self._tap(notes, "Notes")
+            notes = self._require(screen, "row notes icon",
+                                  desc=self.s.app("picker.notes_button"))
+            self._tap(notes, "notes icon")
             self._wait_for(self.s.app("picker.install_button"),
                            what="release-notes overlay", timeout=20)
             self._expect_text(self.s.app("picker.notes_heading"), fatal=True)
@@ -602,7 +602,7 @@ class Flows:
             self._expect_gone(self.s.app("picker.install_button"),
                               what="release-notes overlay", timeout=15)
             # Back must close it too (the second way out of the overlay).
-            self._tap(notes, "Notes")
+            self._tap(notes, "notes icon")
             self._wait_for(self.s.app("picker.install_button"),
                            what="release-notes overlay", timeout=20)
             self.d.key("KEYCODE_BACK")

@@ -3,13 +3,12 @@
 <resources>
     <string name="notif_available_text">Appuyez pour ouvrir</string>
     <string name="set_test_notification_msg">Notification de test — appuyez pour ouvrir</string>
-    <string name="picker_hint">Plus récent en premier. Installé : %1$s   —   touchez une version pour l\'installer, ou Notes pour lire les notes de version.</string>
+    <string name="picker_hint">Plus récent en premier. Installé : %1$s   —   touchez une version pour l\'installer, ou l\'icône notes pour lire les notes de version.</string>
 
     <!-- « téléviseur » → « appareil » -->
     <string name="main_subtitle">Garde com.edde746.plezy à jour sur cet appareil.</string>
-    <string name="main_hint">Vérifie %1$s pendant que l\'appareil est allumé. Une mise à jour nécessite une confirmation sur l\'écran d\'installation du système.</string>
     <string name="set_auto_desc">S\'exécute à l\'intervalle ci-dessous et après le démarrage de l\'appareil.</string>
-    <string name="set_interval_runs">S\'exécute %1$s et après le démarrage de l\'appareil.</string>
+    <string name="set_interval_runs">S\'exécute %1$s et après le démarrage de l\'appareil. Une mise à jour nécessite une confirmation sur l\'écran d\'installation du système.</string>
     <string name="about_thanks_text">Plezy Updater est un petit utilitaire de sideload qui garde com.edde746.plezy à jour sur cet appareil. Merci au projet Plezy pour l\'application qu\'il met à jour, et à GitHub pour l\'hébergement des versions.</string>
     <string name="interval_note">S\'exécute pendant que l\'appareil est allumé. Un mois compte pour 30 jours.</string>
     <string name="progress_confirm">Confirmez l\'installation sur l\'appareil.</string>

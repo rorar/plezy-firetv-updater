@@ -11,7 +11,7 @@
     <string name="main_check">Rechercher des mises à jour</string>
     <string name="main_choose_version">Choisir la version…</string>
     <string name="main_settings">Paramètres</string>
-    <string name="main_hint">Vérifie %1$s pendant que le téléviseur est allumé. Une mise à jour nécessite une confirmation sur l\'écran d\'installation du système.</string>
+    <string name="main_hint">⏳ Vérification : %1$s</string>
     <string name="main_not_installed_word">non installé</string>
 
     <string name="status_check_failed">Échec de la recherche de mise à jour</string>
@@ -32,7 +32,7 @@
     <string name="status_checking">Recherche de mises à jour…</string>
     <string name="status_installed_only">Installé %1$s.</string>
 
-    <string name="free_space">Espace libre : %1$s</string>
+    <string name="free_space">⛃ Espace libre : %1$s</string>
     <string name="free_space_low">"  — trop peu pour une mise à jour (environ %1$s requis)"</string>
 
     <string name="progress_update_failed">Échec de la mise à jour : %1$s</string>
@@ -59,7 +59,7 @@
     <string name="set_auto_desc">S\'exécute à l\'intervalle ci-dessous et après le démarrage du téléviseur.</string>
     <string name="set_interval_label">Modifier l\'intervalle de vérification…</string>
     <string name="set_interval_now">Maintenant %1$s.</string>
-    <string name="set_interval_runs">S\'exécute %1$s et après le démarrage du téléviseur.</string>
+    <string name="set_interval_runs">S\'exécute %1$s et après le démarrage du téléviseur. Une mise à jour nécessite une confirmation sur l\'écran d\'installation du système.</string>
     <string name="set_delete_label">Supprimer l\'APK après l\'installation</string>
     <string name="set_delete_desc">Supprimer le fichier téléchargé une fois Plezy installé, pour économiser de l\'espace.</string>
     <string name="set_allow_older_label">Autoriser les versions plus anciennes</string>

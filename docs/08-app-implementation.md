@@ -1,12 +1,12 @@
 # 08 — The updater app, as built
 
-`app/` is the working updater: `dev.rorar.plezyupdater` **0.9.1** (`versionCode 10`),
+`app/` is the working updater: `dev.rorar.plezyupdater` **0.10.0** (`versionCode 11`),
 minSdk **25** / targetSdk **34**, plain Java, programmatic UI, **no Gradle and no AndroidX**. It is
 verified end-to-end on the API 25 stick (AFTMM, Fire OS 6.7.1.1 / API 25) and, on 2026-11-18/19, on the
 emulator lane (Android TV API 25/30, phone API 34) **and on a real arm64 phone** (LineageOS 22.1 =
 Android 15 = API 35). All seven flows pass 7/7 in English and German, with French and Spanish
 `install` smokes, on the stick and the API 34 emulator; the real phone passed the six `0.9.0` flows
-but was offline for `0.9.1`. The UI is TV-first but both
+but was offline for `0.9.1`/`0.10.0`. The UI is TV-first but both
 pickers now have a **touch layout** too (`0.9.0` for Choose-Version, `0.9.1` for the check interval,
 [roadmap item 3](11-roadmap.md#3-android-tv--phone-compatibility)),
 and the API 33 `POST_NOTIFICATIONS` request path is verified by hand on both API 33+ devices.
@@ -561,8 +561,8 @@ Two behaviour differences worth knowing:
   (`checkForUpdates(false)`) *and* a background one. Harmless (the check is unmetered and cheap),
   and it means a `schedule()` from Settings or the interval picker triggers a check straight away.
 - **A job does not wake a sleeping TV** the way the old `RTC_WAKEUP` alarm could. The check runs
-  while the TV is on; the UI wording ("Runs while the TV is on", "Checks every 12 hours while the
-  TV is on") already says so.
+  while the TV is on; the UI wording ("Runs while the TV is on", "⏳ Update check: 12 hours")
+  already says so.
 
 **Verified on a newer platform.** The API 26+ branches this stick cannot reach are exercised on the
 emulator lane ([`test/README.md`](../test/README.md#emulator-lane)): on `tv30` (Android TV, API 30)
@@ -835,9 +835,10 @@ Two places show the notes:
   version; pressing right moves into the notes pane to scroll a long changelog. **OK installs the
   highlighted version right here** (see [Install routine](#install-routine-shared)) — there is no
   detour back to the main screen just to press Install. On **touch** it is a single pane of rows:
-  tapping a version label installs it, and the row's **Notes** button flies the same notes in from
-  the right as an overlay with a `✕` close button, a Back handler and an **Install this version**
-  action.
+  tapping a version label installs it, and the row's notes icon (`ic_news`, the same glyph as the
+  main screen's **What's new**; `0.10.0`, before that a *Notes* text button) flies the same notes in
+  from the right as an overlay with a `✕` close button, a Back handler and an **Install this
+  version** action.
 - **`ChangelogActivity`** is a single-release view opened from the main screen's **What's new**
   button, which is only visible while a release is selected.
 
@@ -1016,7 +1017,8 @@ dashboard and proves a *replace* from the package identity: `firstInstallTime` m
 release the flow downgrades first, so `upgrade` also runs on its own.
 
 The **`picker-notes` flow (`0.9.0`)** covers the release-notes path on both layouts. It opens
-**Choose version…** and, per `Device.isTouch`, either taps a row's **Notes** button and asserts the
+**Choose version…** and, per `Device.isTouch`, either taps a row's notes icon — found by its
+content description, the only label an icon-only button has (`0.10.0`) — and asserts the
 changelog overlay appears (heading `RELEASE NOTES`, an **Install this version** action, a `✕` close
 button) and closes it twice — once with `✕`, once with the remote's BACK — or, on the D-pad branch,
 asserts the two-pane hint (`Select a version to see its release notes.`) and presses DOWN until the
@@ -1138,16 +1140,16 @@ touch layout. Still one APK on API 25, still no AndroidX and no Gradle.
   highlighted version's release notes on the right, OK installs the highlighted version. The touch
   branch is additive — the stick's screen and D-pad path are as in `0.8.0`.
 - **Touch (`buildTouchUi`).** A single pane of full-width rows. Tapping a row's version **label**
-  installs it; the row's **Notes** button flies the release notes in from the right as a full-width
+  installs it; the row's **notes icon** flies the release notes in from the right as a full-width
   overlay (`buildChangelogOverlay`) with a `✕` close button, a Back handler and an **Install this
   version** action. The overlay is `clickable`, so a tap on a dead zone is consumed instead of
   falling through to the list beneath and starting an install
   ([Finding 7](#finding-7--the-touch-notes-overlay-let-taps-fall-through)).
-- **Wording carried the rest of the way.** Seven behaviour strings that still named the device are
-  overridden in `values-finger/` (and `-de`/`-fr`/`-es`): `main_subtitle`, `main_hint`,
+- **Wording carried the rest of the way.** Behaviour strings that still named the device are
+  overridden in `values-finger/` (and `-de`/`-fr`/`-es`): `main_subtitle`,
   `set_auto_desc`, `set_interval_runs`, `interval_note`, `about_thanks_text` and `progress_confirm`
-  say "device" instead of "TV", and the picker hint now reads *"…tap a version to install it, or its
-  Notes button to read the release notes."* `test/check_strings.py` keeps the four `-finger` files
+  say "device" instead of "TV", and the picker hint now reads *"…tap a version to install it, or the
+  notes icon to read the release notes."* `test/check_strings.py` keeps the four `-finger` files
   honest (they may only override keys in the matching base file, and placeholders must survive).
 
 Nothing else needed a second layout: the main and Settings screens are already plain vertical lists
@@ -1240,6 +1242,62 @@ reachable and Save/Cancel stay on screen), and the double-tap fix — the first 
 it. The real `phone35` (API 35) was **not** re-verified this round: its wireless debugging was off and
 its adbd port no longer answered, so the `0.9.1` touch layout rests on `phone34` and `tv30` for
 touch and on the stick for the D-pad.
+
+### Main View footer + the touch picker's notes icon (`0.10.0`), 2026-11-19
+
+Roadmap item 4, a small polish release. The main screen's footer is tidied and the touch picker's
+per-row *Notes* text button becomes the main screen's **What's new** icon. No behaviour change and no
+new platform API, so the API 25 stick is unchanged beyond two strings.
+
+- **Footer, one line each.** The check line and the free-space line were already separate
+  `TextView`s (`hintView` / `storageView`); the long sentence `Checks every 12 hours while the TV is
+  on. An update needs one confirmation on the system installer screen.` is shortened to **`⏳ Update
+  check: <n> <m>`**, and the "one confirmation on the installer" caveat moves into Settings, appended
+  to the auto-check summary (`set_interval_runs` → `Runs <n> <m> and after the TV boots. An update
+  needs one confirmation on the system installer screen.`).
+- **A data glyph.** The free-space line gains a `⛃` (draughts-king, read as a data/disk mark) prefix:
+  `⛃ Free space: 1,21 GB`. Both text glyphs (`⏳`, `⛃`) were confirmed to **render** — not the
+  missing-glyph tofu box — on the API 25 stick by ASCII-art pixel analysis of a `screencap`: the
+  hourglass and the draughts-king are both legible.
+- **Notes → icon.** The touch picker's per-row button becomes a new `Ui.iconButton(Context, String,
+  int)` — an `ImageButton` carrying the `ic_news` glyph (the same one as **What's new**) with the word
+  in its `contentDescription`. An icon-only button has no visible text, so the flow harness matches it
+  by the content description (`Screen.find(desc=…)`), the same label the text button showed.
+- **`main_hint` is now device-neutral**, so it is no longer overridden in `values-*-finger/` (the
+  touch wording keeps only the strings that still name the device).
+
+Stick (API 25), updater `0.10.0` / `versionCode 11` (APK 323 306 B, `sha256 bc714d07…`):
+
+| Step | Result |
+|---|---|
+| Build identity | `dumpsys package dev.rorar.plezyupdater` → `versionCode=11 minSdk=25 targetSdk=34`, `versionName=0.10.0`; `aapt2 dump badging` → `targetSdkVersion:'34'` |
+| Footer | main screen reads `⏳ Update-Prüfung: alle 12 Stunden` / `⛃ Freier Speicher: 1,21 GB`; both glyphs render (pixel analysis) |
+| Settings caveat | auto-check summary reads `Läuft alle 12 Stunden und nach dem Start des Fernsehers. Ein Update braucht eine Bestätigung im System-Installer.` |
+| English `all` | **7/7 PASS** — install 126s, picker-notes 26s, interval 117s, downgrade 100s, upgrade 62s, uninstall 73s, clean-install 77s |
+| German `all` | **7/7 PASS** — install 76s, picker-notes 28s, interval 117s, downgrade 90s, upgrade 58s, uninstall 74s, clean-install 76s |
+| French / Spanish smokes | `install --app-lang fr\|es` → **1/1 each** (75s / 75s) |
+| API 25 regression | no touch path runs and no new platform API is called — every flow runs as in `0.9.1` |
+
+`phone34` (Google APIs phone, API 34), updater `0.10.0` / `versionCode 11`:
+
+| Step | Result |
+|---|---|
+| Build identity | `versionCode=11 minSdk=25 targetSdk=34`, `versionName=0.10.0`; the diagnostics report reads `device=touch;tv=0;touch=1` |
+| Notes icon (touch) | the `picker-notes` flow finds the row's notes glyph by its `Notes` content description, taps it, asserts the overlay and closes it twice |
+| English `all` | **7/7 PASS** — install 35s, picker-notes 28s, interval 131s, downgrade 75s, upgrade 54s, uninstall 88s, clean-install 57s |
+| German `all` | **7/7 PASS** — install 62s, picker-notes 27s, interval 131s, downgrade 70s, upgrade 43s, uninstall 88s, clean-install 28s |
+
+Android TV lanes (`tv25` / `tv30`, updater-side checks only — Plezy ships no 32-bit `x86` build, so
+the Plezy flows cannot install there; the `interval` flow installs nothing, so it runs on both):
+
+| Step | Result |
+|---|---|
+| `tv25` (API 25) | reports `device=android_tv;tv=1;touch=0;notif=allowed`; the `interval` flow takes the **D-pad** branch (two panes, unchanged) and passes in 46s |
+| `tv30` (API 30) | reports `device=android_tv;tv=1;touch=1` — an Android TV that also reports a finger touchscreen, so the `interval` flow takes the **touch** branch (number grid + unit chips) on a TV: it taps number `3` + unit `days`, asserts `Every 3 days`, saves, proves the Settings summary follows, then restores `12 hours`; passes in 134s |
+
+The real `phone35` (API 35) was again **not** reachable this round (wireless debugging off), so the
+`0.10.0` touch checks rest on `phone34` and `tv30`; the notes-icon change is device-neutral and the
+`picker-notes` touch branch passed on `phone34`.
 
 ### Round-1 verification phases (2026-11-14/15)
 

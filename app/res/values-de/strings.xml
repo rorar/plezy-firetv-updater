@@ -12,7 +12,7 @@
     <string name="main_check">Nach Updates suchen</string>
     <string name="main_choose_version">Version wählen…</string>
     <string name="main_settings">Einstellungen</string>
-    <string name="main_hint">Prüft %1$s, solange der Fernseher an ist. Ein Update braucht eine Bestätigung im System-Installer.</string>
+    <string name="main_hint">⏳ Update-Prüfung: %1$s</string>
     <string name="main_not_installed_word">nicht installiert</string>
 
     <string name="status_check_failed">Update-Suche fehlgeschlagen</string>
@@ -33,7 +33,7 @@
     <string name="status_checking">Suche nach Updates…</string>
     <string name="status_installed_only">Installiert %1$s.</string>
 
-    <string name="free_space">Freier Speicher: %1$s</string>
+    <string name="free_space">⛃ Freier Speicher: %1$s</string>
     <string name="free_space_low">"  — zu wenig für ein Update (ca. %1$s nötig)"</string>
 
     <string name="progress_update_failed">Update fehlgeschlagen: %1$s</string>
@@ -60,7 +60,7 @@
     <string name="set_auto_desc">Läuft im folgenden Intervall und nach dem Start des Fernsehers.</string>
     <string name="set_interval_label">Prüfintervall bearbeiten…</string>
     <string name="set_interval_now">Jetzt %1$s.</string>
-    <string name="set_interval_runs">Läuft %1$s und nach dem Start des Fernsehers.</string>
+    <string name="set_interval_runs">Läuft %1$s und nach dem Start des Fernsehers. Ein Update braucht eine Bestätigung im System-Installer.</string>
     <string name="set_delete_label">APK nach der Installation löschen</string>
     <string name="set_delete_desc">Die heruntergeladene Datei entfernen, sobald Plezy installiert ist, um Speicher zu sparen.</string>
     <string name="set_allow_older_label">Ältere Versionen erlauben</string>

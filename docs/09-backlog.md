@@ -7,15 +7,6 @@ parking lot. Status is checked against the code in `app/`.
 
 The forward-looking items now live in the [roadmap](11-roadmap.md), so this stays a short pointer:
 
-- **Main View footer: one line each, an interval glyph, a data glyph (user request, 2026-11-18).**
-  Three small tweaks to the bottom of the main screen:
-  - the update-check text and the free-space line each get their **own line** (today they read as
-    one wrapped hint plus a line);
-  - the long check sentence — `Checks every 12 hours while the device is on. An update needs one
-    confirmation on the system installer screen.` — is shortened to **`⏳ Update check: <n> <m>`**
-    (e.g. `⏳ Update check: 12 hours`); the "one confirmation on the installer" caveat moves into
-    Settings (where the interval already lives);
-  - a **data glyph** (`⛃` or similar) is added before the free-space text (`⛃ Free space: 5.83 GB`).
 - **README: add Android TV + phone screenshots (user request, 2026-11-18).** The README has no
   screenshots; add captures of the Android TV (two-pane) and the phone (touch) views — main screen,
   Settings, and the two Choose-Version layouts.
@@ -23,16 +14,14 @@ The forward-looking items now live in the [roadmap](11-roadmap.md), so this stay
   at the highest user experience for someone who just wants the app on their TV/phone: lead with
   *what it does* and *how to install*, keep the engineering depth in `docs/`. Do it in a separate
   session (`claude` from inside the repo) so it is not entangled with the release work.
-- **Choose version (touch): use an icon, not the word "Notes" (user request, 2026-11-18).** The
-  touch picker's per-row *Notes* button should reuse the main screen's **What's new** icon instead
-  of the text label — a small, self-contained follow-up to the `0.9.0` touch picker.
 - **`targetSdk` bump, further steps** — 25 → 26 landed in `0.5.0`, 26 → 31 in `0.6.0`, 31 → 33 in
   `0.7.0`, 33 → 34 in `0.8.0`; 35 → … remains, one step per release
   ([roadmap item 5](11-roadmap.md#5-targetsdk-bump-matrix)).
 
-The former requests here — **make the touch Choose-Version phone-ready**, **device-aware wording
-beyond the input hint** (`0.9.0`) and the **touch check-interval picker** (`0.9.1`) — have landed;
-see [Already implemented](#already-implemented).
+The former requests here — **make the touch Choose-Version phone-ready** and **device-aware wording
+beyond the input hint** (`0.9.0`), the **touch check-interval picker** (`0.9.1`), the **Main View
+footer polish** and the **touch picker's Notes → icon** (`0.10.0`) — have landed; see
+[Already implemented](#already-implemented).
 
 Nothing here is a commitment; the roadmap explains the order and the reasoning.
 
@@ -99,10 +88,12 @@ Nothing here is a commitment; the roadmap explains the order and the reasoning.
 - **Touch layout: single-pane Choose-Version + right-side changelog fly-in (roadmap item 3, layout
   half).** Landed 2026-11-18 (`0.9.0`): `VersionListActivity` branches once on `Device.isTouch(this)`
   into the unchanged TV two-pane layout and a new touch layout — full-width version rows (tap the
-  label to install) with a per-row **Notes** button that flies the release notes in from the right as
-  a full-width overlay (`✕` close, Back closes it, an **Install this version** action). The
+  label to install) with a per-row notes icon that flies the release notes in from the right as
+  a full-width overlay (`✕` close, Back closes it, an **Install this version** action). The icon is
+  the main screen's **What's new** glyph (`0.10.0`; before that a *Notes* text button), and it
+  carries its word in a content description so the harness still finds it. The
   `-finger` wording was carried the rest of the way: the *behaviour* sentences (`main_subtitle`,
-  `main_hint`, `set_auto_desc`, `set_interval_runs`, `interval_note`, `about_thanks_text`,
+  `set_auto_desc`, `set_interval_runs`, `interval_note`, `about_thanks_text`,
   `progress_confirm`) now say "device" not "TV" on a touch device, plus the new `picker_hint`. A new
   **`picker-notes`** harness flow opens and closes the notes on both layouts; the
   overlay is `clickable` so a tap on a dead zone is consumed instead of falling through to the list
@@ -111,6 +102,16 @@ Nothing here is a commitment; the roadmap explains the order and the reasoning.
   Verified on the stick (two-pane), `phone34` and the real `phone35` (touch), and `tv30` — an
   Android TV that reports `touch=1`, so it exercises the touch picker on a TV. See
   [11 § 3](11-roadmap.md#3-android-tv--phone-compatibility) and
+  [11 § 3 · Layout](11-roadmap.md#layout--done-2026-11-1819-090--091).
+
+- **Main View footer polish + the touch picker's notes icon (roadmap item 4).** Landed 2026-11-19
+  (`0.10.0`): the main screen's two footer lines are each their own line, the long check sentence
+  `Checks every 12 hours while the TV is on. An update needs one confirmation on the system installer
+  screen.` is shortened to **`⏳ Update check: <n> <m>`** (the installer caveat moved into the
+  Settings auto-check summary, `set_interval_runs`), and the free-space line gains a **data glyph**
+  (`⛃ Free space: 1,21 GB`). The touch picker's per-row *Notes* text button becomes the main screen's
+  **What's new** icon. Both glyphs were confirmed to render (not tofu) on the API 25 stick. See
+  [10 § Main](10-tv-ui-design.md#main--a-dashboard) and
   [11 § 3 · Layout](11-roadmap.md#layout--done-2026-11-1819-090--091).
 
 - **Device detection (roadmap item 2).** Landed 2026-11-17 (`0.4.0`): `DeviceKind` (the decision, a
@@ -302,5 +303,6 @@ Nothing here is a commitment; the roadmap explains the order and the reasoning.
 - **Touch layout** landed in two halves: the **Choose-Version picker** on 2026-11-18 (updater
   `0.9.0`) and the **check-interval picker** on 2026-11-18/19 (updater `0.9.1`), the latter with a
   screen audit that confirmed `IntervalActivity` was the only D-pad-only screen left. With both in,
-  the touch **layout** is done; what remains for roadmap item 3 is the `targetSdk` 35 step (item 5)
-  and the README work, and item 4 (the Main View footer) is still open.
+  the touch **layout** is done; the **Main View footer polish** and the touch picker's notes icon
+  followed on 2026-11-19 (updater `0.10.0`). What remains for roadmap item 3 is the `targetSdk` 35
+  step (item 5) and the README work.

@@ -11,7 +11,7 @@
     <string name="main_check">Buscar actualizaciones</string>
     <string name="main_choose_version">Elegir versión…</string>
     <string name="main_settings">Ajustes</string>
-    <string name="main_hint">Comprueba %1$s mientras el televisor está encendido. Una actualización requiere una confirmación en la pantalla del instalador del sistema.</string>
+    <string name="main_hint">⏳ Comprobación: %1$s</string>
     <string name="main_not_installed_word">no instalado</string>
 
     <string name="status_check_failed">Error al buscar actualizaciones</string>
@@ -32,7 +32,7 @@
     <string name="status_checking">Buscando actualizaciones…</string>
     <string name="status_installed_only">Instalado %1$s.</string>
 
-    <string name="free_space">Espacio libre: %1$s</string>
+    <string name="free_space">⛃ Espacio libre: %1$s</string>
     <string name="free_space_low">"  — muy poco para una actualización (se necesitan unos %1$s)"</string>
 
     <string name="progress_update_failed">Error de actualización: %1$s</string>
@@ -59,7 +59,7 @@
     <string name="set_auto_desc">Se ejecuta en el intervalo de abajo y tras el arranque del televisor.</string>
     <string name="set_interval_label">Editar el intervalo de comprobación…</string>
     <string name="set_interval_now">Ahora %1$s.</string>
-    <string name="set_interval_runs">Se ejecuta %1$s y tras el arranque del televisor.</string>
+    <string name="set_interval_runs">Se ejecuta %1$s y tras el arranque del televisor. Una actualización requiere una confirmación en la pantalla del instalador del sistema.</string>
     <string name="set_delete_label">Eliminar el APK tras instalar</string>
     <string name="set_delete_desc">Elimina el archivo descargado una vez instalado Plezy, para ahorrar espacio.</string>
     <string name="set_allow_older_label">Permitir versiones anteriores</string>

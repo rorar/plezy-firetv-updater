@@ -154,9 +154,11 @@ cannot disagree. Three strings that named the device where the generic word read
 reworded instead of duplicated four ways (`set_notification_desc` "Fire TV notification center" →
 "notification area"; `err_not_enough_space` "on the Fire TV" → "on the device"; `set_delete_desc`
 "save space on the stick" → "save space"). `0.9.0` carried the *behaviour* sentences the rest of the
-way too: `main_subtitle`, `main_hint`, `set_auto_desc`, `set_interval_runs`, `interval_note`,
+way too: `main_subtitle`, `set_auto_desc`, `set_interval_runs`, `interval_note`,
 `about_thanks_text` and `progress_confirm` say "device" in `values-*-finger/` ("runs while the device
-is on", "after the device restarts", "confirm the install on the device"). See
+is on", "after the device restarts", "confirm the install on the device"). `main_hint` left that
+list in `0.10.0`: shortened to the device-neutral `⏳ Update check: <n> <m>`, it no longer names the
+device, so it is no longer overridden in `values-*-finger/`. See
 [08 — Device-aware wording](08-app-implementation.md#device-aware-wording).
 
 The sketch this section first carried invented three notification rows; there is really only **one**
@@ -167,8 +169,7 @@ updater:
 |---|---|---|
 | Update available | `Plezy 2.27.0 available` · `Press OK to open` | `Plezy 2.27.0 available` · `Tap to open` |
 | Test notification | `Test notification — press OK to open` | `Test notification — tap to open` |
-| Picker hint | `…press OK to install the highlighted version.` | `…tap a version to install it, or its Notes button to read the release notes.` |
-| Main hint | `…while the TV is on.` | `…while the device is on.` |
+| Picker hint | `…press OK to install the highlighted version.` | `…tap a version to install it, or the notes icon to read the release notes.` |
 | Auto-check | `…after the TV boots.` | `…after the device restarts.` |
 | Install confirm | `Confirm the install on the TV.` | `Confirm the install on the device.` |
 
@@ -187,7 +188,8 @@ rides — into two layouts.
   highlighted version's release notes on the right, driven by the D-pad; OK installs the highlighted
   version.
 - **Touch** (`buildTouchUi`): a single pane of full-width rows. Tapping a row's version label installs
-  it; the row's **Notes** button flies the release notes in from the right as a full-width overlay
+  it; the row's **notes icon** (`0.10.0`; before that, a *Notes* text button) flies the release notes
+  in from the right as a full-width overlay
   (`buildChangelogOverlay`) with a `✕` close button, a Back handler, and an **Install this version**
   action. The overlay is `clickable`, so a tap on a dead zone is consumed instead of falling through
   to the list beneath and starting an install.
@@ -327,10 +329,13 @@ export flag is exercised by every flow (both activities register a receiver on s
    confirmed it was the last D-pad-only screen. Verified with a new non-destructive `interval` flow
    on the stick (D-pad) and `phone34` (touch) — which caught the touch double-tap bug
    ([Finding 8](08-app-implementation.md#finding-8--the-touch-interval-screen-swallowed-the-first-tap)).
-10. **Main View footer polish** (item 4) — next: the update-check text and the free-space line each on
-    their own line, the check sentence shortened to `⏳ Update check: <n> <m>`, and a data glyph before
-    the free-space text; plus the touch picker's **Notes** text → the **What's new** icon. Then the
-    README (screenshots, then a non-technical rewrite), and last…
+10. ~~**Main View footer polish + the touch picker's notes icon** (item 4)~~ — **done** 2026-11-19,
+    `0.10.0`: the footer's two lines are each their own line, the long check sentence is shortened to
+    `⏳ Update check: <n> <m>` (the "one confirmation on the installer" caveat moved into the Settings
+    auto-check summary), the free-space line gains a `⛃` data glyph, and the touch picker's *Notes*
+    text button becomes the **What's new** icon. Both glyphs were confirmed to render (not tofu) on the
+    API 25 stick; the flows pass 7/7 on the stick and `phone34`. Next: the README (screenshots, then a
+    non-technical rewrite), and last…
 11. **`targetSdk` bump, step 35** — deliberately after the touch UI and the footer work: API 35
     enforces edge-to-edge (window insets; `setStatusBarColor` deprecated), and the changelog fly-in's
     insets depend on the touch layouts existing first.

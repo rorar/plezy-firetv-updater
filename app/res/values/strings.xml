@@ -16,7 +16,7 @@
     <string name="main_check">Check for updates</string>
     <string name="main_choose_version">Choose version…</string>
     <string name="main_settings">Settings</string>
-    <string name="main_hint">Checks %1$s while the TV is on. An update needs one confirmation on the system installer screen.</string>
+    <string name="main_hint">⏳ Update check: %1$s</string>
     <string name="main_not_installed_word">not installed</string>
 
     <!-- status card -->
@@ -38,7 +38,7 @@
     <string name="status_checking">Checking for updates…</string>
     <string name="status_installed_only">Installed %1$s.</string>
 
-    <string name="free_space">Free space: %1$s</string>
+    <string name="free_space">⛃ Free space: %1$s</string>
     <string name="free_space_low">"  — too little for an update (about %1$s needed)"</string>
 
     <string name="progress_update_failed">Update failed: %1$s</string>
@@ -66,7 +66,7 @@
     <string name="set_auto_desc">Runs on the interval below and after the TV boots.</string>
     <string name="set_interval_label">Edit check interval…</string>
     <string name="set_interval_now">Now %1$s.</string>
-    <string name="set_interval_runs">Runs %1$s and after the TV boots.</string>
+    <string name="set_interval_runs">Runs %1$s and after the TV boots. An update needs one confirmation on the system installer screen.</string>
     <string name="set_delete_label">Delete APK after installing</string>
     <string name="set_delete_desc">Remove the downloaded file once Plezy is installed, to save space.</string>
     <string name="set_allow_older_label">Allow older versions</string>

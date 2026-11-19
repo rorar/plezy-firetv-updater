@@ -10,6 +10,8 @@ import android.graphics.drawable.StateListDrawable;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.widget.Button;
+import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.Switch;
 import android.widget.TextView;
@@ -101,6 +103,26 @@ public final class Ui {
         if (iconRes != 0) {
             leadingIcon(b, stateIcon(c, iconRes), 22);
         }
+        return b;
+    }
+
+    /**
+     * An icon-only action, as used by the touch picker's per-row notes glyph. It carries no text,
+     * so the accessibility name lives in the {@code contentDescription} — which is also what a
+     * {@code uiautomator dump} exposes, so the flow harness finds it by the same label the old
+     * text button showed. The glyph recolours with the view's state exactly like a labelled row's.
+     */
+    public static ImageButton iconButton(Context c, String contentDescription, int iconRes) {
+        ImageButton b = new ImageButton(c);
+        b.setImageDrawable(stateIcon(c, iconRes));
+        b.setBackground(focusBackground(c));
+        b.setContentDescription(contentDescription);
+        b.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        int pad = dp(c, 12);
+        b.setPadding(pad, pad, pad, pad);
+        b.setMinimumWidth(dp(c, 48));
+        b.setMinimumHeight(dp(c, 48));
+        b.setFocusable(true);
         return b;
     }
 

@@ -17,6 +17,7 @@ import android.widget.AdapterView;
 import android.widget.BaseAdapter;
 import android.widget.Button;
 import android.widget.FrameLayout;
+import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.ScrollView;
@@ -35,9 +36,10 @@ import java.util.List;
  *       left, the highlighted version's release notes on the right. The D-pad changes the version
  *       and the notes follow; pressing OK installs it.</li>
  *   <li><b>Touch</b> (finger touchscreen): a single pane of full-width version rows. Tapping a row
- *       installs that version; the row's <i>Notes</i> button flies the release notes in from the
- *       right as an overlay with a close button and an "Install this version" action. The
- *       side-by-side layout reads badly on a phone, and especially in landscape.</li>
+ *       installs that version; the row's notes icon (the main screen's <i>What's new</i> glyph)
+ *       flies the release notes in from the right as an overlay with a close button and an
+ *       "Install this version" action. The side-by-side layout reads badly on a phone, and
+ *       especially in landscape.</li>
  * </ul>
  *
  * <p>Installing happens right here through {@link InstallFlow} either way — there is no detour
@@ -596,9 +598,11 @@ public class VersionListActivity extends Activity {
     }
 
     /**
-     * Touch rows: the version on the left (tap installs it) and a <i>Notes</i> button on the
-     * right (tap flies the release notes in). Both children carry their own click listener, so
-     * the row itself is not clickable — the label is the install target.
+     * Touch rows: the version on the left (tap installs it) and an icon button on the right (tap
+     * flies the release notes in). The icon is the main screen's <i>What's new</i> glyph, so the
+     * affordance reads the same on both screens; its content description carries the word. Both
+     * children carry their own click listener, so the row itself is not clickable — the label is
+     * the install target.
      */
     private class TouchAdapter extends BaseAdapter {
 
@@ -623,7 +627,7 @@ public class VersionListActivity extends Activity {
             LinearLayout row = convertView instanceof LinearLayout
                     ? (LinearLayout) convertView : buildTouchRow();
             TextView label = (TextView) row.getChildAt(0);
-            Button notes = (Button) row.getChildAt(1);
+            ImageButton notes = (ImageButton) row.getChildAt(1);
             label.setText(rowLabel(release));
             label.setOnClickListener(new View.OnClickListener() {
                 @Override
@@ -653,7 +657,8 @@ public class VersionListActivity extends Activity {
         row.addView(label, new LinearLayout.LayoutParams(0,
                 LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 
-        Button notes = Ui.actionButton(this, getString(R.string.picker_notes));
+        ImageButton notes = Ui.iconButton(this, getString(R.string.picker_notes),
+                R.drawable.ic_news);
         row.addView(notes, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         return row;

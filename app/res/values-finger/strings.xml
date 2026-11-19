@@ -18,13 +18,12 @@
 <resources>
     <string name="notif_available_text">Tap to open</string>
     <string name="set_test_notification_msg">Test notification — tap to open</string>
-    <string name="picker_hint">Newest first. Installed: %1$s   —   tap a version to install it, or its Notes button to read the release notes.</string>
+    <string name="picker_hint">Newest first. Installed: %1$s   —   tap a version to install it, or the notes icon to read the release notes.</string>
 
     <!-- "TV" → "device" -->
     <string name="main_subtitle">Keeps com.edde746.plezy up to date on this device.</string>
-    <string name="main_hint">Checks %1$s while the device is on. An update needs one confirmation on the system installer screen.</string>
     <string name="set_auto_desc">Runs on the interval below and after the device restarts.</string>
-    <string name="set_interval_runs">Runs %1$s and after the device restarts.</string>
+    <string name="set_interval_runs">Runs %1$s and after the device restarts. An update needs one confirmation on the system installer screen.</string>
     <string name="about_thanks_text">Plezy Updater is a small sideload helper that keeps com.edde746.plezy current on this device. Thanks to the Plezy project for the app it updates, and to GitHub for hosting the releases.</string>
     <string name="interval_note">Runs while the device is on. A month is treated as 30 days.</string>
     <string name="progress_confirm">Confirm the install on the device.</string>
