@@ -95,6 +95,7 @@ public class IntervalActivity extends Activity {
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(Ui.BG);
         root.setPadding(pad, pad, pad, pad);
+        Ui.applyInsets(root, pad);
 
         root.addView(Ui.title(this, getString(R.string.interval_title)));
 
@@ -212,6 +213,7 @@ public class IntervalActivity extends Activity {
         content.setOrientation(LinearLayout.VERTICAL);
         content.setBackgroundColor(Ui.BG);
         content.setPadding(pad, pad, pad, pad);
+        Ui.applyInsets(content, pad);
 
         content.addView(Ui.title(this, getString(R.string.interval_title)));
 

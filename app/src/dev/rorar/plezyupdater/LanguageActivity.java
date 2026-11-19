@@ -36,6 +36,7 @@ public class LanguageActivity extends Activity {
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(Ui.BG);
         root.setPadding(pad, pad, pad, pad);
+        Ui.applyInsets(root, pad);
         root.addView(Ui.title(this, getString(R.string.language_title)));
 
         String current = Prefs.appLanguage(this);

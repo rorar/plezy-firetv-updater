@@ -1,12 +1,12 @@
 # 08 — The updater app, as built
 
-`app/` is the working updater: `dev.rorar.plezyupdater` **0.10.0** (`versionCode 11`),
-minSdk **25** / targetSdk **34**, plain Java, programmatic UI, **no Gradle and no AndroidX**. It is
+`app/` is the working updater: `dev.rorar.plezyupdater` **0.11.0** (`versionCode 13`),
+minSdk **25** / targetSdk **35**, plain Java, programmatic UI, **no Gradle and no AndroidX**. It is
 verified end-to-end on the API 25 stick (AFTMM, Fire OS 6.7.1.1 / API 25) and, on 2026-11-18/19, on the
 emulator lane (Android TV API 25/30, phone API 34) **and on a real arm64 phone** (LineageOS 22.1 =
-Android 15 = API 35). All seven flows pass 7/7 in English and German, with French and Spanish
-`install` smokes, on the stick and the API 34 emulator; the real phone passed the six `0.9.0` flows
-but was offline for `0.9.1`/`0.10.0`. The UI is TV-first but both
+Android 15 = API 35). All eight flows pass 8/8 on `phone35` with `0.11.0`, including the API 35
+edge-to-edge insets proof; `phone34` passes the suite apart from one transient clean-install wait
+whose isolated rerun passed. The UI is TV-first but both
 pickers now have a **touch layout** too (`0.9.0` for Choose-Version, `0.9.1` for the check interval,
 [roadmap item 3](11-roadmap.md#3-android-tv--phone-compatibility)),
 and the API 33 `POST_NOTIFICATIONS` request path is verified by hand on both API 33+ devices.
@@ -303,6 +303,30 @@ asserts each expected label is not just present but **entirely inside the displa
 first where the page is meant to scroll; a clipped or off-screen control fails the flow. It restores
 the rotation, app language and *Allow older versions* switch in a `finally`, and skips TV profiles —
 their layouts are landscape already.
+
+## Finding 10 — API 35 edge-to-edge puts tabs under the system bars
+
+`targetSdk` 35 makes the window edge-to-edge on Android 15. The dark background now draws behind the
+status and gesture-nav bars, which is what we want, but the platform no longer reserves space for
+them: a row that is "on screen" in a `uiautomator dump` can have its centre under the nav bar, and
+`input tap` there goes to the bar instead of the app. On `phone35` the Settings **Uninstall Plezy…**
+row was reported at `[84,1557][636,1600]` on a 1600-px-tall display, with the nav bar at
+`[0,1516][720,1600]`; the tap centre `360,1578` hit the bar, so the uninstall dialog never opened.
+
+The app fixes the *visual* half with one shared `Ui.applyInsets(View, int)` helper, called from all
+seven screens' roots. On `SDK_INT >= 35` it listens for insets, adds
+`WindowInsets.Type.systemBars()` plus `displayCutout()` to the root's existing padding, and keeps the
+original background edge-to-edge; below 35 it is a no-op, so the API 25/34 layouts are untouched.
+The values applied are written into the diagnostics report as `sdk=` and `insets=` — verified
+`0,49,0,84` in portrait and `43,49,84,0` in landscape on `phone35`, and absent on API 34 — so a
+script can assert the guard without seeing pixels.
+
+The harness fixes the *driving* half: `_safe_rect()` reads the bar bounds from the dump (with a
+conservative bottom inset on platforms where SystemUI does not expose them), and `_reveal()` keeps
+scrolling a labelled row until it is fully clear of that rectangle before tapping. It corrects an
+overshoot the other way too — a row clamped against the top bar at `[84,0][636,18]` is just as
+untappable. The interval helpers now scroll in both directions for the same reason: units sit above
+the number grid, Save below it, and each tap can put the next target behind you.
 
 ## Install routine (shared)
 
@@ -1362,6 +1386,22 @@ number.
 | `phone34` (API 34 emulator, native 640×320 landscape) | `landscape` **PASS** at the smallest supported size after resetting the screenshot scripts' `wm size`/`density` overrides to native; the same screens and checks |
 | Portrait regression (`phone35`) | `picker-notes` + `interval` **PASS 2/2** after the final harness changes; interval restored to 12 hours, orientation back to `accelerometer_rotation=1 / user_rotation=0` |
 | Stick (API 25, D-pad) | full `all` re-run with `0.10.1`, **8/8 PASS** — install 176s, picker-notes 28s, interval 133s, downgrade 69s, upgrade 36s, uninstall 77s, clean-install 54s, landscape 0s (skips: the TV layouts are landscape already); Plezy left on `2.26.0` |
+
+### `targetSdk` 35: edge-to-edge insets (`0.11.0`), 2026-11-19
+
+The fifth and last bump step in [roadmap item 5](11-roadmap.md#5-targetsdk-bump-matrix): `versionCode
+13` / `versionName 0.11.0`, `targetSdk` 34 → 35, one step per release as before. No new dependency,
+no AndroidX, no Gradle, and every new API is behind `SDK_INT >= 35`
+([Finding 10](#finding-10--api-35-edge-to-edge-puts-tabs-under-the-system-bars)).
+
+| Step | Result |
+|---|---|
+| Build identity | `aapt2 dump badging` → `versionCode='13'`, `versionName='0.11.0'`, `minSdkVersion:'25'`, `targetSdkVersion:'35'`; signed with the existing key |
+| `phone35` (API 35, real arm64 touch) | fresh process `sdk=35;insets=pending`, then `sdk=35;insets=0,49,0,84` in portrait and `43,49,84,0` in landscape; title offset 56 px base + 49 px top inset; top pixels remain the app background |
+| `phone35` full `all` | **8/8 PASS** — install 42s, picker-notes 32s, interval 74s, downgrade 58s, upgrade 22s, uninstall 36s, clean-install 45s, landscape 286s; `insets` asserted live in the landscape flow |
+| `phone34` (API 34 emulator) | `interval` **PASS** after making it scroll-aware in both orientations; full `all` **7/8** with one transient clean-install installer wait, whose isolated rerun **PASS**; diagnostics `sdk=34` with no `insets=` field |
+| Static checks | `py_compile`, `check_strings.py`, `test/jvm/run.sh` **25/25**, link check **213** links, privacy grep clean except the documented placeholders |
+| Stick (API 25, D-pad) | left on `0.10.1` while the release is published; the in-place self-update proof and a full `all` re-run are the final release checks |
 
 ### Round-1 verification phases (2026-11-14/15)
 

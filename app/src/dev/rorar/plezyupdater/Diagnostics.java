@@ -1,6 +1,7 @@
 package dev.rorar.plezyupdater;
 
 import android.content.Context;
+import android.os.Build;
 import android.util.Log;
 
 import java.io.File;
@@ -65,14 +66,19 @@ public final class Diagnostics {
     }
 
     /**
-     * The full machine report: the quota result plus the two things a script cannot see from the
-     * outside — the device classification and whether Android is currently allowing notifications
-     * ({@code device=…;tv=…;touch=…;notif=allowed|blocked}). The Settings row and
-     * {@link DiagnosticsReceiver} both build their report here, so the broadcast result and the
-     * {@code quota.txt} file stay identical.
+     * The full machine report: the quota result plus the things a script cannot see from the
+     * outside — the device classification, whether Android is allowing notifications, the platform
+     * version and (on API 35+) the insets the UI actually applied:
+     * {@code device=…;tv=…;touch=…;notif=allowed|blocked;sdk=…;insets=l,t,r,b}. Below 35 there is no
+     * {@code insets} field at all: the platform still reserves the bars and {@link Ui#applyInsets}
+     * is a no-op. The Settings row and {@link DiagnosticsReceiver} both build their report here, so
+     * the broadcast result and the {@code quota.txt} file stay identical.
      */
     public static String report(Context c, QuotaResult r) {
-        return r.report + ";" + Device.report(c) + ";notif=" + Notifier.state(c);
+        String insets = Ui.insetsReport();
+        return r.report + ";" + Device.report(c) + ";notif=" + Notifier.state(c)
+                + ";sdk=" + Build.VERSION.SDK_INT
+                + (insets == null ? "" : ";insets=" + insets);
     }
 
     /**

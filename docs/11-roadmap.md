@@ -6,7 +6,8 @@ lane, a real-phone lane and `targetSdk` 26 → 31 in `0.6.0`; `targetSdk` 31 →
 `POST_NOTIFICATIONS` in `0.7.0`; `targetSdk` 33 → 34 with the runtime-receiver export flags and the
 `ACCESS_NETWORK_STATE` job permission in `0.8.0`; the touch layout — single-pane Choose-Version with
 a right-side changelog fly-in — in `0.9.0`, and the touch check-interval picker with a screen audit
-in `0.9.1`). Each item says what it
+in `0.9.1`, the landscape clipping fix in `0.10.1`, and `targetSdk` 34 → 35 with edge-to-edge insets
+in `0.11.0`). Each item says what it
 is, what it would take, what can go wrong, and **how it would be verified on the stick** — including
 the honest cases where this hardware cannot verify it (the emulator lane now covers some of those).
 Order is a suggestion, not a commitment.
@@ -252,8 +253,8 @@ branch, which stays logic-only.
 
 ## 5. `targetSdk` bump matrix
 
-The app targets **34** today (25 through `0.4.0`, 26 in `0.5.0`, 31 in `0.6.0`, 33 in `0.7.0`, 34 in
-`0.8.0`); raising it is only
+The app targets **35** today (25 through `0.4.0`, 26 in `0.5.0`, 31 in `0.6.0`, 33 in `0.7.0`, 34 in
+`0.8.0`, 35 in `0.11.0`); raising it is only
 worth doing if the updater must also run well on newer Android (which items 2–3 imply). Each step is a
 known set of changes; all of them can be guarded by `Build.VERSION.SDK_INT` so the API 25 behaviour is
 unchanged.
@@ -268,7 +269,7 @@ unchanged.
 | 31 ✅ | 12.0 | **Done in `0.6.0`.** **`PendingIntent` mutability** — `ApkInstaller`'s session-result `PendingIntent` is `FLAG_UPDATE_CURRENT \| FLAG_MUTABLE` (the platform writes the session status into it, and on API 25 the confirmation intent too); `Notifier`'s notification `PendingIntent` is `FLAG_IMMUTABLE` (it only opens `MainActivity`). Both add the flag only when `SDK_INT >= S`, so the API 25–30 flags stay `0`; `FLAG_MUTABLE`/`FLAG_IMMUTABLE` are compile-time constants, so naming them is safe and dex inlines them. **Notification trampolines** — the notification's `contentIntent` is already an activity, started directly, not a receiver that starts one: verified on `tv30`, nothing to change. **`REQUEST_DELETE_PACKAGES`** — declared; the platform's package-visibility rules make it necessary to send `ACTION_DELETE` on newer Android (declared, but *not* empirically tested by removing it). **Also fixed here** — the downgrade handshake raced the platform ([08](08-app-implementation.md#finding-5--the-uninstall-handshake-raced-the-platform-on-android-12)). Verified end to end on the `phone34` emulator (API 34) **and on the real `phone35` (API 35)**. |
 | 33 ✅ | 13.0 | **Done in `0.7.0`.** **`POST_NOTIFICATIONS` is a runtime permission** — a `targetSdk 33` app's notifications are dropped until it is granted. `Notifier` gained `systemAllows` / `needsPermission` / `requestPermission` (all guarded by `SDK_INT >= TIRAMISU`, so the API 25 stick is untouched), `MainActivity` asks once on the first resume while the *Notifications* switch is on (persisted `notif_asked`), and the Settings row asks again on toggle-on and shows a **Blocked by Android…** hint plus an **Open notification settings** action while the notification is blocked. The diagnostics report gained `notif=allowed\|blocked`, asserted by the harness. Verified on `phone34` (API 34) and the real `phone35` (API 35) — request dialog, grant, and a posted notification — and the API 25 flows are unchanged ([08](08-app-implementation.md#targetsdk-33--post_notifications-070-2026-11-18)). |
 | 34 ✅ | 14.0 | **Done in `0.8.0`.** **Runtime-registered receivers must declare an export flag** — a target-34 app that calls `Context.registerReceiver` without one is refused. All four sites (the custom `ACTION_INSTALL_FINISHED` receivers in `MainActivity` / `VersionListActivity`, the `ACTION_PACKAGE_REMOVED` ones in `SettingsActivity` / `InstallFlow`) now go through `Receivers.register`, which passes `Context.RECEIVER_NOT_EXPORTED` when `SDK_INT >= TIRAMISU` (the flag and the three-argument overload are API 33+) and the plain two-argument call below it, so the API 25 stick is unchanged. **`ACCESS_NETWORK_STATE` is required for a job with a network constraint** — this one is a *hard crash on launch* on API 34+: `UpdateJob.schedule` throws `SecurityException: android.permission.ACCESS_NETWORK_STATE required for jobs with a connectivity constraint`; both jobs require network, so the permission is now declared (inert on API 25). **Foreground-service types / implicit internal intents**: no foreground service and no implicit internal intents, so nothing else to change. Verified on `phone34` (API 34) and `phone35` (API 35) — the crash reproduced first, then the fix — with the API 25 flows re-run ([08](08-app-implementation.md#targetsdk-34-receiver-flags--access_network_state-080-2026-11-18)). |
-| 35 | 15.0 | Nothing new beyond 33/34 seen on the `phone35` run (LineageOS 22.1): the seven flows pass on it, which is the point — the newest platform here is exercised end to end. |
+| 35 ✅ | 15.0 | **Done in `0.11.0`.** **Edge-to-edge is enforced**: the dark background runs behind the bars, which is wanted, but the window no longer reserves inset space, so a row can sit under the nav bar and a tap goes to the bar. A shared `Ui.applyInsets(View, int)` helper, called from every screen's root, adds `systemBars()` + `displayCutout()` to the root's existing padding when `SDK_INT >= 35` and is a no-op below it; the values also appear as `sdk=`/`insets=` in the diagnostics report. Verified on `phone35` (LineageOS 22.1): `insets=0,49,0,84` portrait and `43,49,84,0` landscape, all eight flows 8/8 PASS; API 34/25 unchanged ([08](08-app-implementation.md#finding-10--api-35-edge-to-edge-puts-tabs-under-the-system-bars)). |
 
 The order of the real work inside a bump is: notification channel (26) → job scheduling (26) →
 `PendingIntent` flags (31) → notification permission (33) → receiver export flags and the job
@@ -340,10 +341,13 @@ export flag is exercised by every flow (both activities register a receiver on s
     the interval picker (number grid, Save/Cancel) and the language picker (last row, Back). Both now
     use one outer `ScrollView`, and a new `landscape` flow verifies them on `phone35` and `phone34`
     ([Finding 9](08-app-implementation.md#finding-9--short-landscape-screens-clipped-two-touch-pickers)).
-    Next is the README's non-technical rewrite, and last…
-11. **`targetSdk` bump, step 35** — deliberately after the touch UI and the footer work: API 35
-    enforces edge-to-edge (window insets; `setStatusBarColor` deprecated), and the changelog fly-in's
-    insets depend on the touch layouts existing first.
+    Next is the README's non-technical rewrite.
+11. ~~**`targetSdk` bump, step 35**~~ — **done** 2026-11-19, `0.11.0`: deliberately after the touch UI
+    and the footer work, because API 35 enforces edge-to-edge (window insets; `setStatusBarColor`
+    deprecated) and the changelog fly-in's insets depend on the touch layouts existing first. One
+    shared `Ui.applyInsets` helper now pads every root by the system bars + cutout on API 35+ only,
+    with `sdk=`/`insets=` in the diagnostics report so a script can assert the guard; `phone35`
+    passes 8/8 ([Finding 10](08-app-implementation.md#finding-10--api-35-edge-to-edge-puts-tabs-under-the-system-bars)).
 
 ## Guardrails
 

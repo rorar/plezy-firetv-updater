@@ -12,7 +12,7 @@ The forward-looking items now live in the [roadmap](11-roadmap.md), so this stay
   *what it does* and *how to install*, keep the engineering depth in `docs/`. Do it in a separate
   session (`claude` from inside the repo) so it is not entangled with the release work.
 - **`targetSdk` bump, further steps** — 25 → 26 landed in `0.5.0`, 26 → 31 in `0.6.0`, 31 → 33 in
-  `0.7.0`, 33 → 34 in `0.8.0`; 35 → … remains, one step per release
+  `0.7.0`, 33 → 34 in `0.8.0`, 34 → 35 in `0.11.0`; 35 → … remains, one step per release
   ([roadmap item 5](11-roadmap.md#5-targetsdk-bump-matrix)).
 
 The former requests here — **make the touch Choose-Version phone-ready** and **device-aware wording
@@ -298,8 +298,8 @@ Nothing here is a commitment; the roadmap explains the order and the reasoning.
   (updater `0.4.0`). The classification is asserted over the diagnostics broadcast and the wording
   rides the `-finger` resource qualifier; the parts this stick cannot produce are covered by
   `test/jvm/run.sh` and `test/check_strings.py`, both device-free. What was left then — the touch
-  **layout** and the `targetSdk` bump — has since partly landed (the touch layout, below); the
-  `targetSdk` 35 step remains.
+  **layout** and the `targetSdk` bump — has since landed: the touch layout below and the 35 step in
+  `0.11.0`.
 - **`targetSdk` 25 → 26** (roadmap item 5, first step) landed on 2026-11-17 (updater `0.5.0`):
   notification channel on API 26+, `JobScheduler` in place of the alarm + service. **26 → 31**
   (second step) landed on 2026-11-18 (updater `0.6.0`): `PendingIntent` mutability flags,
@@ -307,12 +307,14 @@ Nothing here is a commitment; the roadmap explains the order and the reasoning.
   verified it is new too. **31 → 33** (third step) landed on 2026-11-18 (updater `0.7.0`):
   `POST_NOTIFICATIONS` requested once automatically and from the Settings switch, a blocked hint
   with an **Open notification settings** action, and `notif=` in the diagnostics report; verified on
-  the API 34 emulator and the real API 35 phone. The remaining steps (34 → 35) are still open.
+  the API 34 emulator and the real API 35 phone. **34 → 35** (fifth step) landed on 2026-11-19
+  (updater `0.11.0`): edge-to-edge window insets via a shared `Ui.applyInsets` helper behind
+  `SDK_INT >= 35`, with `sdk=`/`insets=` in the diagnostics report; verified 8/8 on `phone35`.
 - **Touch layout** landed in two halves: the **Choose-Version picker** on 2026-11-18 (updater
   `0.9.0`) and the **check-interval picker** on 2026-11-18/19 (updater `0.9.1`), the latter with a
   screen audit that confirmed `IntervalActivity` was the only D-pad-only screen left. With both in,
   the touch **layout** is done; the **Main View footer polish** and the touch picker's notes icon
   followed on 2026-11-19 (updater `0.10.0`). The last layout gap — two touch pickers that clipped on
   a short **landscape** screen — closed on 2026-11-19 with `0.10.1` and a new `landscape` flow that
-  verifies `phone35` and `phone34`. What remains for roadmap item 3 is the `targetSdk` 35 step
-  (item 5) and the README work.
+  verifies `phone35` and `phone34`. The `targetSdk` 35 step (item 5) closed on 2026-11-19 with
+  `0.11.0`; what remains is the README rewrite.

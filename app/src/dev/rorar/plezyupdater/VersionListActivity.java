@@ -233,6 +233,7 @@ public class VersionListActivity extends Activity {
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(Ui.BG);
         root.setPadding(pad, pad, pad, pad);
+        Ui.applyInsets(root, pad);
 
         TextView title = Ui.title(this, getString(R.string.picker_title));
         Ui.leadingIcon(title, Ui.icon(this, R.drawable.ic_versions, Ui.ACCENT_BRIGHT), 26);
@@ -295,6 +296,7 @@ public class VersionListActivity extends Activity {
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
         content.setPadding(pad, pad, pad, pad);
+        Ui.applyInsets(content, pad);
 
         TextView title = Ui.title(this, getString(R.string.picker_title));
         Ui.leadingIcon(title, Ui.icon(this, R.drawable.ic_versions, Ui.ACCENT_BRIGHT), 24);
@@ -345,6 +347,7 @@ public class VersionListActivity extends Activity {
         changelogPanel.setClickable(true);
         int pad = Ui.dp(this, 20);
         changelogPanel.setPadding(pad, pad, pad, pad);
+        Ui.applyInsets(changelogPanel, pad);
 
         // Heading row: the section label, and the close button on the right.
         LinearLayout header = new LinearLayout(this);

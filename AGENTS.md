@@ -227,9 +227,10 @@ adb shell logcat -d -s PlezyUpdater                                 # "backgroun
   fresh process (verified), which then logs `background check starting (manual=true)`.
 - With `Check automatically` off, job 2001 is gone from `dumpsys jobscheduler`; the one-off 2002
   still runs when armed with `manual=true`.
-- The updater targets **API 34** now. The channel path (`Notifier.ensureChannel`), the
-  background-execution-limit behaviour, the `POST_NOTIFICATIONS` request and the API 34
-  runtime-receiver export flag (`Receivers.register`, `RECEIVER_NOT_EXPORTED`) are **not** reachable
+- The updater targets **API 35** now (`0.11.0`). The channel path (`Notifier.ensureChannel`), the
+  background-execution-limit behaviour, the `POST_NOTIFICATIONS` request, the API 34 runtime-receiver
+  export flag (`Receivers.register`, `RECEIVER_NOT_EXPORTED`) and the API 35 edge-to-edge insets
+  (`Ui.applyInsets`, reported as `sdk=`/`insets=` in the diagnostics broadcast) are **not** reachable
   on this API 25 stick — use the emulator lane (`tv30` / `phone34`, below) or the real `phone35` for
   those branches. A target-34 app that registers a receiver without an export flag is refused at
   `registerReceiver`, so a `SecurityException`/`IllegalArgumentException` in logcat is the symptom to

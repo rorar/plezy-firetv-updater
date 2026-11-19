@@ -41,6 +41,91 @@ class Flows:
         self.log(f"    tap {what!r} @ ({node.cx},{node.cy})")
         self.d.tap(node.cx, node.cy)
 
+    def _safe_rect(self, screen=None):
+        """The pixel rectangle a finger can actually touch, minus the system bars.
+
+        With ``targetSdk`` 35 the window runs edge to edge: uiautomator still reports nodes whose
+        centres sit *under* the gesture-nav bar, but ``input tap`` there goes to the bar instead of
+        the app. The bar is a node in the app's own dump (``android:id/navigationBarBackground``),
+        so use its bounds rather than guessing a margin. On a TV, or below 35 where the platform
+        still reserves the bars, no such node is present and the whole display is safe.
+        """
+        screen = screen or self.d.dump()
+        m = re.match(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]",
+                     screen.root.attrib.get("bounds", ""))
+        if m:
+            width, height = int(m.group(3)), int(m.group(4))
+        else:
+            out = self.d.shell("wm size", check=False)
+            size = re.search(r"(\d+)x(\d+)", out)
+            if not size:
+                raise HarnessError(f"cannot read the display size: {out!r}")
+            width, height = int(size.group(1)), int(size.group(2))
+        # A conservative bottom inset even when no bar is in the app dump: on API 34 the nav bar
+        # belongs to SystemUI, so uiautomator does not show it, but a swipe starting in those
+        # bottom pixels goes to the launcher/quick settings instead of the app's scroll view.
+        left, top, right, bottom = 0, 0, width, height - max(24, height // 16)
+        for node in screen.nodes:
+            if node.rid == "android:id/navigationBarBackground":
+                if node.x2 - node.x1 >= node.y2 - node.y1:  # horizontal bar
+                    if node.y2 >= height - 2 and node.y1 > top:
+                        bottom = node.y1
+                    elif node.y1 <= 2 and node.y2 < bottom:
+                        top = node.y2
+                else:  # bar on a side (landscape phone)
+                    if node.x2 >= width - 2 and node.x1 > left:
+                        right = node.x1
+                    elif node.x1 <= 2 and node.x2 < right:
+                        left = node.x2
+            elif node.rid == "android:id/statusBarBackground" and node.y2 > top:
+                top = node.y2
+        return left, top, right, bottom
+
+    def _reveal(self, label, what=None, max_swipes=8):
+        """Scroll a labelled node fully clear of the system bars, then return it.
+
+        ``_scroll_to`` stops as soon as uiautomator can see a row. On an edge-to-edge API 35 phone
+        that can be a row whose centre is under the nav bar, where a tap hits the bar instead. Keep
+        swiping in the direction that brings the row into the safe rectangle, checking after every
+        step so an overshoot (a row clamped against the *top* bar) is corrected too.
+        """
+        what = what or label
+        margin = 8
+        last = None
+        for _ in range(max_swipes + 1):
+            screen = self.d.dump()
+            node = screen.find(exact=label)
+            if node is not None:
+                last = f"[{node.x1},{node.y1}][{node.x2},{node.y2}]"
+                left, top, right, bottom = self._safe_rect(screen)
+                if (node.x1 < left + margin or node.x2 > right - margin):
+                    raise HarnessError(
+                        f"{what!r} {last} is under a side system bar "
+                        f"(safe x {left}..{right}); a vertical scroll cannot reveal it")
+                if (node.y1 >= top + margin and node.y2 <= bottom - margin):
+                    self.log(f"    ✓ {what!r} clear of system bars @ {last}")
+                    return node
+                too_high = node.y1 < top + margin
+            else:
+                too_high = False
+                left, top, right, bottom = self._safe_rect(screen)
+                last = "off screen"
+
+            scroll = next((n for n in screen.nodes if "ScrollView" in n.cls), None)
+            if scroll is None:
+                raise HarnessError(f"{what!r} is not fully visible ({last}) and there is no scroll view")
+            y_hi = min(scroll.y2 - 12, bottom - 12)
+            y_lo = max(scroll.y1 + 12, top + 12)
+            if y_hi <= y_lo:
+                raise HarnessError(f"no room to scroll {what!r} into the safe rectangle")
+            step = min(320, max(120, (y_hi - y_lo) // 4))
+            y_start, y_end = (y_lo, min(y_lo + step, y_hi)) if too_high else \
+                             (y_hi, max(y_hi - step, y_lo))
+            self.log(f"    scroll {what!r} clear of system bars ({last})")
+            self.d.shell(f"input swipe {scroll.cx} {y_start} {scroll.cx} {y_end} 250", check=False)
+            time.sleep(0.6)
+        raise HarnessError(f"could not reveal {what!r} clear of the system bars (last {last})")
+
     def _require(self, screen, what, **kw):
         node = screen.find(**kw)
         if node is None:
@@ -527,6 +612,32 @@ class Flows:
             raise HarnessError(f"device report {got} != expected {expect}")
         self.log(f"    ✓ device: {got['device']} (tv={got['tv']}, touch={got['touch']})")
 
+    def assert_insets(self, report):
+        """API 35 must report the insets its UI applied; lower APIs must report none.
+
+        targetSdk 35 makes the window edge-to-edge, so the app has to add the system-bar insets to
+        its own padding. That is otherwise invisible to a script: it rides along on the diagnostics
+        report, written by the insets listener the moment a screen was laid out. Below 35 the
+        platform still reserves the bars, so the field must be absent — proving the guard leaves
+        the API 25/34 layouts untouched. The values are px, and both ends must be non-zero on a
+        phone, where a status bar and a gesture-nav bar are present. In landscape the nav bar sits
+        on the right (and the cutout on the left), so only the top edge is fixed across rotations.
+        """
+        sdk = int(report["sdk"])
+        got = report.get("insets")
+        if sdk < 35:
+            if got is not None:
+                raise HarnessError(f"API {sdk} must not report insets, got {got!r}")
+            self.log("    ✓ insets: none (the platform still reserves the bars)")
+            return
+        m = re.fullmatch(r"(\d+),(\d+),(\d+),(\d+)", got or "")
+        if not m:
+            raise HarnessError(f"API {sdk} insets report {got!r} is not left,top,right,bottom px")
+        left, top, right, bottom = (int(x) for x in m.groups())
+        if top <= 0 or left + right + bottom <= 0:
+            raise HarnessError(f"API {sdk} insets report has no bars: {got}")
+        self.log(f"    ✓ insets: {got} (status bar and one nav edge cleared)")
+
     def assert_notifications(self, report):
         """The broadcast's notif=… must be ``allowed`` (roadmap item 5, step 33).
 
@@ -738,6 +849,12 @@ class Flows:
         try:
             original = self.d.set_orientation(1)
             self.open_updater()
+            # A screen has now been laid out, so on API 35 the insets listener has fired. Prove the
+            # edge-to-edge handling is live here (and absent on the API 34 phone) over the same
+            # diagnostics channel the quota check already uses.
+            insets_report = self.check_quota()
+            if insets_report:
+                self.assert_insets(insets_report)
             screen = self.d.dump()
             size = self._display_size(screen)
             self.log(f"    display: {size[0]}x{size[1]}")
@@ -830,12 +947,16 @@ class Flows:
 
     def _interval_touch(self):
         self._expect_text(self.s.app("interval.title"), fatal=True)
-        self._expect_text(self.s.app("interval.save"), fatal=True)
-        self._expect_text(self.s.app("interval.cancel"), fatal=True)
+        # On a short landscape screen Save/Cancel start below the fold. They are reachable through
+        # the outer ScrollView, so scroll to them instead of assuming the portrait layout.
+        self._scroll_list_to(self.s.app("interval.save"))
+        self._scroll_list_to(self.s.app("interval.cancel"))
 
         days = self.s.app("interval.units.days")
         self._set_interval(3, "days")
-        self._expect_text(self.s.app("interval.preview", n=3, unit=days), fatal=True)
+        preview = self.s.app("interval.preview", n=3, unit=days)
+        self._scroll_list_to(preview)
+        self._expect_text(preview, fatal=True)
         self._save_interval()
         self._scroll_to(self.s.app("interval.now", n=3, unit=days), timeout=30, max_presses=8)
         self.log("    ✓ tapping a number and a unit chip set the interval; Settings followed")
@@ -845,7 +966,9 @@ class Flows:
         self.open_interval()
         hours = self.s.app("interval.units.hours")
         self._set_interval(12, "hours")
-        self._expect_text(self.s.app("interval.preview", n=12, unit=hours), fatal=True)
+        preview = self.s.app("interval.preview", n=12, unit=hours)
+        self._scroll_list_to(preview)
+        self._expect_text(preview, fatal=True)
         self._save_interval()
         self._scroll_to(self.s.app("interval.now", n=12, unit=hours), timeout=30, max_presses=8)
         self.log("    ✓ restored the default interval (12 hours)")
@@ -895,18 +1018,22 @@ class Flows:
         raise HarnessError("the interval preview line is not on screen")
 
     def _set_interval(self, value, unit):
-        """Touch picker: tap number ``value`` in the grid, then the chip for ``unit``."""
+        """Touch picker: tap number ``value`` in the grid, then the chip for ``unit``.
+
+        Units sit above the number grid and Save below it, so on a short screen each target has to
+        be scrolled into view in turn — the dump after one tap may not contain the next one.
+        """
         number = self._scroll_list_to(str(value))
         self._tap(number, f"interval {value}")
         time.sleep(0.6)
         label = self.s.app(f"interval.units.{unit}")
-        chip = self._require(self.d.dump(), f"unit chip {label!r}", exact=label)
+        chip = self._scroll_list_to(label)
         self._tap(chip, label)
         time.sleep(0.6)
 
     def _save_interval(self):
         save = self.s.app("interval.save")
-        self._tap(self._require(self.d.dump(), f"interval {save!r}", exact=save), save)
+        self._tap(self._scroll_list_to(save), save)
         self.d.wait_focus("SettingsActivity", timeout=20)
         time.sleep(1)
 
@@ -914,10 +1041,10 @@ class Flows:
         """Bring ``text`` into view inside the screen's scroll view, and return its node.
 
         The touch interval list is longer than a phone screen, and ``uiautomator dump`` omits
-        off-screen nodes, so a number has to be scrolled to before it can be tapped. The swipe
-        stays inside the scroll view's own bounds, so the helper works on any screen size: a
-        fixed 120 px inset overshoots a short viewport (the number list is only a few rows tall
-        on a small screen), so the endpoints are inset by a fraction of the view's height.
+        off-screen nodes, so each target has to be scrolled to before it can be tapped. Swipe in
+        both directions: units sit above the number grid while Save sits below it, so a target
+        reached from one tap may be behind us for the next one. Swipes stay inside the scroll
+        view's bounds and above any overlaid navigation bar.
         """
         screen = self.d.dump()
         node = screen.find(exact=text)
@@ -927,14 +1054,21 @@ class Flows:
         scroll = next((n for n in screen.nodes if "ScrollView" in n.cls), None)
         if scroll is None:
             raise HarnessError(f"{text!r} is not on screen and there is no scroll view")
-        inset = max(8, min(60, (scroll.y2 - scroll.y1) // 4))
-        for _ in range(tries):
-            self.d.shell(f"input swipe {scroll.cx} {scroll.y2 - inset} "
-                         f"{scroll.cx} {scroll.y1 + inset} 300", check=False)
-            time.sleep(0.5)
-            node = self.d.dump().find(exact=text)
-            if node is not None:
-                return node
+        left, top, right, bottom = self._safe_rect(screen)
+        y_hi = min(scroll.y2 - 12, bottom - 12)
+        y_lo = max(scroll.y1 + 12, top + 12)
+        if y_hi <= y_lo:
+            raise HarnessError(f"no room to scroll {text!r} into view")
+        step = min(240, max(80, (y_hi - y_lo) // 3))
+        for y_start, y_end in ((y_hi, max(y_lo, y_hi - step)),
+                               (y_lo, min(y_hi, y_lo + step))):
+            for _ in range(tries):
+                self.d.shell(f"input swipe {scroll.cx} {y_start} "
+                             f"{scroll.cx} {y_end} 300", check=False)
+                time.sleep(0.5)
+                node = self.d.dump().find(exact=text)
+                if node is not None:
+                    return node
         raise HarnessError(f"could not scroll {text!r} into view")
 
     def downgrade(self, older=None):
@@ -1017,8 +1151,11 @@ class Flows:
         self.d.wait_focus("SettingsActivity", timeout=20)
         time.sleep(1)
 
-        # The row sits below the fold; walk the D-pad down until it is on screen.
-        node = self._scroll_to(row_label, enabled=True, timeout=40)
+        # The row sits below the fold. On API 35 "on screen" is not enough: the nav bar overlays
+        # the bottom edge, so reveal it fully before tapping (a D-pad-only scroll stops too early).
+        node = self._reveal(row_label)
+        if not node.enabled:
+            raise HarnessError(f"the {row_label!r} row is disabled")
         self._tap(node, row_label)
 
         button = self.s.app("settings.uninstall_confirm_button")

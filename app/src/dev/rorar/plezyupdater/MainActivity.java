@@ -247,6 +247,7 @@ public class MainActivity extends Activity {
         content.setOrientation(LinearLayout.VERTICAL);
         content.setBackgroundColor(Ui.BG);
         content.setPadding(pad, pad, pad, pad);
+        Ui.applyInsets(content, pad);
 
         TextView title = Ui.title(this, getString(R.string.app_name));
         Ui.leadingIcon(title, Ui.icon(this, R.drawable.ic_up, Ui.ACCENT_BRIGHT), 28);

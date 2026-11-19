@@ -32,7 +32,16 @@ asserts every expected label is **fully inside the display bounds**, not merely 
 swiping first where a page is meant to scroll. That is what caught the two clipping bugs the portrait
 flows could not see ([Finding 9](../docs/08-app-implementation.md#finding-9--short-landscape-screens-clipped-two-touch-pickers)).
 It restores the original rotation, app language and *Allow older versions* switch in a `finally`;
-on a TV profile it does nothing, since those layouts are landscape already.
+on a TV profile it does nothing, since those layouts are landscape already. On a `targetSdk` 35 device
+it also reads the applied insets from the diagnostics report and asserts they clear the status bar
+and at least one nav edge ([Finding 10](../docs/08-app-implementation.md#finding-10--api-35-edge-to-edge-puts-tabs-under-the-system-bars)).
+
+Because API 35 runs edge-to-edge, a node can be *visible* in a dump yet have its centre under the
+gesture-nav bar, where `input tap` goes to the bar instead of the app. The shared `_safe_rect()` reads
+the bar bounds out of the dump (with a conservative bottom inset where SystemUI does not expose them,
+as on API 34) and `_reveal()` scrolls a labelled row until it is fully inside that rectangle before
+tapping — it also corrects an overshoot clamped under the top bar. `_scroll_list_to()` sweeps in both
+directions, since on the interval picker the units sit above the number grid and Save below it.
 
 Before any of that, `run.py` runs the static string-parity check (`test/check_strings.py`) — no
 device needed, and a locale that drifted from `values/` would otherwise make a flow look for a
@@ -243,10 +252,11 @@ adb shell am broadcast -p dev.rorar.plezyupdater --include-stopped-packages \
 ```
 
 and parses the ordered-broadcast result, which `am broadcast` prints as
-`Broadcast completed: result=-1, data="status=ok;remaining=59;limit=60;reset_ms=…;checked_ms=…;device=fire_tv;tv=1;touch=0;notif=allowed"`.
-The preamble prints `GitHub API quota: 59/60 requests left`. The action lives in
-`config.json` (`diagnostics_action`); the report is a quote-free `key=value;…` string by design, so
-it survives that channel.
+`Broadcast completed: result=-1, data="status=ok;remaining=59;limit=60;reset_ms=…;checked_ms=…;device=fire_tv;tv=1;touch=0;notif=allowed;sdk=25"`.
+On API 35 the same report ends `…;notif=allowed;sdk=35;insets=43,49,84,0` (left, top, right, bottom
+px); below 35 there is **no** `insets` field at all. The preamble prints `GitHub API quota: 59/60
+requests left`. The action lives in `config.json` (`diagnostics_action`); the report is a quote-free
+`key=value;…` string by design, so it survives that channel.
 
 **`-p <package>` is required on API 26+.** Since Android 8 the platform will not deliver an
 *implicit* broadcast to a manifest receiver (`Background execution not allowed` in logcat), so the
@@ -263,7 +273,11 @@ actually deliver a notification (item 5, step 33: the API 33 `POST_NOTIFICATIONS
 `areNotificationsEnabled`) — asserted by `Flows.assert_notifications()` against `expected_notif`.
 On API 33+ `run.py` also grants `POST_NOTIFICATIONS` before the flows (`Device.grant_notification_permission`,
 a no-op below 33) so the one-time request dialog never lands in the middle of a flow; the dialog
-itself is verified by hand.
+itself is verified by hand. The `sdk=` field is `Build.VERSION.SDK_INT`, and `insets=` is written by
+the same `Ui.applyInsets` listener that pads the screen roots — `Flows.assert_insets()` checks that
+API 35 reports a top bar plus at least one nav edge and that API 25/34 report none, proving the
+`SDK_INT >= 35` guard leaves the older layouts untouched. The landscape flow reads it after a screen
+has been laid out, so the value is live rather than a stored default.
 
 ## String parity
 

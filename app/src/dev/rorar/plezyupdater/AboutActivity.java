@@ -37,6 +37,7 @@ public class AboutActivity extends Activity {
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(Ui.BG);
         root.setPadding(pad, pad, pad, pad);
+        Ui.applyInsets(root, pad);
 
         root.addView(Ui.title(this, getString(R.string.about_title)));
 

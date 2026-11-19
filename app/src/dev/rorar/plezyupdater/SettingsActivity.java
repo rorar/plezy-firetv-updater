@@ -62,6 +62,7 @@ public class SettingsActivity extends Activity {
         content.setOrientation(LinearLayout.VERTICAL);
         content.setBackgroundColor(Ui.BG);
         content.setPadding(pad, pad, pad, pad);
+        Ui.applyInsets(content, pad);
 
         content.addView(Ui.title(this, getString(R.string.settings_title)));
 

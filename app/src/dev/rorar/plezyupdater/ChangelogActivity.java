@@ -30,6 +30,7 @@ public class ChangelogActivity extends Activity {
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(Ui.BG);
         root.setPadding(pad, pad, pad, pad);
+        Ui.applyInsets(root, pad);
 
         String tag = getIntent().getStringExtra(EXTRA_TAG);
         String published = getIntent().getStringExtra(EXTRA_PUBLISHED);

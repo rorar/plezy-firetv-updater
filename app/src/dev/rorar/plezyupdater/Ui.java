@@ -3,12 +3,16 @@ package dev.rorar.plezyupdater;
 import android.content.Context;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
+import android.graphics.Insets;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.StateListDrawable;
+import android.os.Build;
 import android.util.TypedValue;
 import android.view.Gravity;
+import android.view.View;
+import android.view.WindowInsets;
 import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.ImageView;
@@ -49,11 +53,64 @@ public final class Ui {
     /** The fill for a row that is selected but whose column does not have focus. */
     public static final int SELECTED = Color.rgb(42, 96, 126);
 
+    /** Last insets a screen received on API 35+, as {@code left,top,right,bottom} in px. */
+    private static volatile String lastInsets;
+
     private Ui() {
     }
 
     public static int dp(Context c, int value) {
         return Math.round(c.getResources().getDisplayMetrics().density * value);
+    }
+
+    /**
+     * Keep a screen's content clear of the system bars on Android 15+.
+     *
+     * <p>A {@code targetSdk 35} window is edge-to-edge: the status bar and the gesture-navigation
+     * bar draw over the app and no longer reserve space, so the fixed padding below would let them
+     * cover the title and the last button. The listener adds the live insets to the padding the
+     * screen already sets. It is installed <em>only</em> on 35+, where {@link WindowInsets.Type} and
+     * {@link Insets} exist; through API 34 (and on the API 25 stick) the platform still insets the
+     * window itself and this is a no-op, so older behaviour is byte-for-byte unchanged.
+     *
+     * <p>The padded view keeps its own dark background, so the bars still show the app colour
+     * behind them — only the content moves in. On a {@link android.widget.ScrollView} screen pass
+     * the <em>inner</em> content view: its bottom padding then scrolls with the page and the last
+     * row can never be stranded under the nav bar.
+     *
+     * @param view the padded content view or window root
+     * @param basePadding the padding the screen already set, in px, on all four sides
+     */
+    public static void applyInsets(final View view, final int basePadding) {
+        if (Build.VERSION.SDK_INT < 35) {
+            return;
+        }
+        view.setOnApplyWindowInsetsListener(new View.OnApplyWindowInsetsListener() {
+            @Override
+            public WindowInsets onApplyWindowInsets(View v, WindowInsets insets) {
+                // systemBars covers the status bar and gesture nav. A display cutout is a separate
+                // type, and getInsets(mask) takes the largest value per side rather than adding
+                // them, so a punch-hole camera inside the status bar is not counted twice.
+                Insets bars = insets.getInsets(
+                        WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
+                v.setPadding(basePadding + bars.left, basePadding + bars.top,
+                        basePadding + bars.right, basePadding + bars.bottom);
+                lastInsets = bars.left + "," + bars.top + "," + bars.right + "," + bars.bottom;
+                return insets;
+            }
+        });
+    }
+
+    /**
+     * The insets last applied on this device, for the diagnostics report: {@code null} below 35 (no
+     * edge-to-edge handling), {@code pending} before a screen has been shown, else the four px
+     * values. A test script can assert this on the API 35 lane where the branch is actually live.
+     */
+    public static String insetsReport() {
+        if (Build.VERSION.SDK_INT < 35) {
+            return null;
+        }
+        return lastInsets == null ? "pending" : lastInsets;
     }
 
     public static TextView text(Context c, CharSequence s, float sp, int color) {
