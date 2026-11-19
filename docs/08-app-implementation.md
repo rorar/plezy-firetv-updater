@@ -1214,6 +1214,7 @@ Stick (API 25), updater `0.9.1` / `versionCode 10` (APK 323 306 B, `sha256 db4c8
 | English `all` | **7/7 PASS** — install 100s, picker-notes 27s, interval 116s, downgrade 118s, upgrade 82s, uninstall 73s, clean-install 97s |
 | German `all` | **7/7 PASS** — install 105s, picker-notes 27s, interval 116s, downgrade 113s, upgrade 77s, uninstall 74s, clean-install 92s |
 | French / Spanish smokes | `install --app-lang fr\|es` → **1/1 each** (100s / 86s) |
+| Self-update `0.9.0` → `0.9.1` | the updater was reset to a fresh `v0.9.0` (uninstall + install — API 25 refuses the in-place downgrade of the updater, [Finding 2](#finding-2--android-71-refuses-downgrades-of-release-builds)), then **Settings → About → "Plezy Updater aktualisieren…"** found `0.9.1`, downloaded and verified it (`verified self-update 0.9.1 (10) signer 62bc02eb…`), and the stock installer showed an **update** dialog ("Möchtest du ein Update für diese App installieren?"); after **INSTALLIEREN** → `versionCode 9 → 10`, `firstInstallTime 2026-11-19 01:01:30` **unchanged**, `lastUpdateTime 01:02:28` |
 | API 25 regression | no touch path runs and no new platform API is called — every flow runs as in `0.9.0` |
 
 `phone34` (Google APIs phone, API 34), updater `0.9.1` / `versionCode 10`:
