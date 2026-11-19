@@ -1296,9 +1296,18 @@ the Plezy flows cannot install there; the `interval` flow installs nothing, so i
 | `tv25` (API 25) | reports `device=android_tv;tv=1;touch=0;notif=allowed`; the `interval` flow takes the **D-pad** branch (two panes, unchanged) and passes in 46s |
 | `tv30` (API 30) | reports `device=android_tv;tv=1;touch=1` — an Android TV that also reports a finger touchscreen, so the `interval` flow takes the **touch** branch (number grid + unit chips) on a TV: it taps number `3` + unit `days`, asserts `Every 3 days`, saves, proves the Settings summary follows, then restores `12 hours`; passes in 134s |
 
-The real `phone35` (API 35) was again **not** reachable this round (wireless debugging off), so the
-`0.10.0` touch checks rest on `phone34` and `tv30`; the notes-icon change is device-neutral and the
-`picker-notes` touch branch passed on `phone34`.
+The real `phone35` (API 35) was **not** reachable during the release round (wireless debugging
+off), so the `0.10.0` touch checks originally rested on `phone34` and `tv30`. It was reconnected
+afterwards — wireless debugging re-enabled, its adbd port re-discovered over mDNS (it had moved,
+`39185 → 41833`), the updater updated in place from `0.9.0` to `0.10.0` — and the whole set then
+passed on the real arm64 touch device:
+
+| Step | Result |
+|---|---|
+| Build identity | `dumpsys package dev.rorar.plezyupdater` → `versionCode=11 minSdk=25 targetSdk=34`, `versionName=0.10.0`; the diagnostics report reads `device=touch;tv=0;touch=1;notif=allowed` |
+| English `all` | **7/7 PASS** — install 44s, picker-notes 32s, interval 67s, downgrade 53s, upgrade 26s, uninstall 94s, clean-install 33s |
+| In-place updater update | `adb install -r` of the same key left `firstInstallTime 2026-11-18 16:13:53` unchanged while `versionName` went `0.9.0 → 0.10.0` |
+| Notes icon (touch) | the `picker-notes` flow finds the row's notes glyph by its `Notes` content description, taps it, asserts the overlay and closes it — passes on the real phone too |
 
 ### Round-1 verification phases (2026-11-14/15)
 
