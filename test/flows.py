@@ -202,20 +202,28 @@ class Flows:
 
         Every picker flow needs it: "Choose version…" only exists while it is on. Idempotent.
         """
-        label = self.s.app("settings.allow_older_label")
         self.log("  the picker is hidden — turning on Settings → Developer → Allow older versions")
-        settings = self.s.app("main.settings")
-        self._tap(self._require(self.d.dump(), f"Settings button {settings!r}", exact=settings),
-                  settings)
-        self.d.wait_focus("SettingsActivity", timeout=20)
-        time.sleep(1)
+        self.set_allow_older(True)
+
+    def set_allow_older(self, enabled):
+        """Turn Settings → Developer → "Allow older versions" on or off.
+
+        "Choose version…" only exists while it is on, so the picker flows enable it; the
+        screenshot run puts it back the way it found it. Idempotent — it reads the switch first —
+        and returns the state *before* the change so a caller can restore it. It opens Settings
+        itself, so it does not matter which screen is in front when it is called.
+        """
+        label = self.s.app("settings.allow_older_label")
+        self.open_settings()
         node = self._scroll_to_row(label, timeout=120, max_presses=25)
-        if not node.checked:
+        was = node.checked
+        if was != enabled:
             self._tap(node, label)
             time.sleep(1)
         self.d.key("KEYCODE_BACK")
         self.d.wait_focus("MainActivity", timeout=20)
         time.sleep(1)
+        return was
 
     def _picker_row(self, version, timeout=45):
         suffix = self.s.app("picker.installed_suffix")
@@ -632,8 +640,8 @@ class Flows:
         installed.
         """
         self.log("[interval] Settings → Edit check interval…")
-        self._open_settings()
-        self._open_interval()
+        self.open_settings()
+        self.open_interval()
 
         if self._touch_layout():
             self._interval_touch()
@@ -648,7 +656,8 @@ class Flows:
         """True when the app itself picks the touch layout — the same signal Device.isTouch reads."""
         return self.c.get("expected_device", {}).get("touch") == "1"
 
-    def _open_settings(self):
+    def open_settings(self):
+        """Open Settings from the Main View (shared by the interval flow and the screenshots)."""
         self.open_updater()
         settings = self.s.app("main.settings")
         self._tap(self._require(self.d.dump(), f"Settings button {settings!r}", exact=settings),
@@ -656,7 +665,8 @@ class Flows:
         self.d.wait_focus("SettingsActivity", timeout=20)
         time.sleep(1)
 
-    def _open_interval(self):
+    def open_interval(self):
+        """Open Settings → Edit check interval… (the row only exists while *Check automatically*)."""
         row = self.s.app("settings.interval_label")
         node = self._scroll_to(row, timeout=60, max_presses=25)
         self._tap(node, row)
@@ -676,8 +686,8 @@ class Flows:
         self.log("    ✓ tapping a number and a unit chip set the interval; Settings followed")
 
         # A clean Settings, then put the default back so a re-run starts from the same place.
-        self._open_settings()
-        self._open_interval()
+        self.open_settings()
+        self.open_interval()
         hours = self.s.app("interval.units.hours")
         self._set_interval(12, "hours")
         self._expect_text(self.s.app("interval.preview", n=12, unit=hours), fatal=True)

@@ -138,6 +138,24 @@ BT=/tmp/opencode/sdk/android-15 AJ=/tmp/opencode/sdk/android-35/android.jar ./bu
 adb install -r build/plezy-updater.apk
 ```
 
+## Screenshots
+
+English UI, the **same APK on both** — it picks the TV or the touch layout from the device. On a
+**TV** the pickers are two-pane and D-pad-driven; on a **touch device** each picker becomes tappable
+and the release notes fly in from the right.
+
+| | Android TV | Phone / touch |
+|:--|:--:|:--:|
+| **Main View** | <img src="docs/screenshots/tv-main.png" width="440" alt="Main View on Android TV"> | <img src="docs/screenshots/phone-main.png" width="200" alt="Main View on a phone"> |
+| **Settings** | <img src="docs/screenshots/tv-settings.png" width="440" alt="Settings on Android TV"> | <img src="docs/screenshots/phone-settings.png" width="200" alt="Settings on a phone"> |
+| **Choose version** | <img src="docs/screenshots/tv-picker.png" width="440" alt="Choose version on Android TV"> | <img src="docs/screenshots/phone-picker.png" width="200" alt="Choose version on a phone"> |
+| **Release notes** | <sub>in the picker's right pane</sub> | <img src="docs/screenshots/phone-notes.png" width="200" alt="Release notes overlay on a phone"> |
+| **Check interval** | <img src="docs/screenshots/tv-interval.png" width="440" alt="Check interval on Android TV"> | <img src="docs/screenshots/phone-interval.png" width="200" alt="Check interval on a phone"> |
+
+These are **generated**, not hand-taken: [`test/screenshots.py`](test/README.md#readme-screenshots)
+drives the app to each screen, captures it, and checks the capture against the screen's
+`uiautomator dump` — re-run it after a UI change to refresh the images.
+
 ## Docs
 
 | File | Content |

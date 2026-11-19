@@ -7,9 +7,6 @@ parking lot. Status is checked against the code in `app/`.
 
 The forward-looking items now live in the [roadmap](11-roadmap.md), so this stays a short pointer:
 
-- **README: add Android TV + phone screenshots (user request, 2026-11-18).** The README has no
-  screenshots; add captures of the Android TV (two-pane) and the phone (touch) views — main screen,
-  Settings, and the two Choose-Version layouts.
 - **README: rewrite for non-technical users (user request, 2026-11-18).** A second README pass aimed
   at the highest user experience for someone who just wants the app on their TV/phone: lead with
   *what it does* and *how to install*, keep the engineering depth in `docs/`. Do it in a separate
@@ -20,8 +17,8 @@ The forward-looking items now live in the [roadmap](11-roadmap.md), so this stay
 
 The former requests here — **make the touch Choose-Version phone-ready** and **device-aware wording
 beyond the input hint** (`0.9.0`), the **touch check-interval picker** (`0.9.1`), the **Main View
-footer polish** and the **touch picker's Notes → icon** (`0.10.0`) — have landed; see
-[Already implemented](#already-implemented).
+footer polish** and the **touch picker's Notes → icon** (`0.10.0`), and the **README screenshots** —
+have landed; see [Already implemented](#already-implemented).
 
 Nothing here is a commitment; the roadmap explains the order and the reasoning.
 
@@ -113,6 +110,17 @@ Nothing here is a commitment; the roadmap explains the order and the reasoning.
   **What's new** icon. Both glyphs were confirmed to render (not tofu) on the API 25 stick. See
   [10 § Main](10-tv-ui-design.md#main--a-dashboard) and
   [11 § 3 · Layout](11-roadmap.md#layout--done-2026-11-1819-090--091).
+
+- **README screenshots (user request, 2026-11-18).** Landed 2026-11-19: the README gains a
+  **Screenshots** table with the Android TV (two-pane) and phone (touch) views — Main View, Settings,
+  the Choose-Version picker (the TV notes pane filled, the touch release-notes fly-in), and the
+  check-interval picker. They are **generated, not hand-taken**: a new stdlib-only
+  `test/screenshots.py` drives the app to each screen, `screencap`s it, and verifies the capture
+  *structurally* against the same screen's `uiautomator dump` (an expected label must be present) —
+  the harness cannot see images — so a mis-navigated shot fails loudly. It is non-destructive and
+  restores the app language and the developer *Allow older versions* switch before it exits; re-run
+  it after a UI change to refresh the images. See
+  [`test/README.md`](../test/README.md#readme-screenshots).
 
 - **Device detection (roadmap item 2).** Landed 2026-11-17 (`0.4.0`): `DeviceKind` (the decision, a
   pure enum with no `android.*` import) and `Device` (the Android wrapper) answer *what is this

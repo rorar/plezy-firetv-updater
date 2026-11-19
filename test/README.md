@@ -66,6 +66,31 @@ release), so they need `--yes`.
 
 The harness leaves Plezy on the **latest** release; the last flow in `all` is the clean install.
 
+## README screenshots
+
+`test/screenshots.py` generates the images in [`../docs/screenshots/`](../docs/screenshots/). They
+are captured by script, not by hand, so they can be refreshed after any UI change:
+
+```bash
+source local.env
+python3 test/screenshots.py                        # the stick → docs/screenshots/tv-*.png
+python3 test/screenshots.py --profile phone34 --serial emulator-5554
+                                                   # the phone lane → docs/screenshots/phone-*.png
+```
+
+It drives the app to each screen the README shows — the Main View, Settings, the Choose-Version
+picker (filling the TV notes pane, or opening the touch release-notes overlay), and the
+check-interval picker — `screencap`s it, and, because the harness cannot see images, verifies the
+capture **structurally**: an expected label must be present in the same screen's `uiautomator dump`,
+so a mis-navigated shot fails loudly instead of being committed. Files are named
+`<prefix>-<screen>.png`, the prefix defaulting to `phone` on a touch device and `tv` on a TV.
+
+It is non-destructive — nothing is installed — and it restores the app language and the developer
+*Allow older versions* switch (which the picker shots need) to the state it found them in. On the
+`phone34` AVD the shots are taken at a phone resolution set up front — `adb shell wm size 1080x2400`
+clamps to the panel's `1080x1920`, then `adb shell wm density 440`; the committed phone shots are
+`1080x1920`.
+
 ## Device profiles
 
 One run targets one device, and the things that differ between devices are not in the flows. They
@@ -258,6 +283,7 @@ thin Android wrapper that only reads the platform.
 ```
 test/
   run.py                 CLI: pick flows + languages + profile, print a summary
+  screenshots.py         capture the README images (Main/Settings/pickers) from a device
   harness.py             Device (adb + uiautomator) and the parsed Screen/Node model
   flows.py               the seven flows, in remote-press terms
   check_strings.py       static parity check for res/values*/strings.xml
