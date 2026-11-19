@@ -1401,7 +1401,8 @@ no AndroidX, no Gradle, and every new API is behind `SDK_INT >= 35`
 | `phone35` full `all` | **8/8 PASS** — install 42s, picker-notes 32s, interval 74s, downgrade 58s, upgrade 22s, uninstall 36s, clean-install 45s, landscape 286s; `insets` asserted live in the landscape flow |
 | `phone34` (API 34 emulator) | `interval` **PASS** after making it scroll-aware in both orientations; full `all` **7/8** with one transient clean-install installer wait, whose isolated rerun **PASS**; diagnostics `sdk=34` with no `insets=` field |
 | Static checks | `py_compile`, `check_strings.py`, `test/jvm/run.sh` **25/25**, link check **213** links, privacy grep clean except the documented placeholders |
-| Stick (API 25, D-pad) | left on `0.10.1` while the release is published; the in-place self-update proof and a full `all` re-run are the final release checks |
+| Self-update `0.10.1` → `0.11.0` | after publishing `v0.11.0` as latest, **Settings → About → "Update Plezy Updater…"** on the D-pad found the new build and the stock installer showed an *update* dialog ("Möchtest du ein Update für diese App installieren? Bestehende Daten gehen nicht verloren."); after **INSTALLIEREN**: `versionCode 12 → 13`, `versionName 0.10.1 → 0.11.0`, `firstInstallTime 2026-11-19 01:38:47` **unchanged**, `lastUpdateTime 12:30:53 → 15:39:20` |
+| Stick (API 25, D-pad) | full `all` with `0.11.0`, **8/8 PASS** (install 62s, picker-notes 27s, interval 121s, downgrade 70s, upgrade 35s, uninstall 47s, clean-install 54s, landscape 0s); diagnostics `sdk=25` with **no `insets=` field**, proving the guard leaves the legacy path untouched; Plezy left on `2.26.0` |
 
 ### Round-1 verification phases (2026-11-14/15)
 
